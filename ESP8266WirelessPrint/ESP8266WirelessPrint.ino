@@ -67,16 +67,16 @@ void handleFileUpload() {
     if (SD.exists((char *)uploadfilename.c_str())) SD.remove((char *)uploadfilename.c_str());
     delay(500);
     uploadFile = SD.open(uploadfilename.c_str(), FILE_WRITE);
-    Serial.print("; Upload: START, filename: "); Serial.println(uploadfilename);
+    // Serial.print("; Upload: START, filename: "); Serial.println(uploadfilename); // TODO: Convert to lcd()
   } else if (upload.status == UPLOAD_FILE_WRITE) {
     if (uploadFile) uploadFile.write(upload.buf, upload.currentSize);
-    Serial.print("; Upload: WRITE, Bytes: "); Serial.println(upload.currentSize);
   } else if (upload.status == UPLOAD_FILE_END) {
     if (uploadFile) uploadFile.close();
-    Serial.print("; Upload: END, Size: "); Serial.println(upload.totalSize);
+    // Serial.print("; Upload: END, Size: "); Serial.println(upload.totalSize); // TODO: Convert to lcd()
     delay(50);
     lcd("Received");
-    handleStart();
+    delay(1000); // So that we can read the message
+    // handleStart();
   }
 }
 
@@ -204,12 +204,10 @@ void lcd(String string) {
   okFound = false;
   Serial.print("M117 ");
   Serial.println(string);
-  /* Commenting this out because otherwise doesn't start up then no 3D printer is connected
     while (okFound == false) {
     response = Serial.readStringUntil('\n');
     if (response.startsWith("ok")) okFound = true;
     }
-  */
 }
 
 void setup() {
