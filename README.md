@@ -8,6 +8,14 @@ Allows you to print from [Cura](https://ultimaker.com/en/products/cura-software)
 
 [esp8266/Arduino](https://github.com/esp8266/Arduino) sketch to be uploaded to a Wemos D1 mini module. To be connected with your 3D printer via the serial connection and to a SD card (acting as a cache during printing).
 
+To print, just open http://3d.local/print and upload a G-Code file using the form:
+
+![Upload](https://cloud.githubusercontent.com/assets/2480569/23586936/fd0e3fa2-01a0-11e7-9d83-dc4e7d031f30.png)
+
+Ycan also print from the command line using curl:
+
+curl -F "file=@/path/to/some.gcode" http://3d.local/print
+
 ### Compiling
 
 Before you compile this, you need to create a file called `private.h` in the same direcory as the sketch. It should contain:
