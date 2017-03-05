@@ -13,4 +13,5 @@ install:
   - cd -
 
 script:
+  - echo 'const char* ssid = "________";\nconst char* password = "________";' > ESP8266WirelessPrint/private.h
   - build_platform esp8266
