@@ -32,6 +32,10 @@ You need to connect
 * Power and GND from your 3D printer to the ESP8266 module (attention, the __EXT-1__ header on RAMPS boards has 5V while the ESP8266 needs 3.3V)
 * SD card to the ESP8266 module
 
+### A note on SD cards
+
+Using a SanDisk 2 GB card formatted with the [SD Card Formatter](https://www.sdcard.org/downloads/formatter_4/) from the SD Association seems to work for me. Sometimes I have to put a 8+3 file on it using Linux or insert a non-working SD card until the "good" card starts working.
+
 ### Usage
 
 To print, just open http://3d.local/ and upload a G-Code file using the form:
