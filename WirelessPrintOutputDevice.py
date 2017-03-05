@@ -42,7 +42,7 @@ class WirelessPrintOutputDevice(PrinterOutputDevice):
         self._port = port
         self._progress_message = None
         self.setName(key)
-        description = catalog.i18nc("@action:button", "Save to {0} ({1})").format(key, address)
+        description = catalog.i18nc("@action:button", "Print on {0} ({1})").format(key, address)
         self.setShortDescription(description)
         self.setDescription(description)
 
