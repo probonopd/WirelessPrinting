@@ -1,15 +1,16 @@
 # WirelessPrinting [![Build Status](https://travis-ci.org/probonopd/WirelessPrint.svg?branch=master)](https://travis-ci.org/probonopd/WirelessPrinting)
 
-__IN DEVELOPMENT__. See Issues.
+__UNDER DEVELOPMENT__. See [Issues](https://github.com/probonopd/WirelessPrinting/issues). Pull requests welcome!
 
 Allows you to print from [Cura](https://ultimaker.com/en/products/cura-software) to your 3D printer connected to an [ESP8266](https://espressif.com/en/products/hardware/esp8266ex/overview) module.
 
 ## ESP8266WirelessPrint
 
-Sketch to be uploaded to a Wemos D1 mini module. To be connected with your 3D printer via the serial connection and to a SD card (acting as a cache during printing).
+[esp8266/Arduino](https://github.com/esp8266/Arduino) sketch to be uploaded to a Wemos D1 mini module. To be connected with your 3D printer via the serial connection and to a SD card (acting as a cache during printing).
 
 ## WirelessPrinting
-Cura plugin which discovers ESP8266WirelessPrint instances using Zeroconf and enables printing directly to ESP8266WirelessPrint
+
+Cura plugin which discovers ESP8266WirelessPrint instances using Zeroconf and enables printing directly to ESP8266WirelessPrint.
 
 ### Installation
 
@@ -29,5 +30,4 @@ Cura plugin which discovers ESP8266WirelessPrint instances using Zeroconf and en
 - Select "Connect to WirelessPrint" on the Manage Printers page.
 - Select your WirelessPrint instance from the list
 - From this point on, the print monitor should be functional and you should be
-  able to switch to "Print to WirelessPrint" on the bottom of the sidebar.
-
+  able to switch to "Print on <devicename>" on the bottom of the sidebar.
