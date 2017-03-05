@@ -8,6 +8,16 @@ Allows you to print from [Cura](https://ultimaker.com/en/products/cura-software)
 
 [esp8266/Arduino](https://github.com/esp8266/Arduino) sketch to be uploaded to a Wemos D1 mini module. To be connected with your 3D printer via the serial connection and to a SD card (acting as a cache during printing).
 
+### Compiling
+
+Before you compile this, you need to create a file called `private.h` in the same direcory as the sketch. It should contain:
+
+```
+const char* ssid = "________";
+const char* password = "________";
+```
+This should be replaced by something more elegant. Pull requests welcome.
+
 ## WirelessPrinting
 
 Cura plugin which discovers ESP8266WirelessPrint instances using Zeroconf and enables printing directly to ESP8266WirelessPrint.
