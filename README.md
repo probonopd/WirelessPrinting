@@ -14,7 +14,9 @@ To print, just open http://3d.local/print and upload a G-Code file using the for
 
 Ycan also print from the command line using curl:
 
+```
 curl -F "file=@/path/to/some.gcode" http://3d.local/print
+```
 
 ### Compiling
 
@@ -24,6 +26,7 @@ Before you compile this, you need to create a file called `private.h` in the sam
 const char* ssid = "________";
 const char* password = "________";
 ```
+
 This should be replaced by something more elegant. Pull requests welcome.
 
 ## WirelessPrinting
