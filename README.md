@@ -6,17 +6,7 @@ Allows you to print from [Cura](https://ultimaker.com/en/products/cura-software)
 
 ## ESP8266WirelessPrint
 
-[esp8266/Arduino](https://github.com/esp8266/Arduino) sketch to be uploaded to a Wemos D1 mini module. To be connected with your 3D printer via the serial connection and to a SD card (acting as a cache during printing).
-
-To print, just open http://3d.local/print and upload a G-Code file using the form:
-
-![Upload](https://cloud.githubusercontent.com/assets/2480569/23586936/fd0e3fa2-01a0-11e7-9d83-dc4e7d031f30.png)
-
-Ycan also print from the command line using curl:
-
-```
-curl -F "file=@/path/to/some.gcode" http://3d.local/print
-```
+The [esp8266/Arduino](https://github.com/esp8266/Arduino) sketch `ESP8266WirelessPrint.ino` is uploaded to a ESP8266 module. 
 
 ### Compiling
 
@@ -28,6 +18,29 @@ const char* password = "________";
 ```
 
 This should be replaced by something more elegant. Pull requests welcome.
+
+As or March 2017, this code compiled on Arduino hourly and esp8266/Arduino git master.
+
+### Connection
+
+The ESP8266 module is connected with your 3D printer via the serial connection and to a SD card (acting as a cache during printing).
+
+You need to connect
+* TX, RX from your 3D printer to the ESP8266 module (__EXT-1__ header on RAMPS boards)
+* Power and GND from your 3D printer to the ESP8266 module (attention, the __EXT-1__ header on RAMPS boards has 5V while the ESP8266 needs 3.3V)
+* SD card to the ESP8266 module
+
+### Usage
+
+To print, just open http://3d.local/ and upload a G-Code file using the form:
+
+![Upload](https://cloud.githubusercontent.com/assets/2480569/23586936/fd0e3fa2-01a0-11e7-9d83-dc4e7d031f30.png)
+
+Ycan also print from the command line using curl:
+
+```
+curl -F "file=@/path/to/some.gcode" http://3d.local/print
+```
 
 ## WirelessPrinting
 
