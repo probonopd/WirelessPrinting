@@ -1,0 +1,16 @@
+language: c
+sudo: false
+notifications: false
+
+before_install:
+  - source <(curl -SLs https://raw.githubusercontent.com/adafruit/travis-ci-arduino/master/install.sh)
+
+install:
+  - mkdir -p $HOME/arduino_ide/libraries/
+  - cd $HOME/arduino_ide/libraries/
+  - # git clone https://github.com/interactive-matter/aJson.git
+  - # sed -i -e 's|#define PRINT_BUFFER_LEN 256|#define PRINT_BUFFER_LEN 4096|g'  aJson/aJSON.h
+  - cd -
+
+script:
+  - build_platform esp8266
