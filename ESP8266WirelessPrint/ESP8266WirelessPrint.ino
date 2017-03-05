@@ -40,6 +40,7 @@ bool okFound; // Set to true if last response from 3D printer was "ok", otherwis
 String response; // The last response from 3D printer
 
 bool isPrinting = false;
+bool shouldPrint = false;
 
 /* Start webserver functions */
 
@@ -76,7 +77,7 @@ void handleFileUpload() {
     delay(50);
     lcd("Received");
     delay(1000); // So that we can read the message
-    handleStart();
+    shouldPrint = true; // This is seen by loop() and the printing is then started, but this function can exit, hence ending the HTTP transmission
   }
 }
 
@@ -97,6 +98,17 @@ void handleIndex() {
   server.send(200, "text/html", message);
 }
 
+/*
+ * Sending HTTP leads to issues, e.g., sub-second pauses while printing.
+ * Possibly it also causes
+ * https://github.com/probonopd/WirelessPrinting/issues/9
+ * Hence using the following function only when reprint invoked from the web interface
+ * for debugging reasons for now. Use handlePrint() instead for normal prints
+ * which does not send HTTP while printing. This should also allow for status
+ * querying during printing, which may be needed for 
+ * https://github.com/probonopd/WirelessPrinting/issues/4
+ */
+ 
 void handleStart() {
   isPrinting = true;
   String output;
@@ -145,6 +157,48 @@ void handleStart() {
 
   }
   server.sendContent("Complete");
+  isPrinting = false;
+  lcd("Complete");
+}
+
+/*
+ * This function streams out the G-Code to the printer
+ */
+
+void handlePrint() {
+
+  shouldPrint = false;
+  isPrinting = true;
+
+  int i = 0;
+  File gcodeFile = SD.open(uploadfilename.c_str(), FILE_READ);
+  String line;
+  if (gcodeFile) {
+    while (gcodeFile.available()) {
+      i = i + 1;
+      line = gcodeFile.readStringUntil('\n'); // The G-Code line being worked on
+      int pos = line.indexOf(';');
+      if (pos != -1) {
+        line = line.substring(0, pos);
+      }
+
+      if ((line.startsWith("(")) || (line.startsWith(";")) || (line.length() == 0)) {
+        continue;
+      }
+
+      Serial.println(line); // Send to 3D Printer
+
+      okFound = false;
+      while (okFound == false) {
+        response = Serial.readStringUntil('\n');
+        if (response.startsWith("ok")) okFound = true;
+      }
+    }
+
+  } else {
+    lcd("The file is not available on the SD card");
+
+  }
   isPrinting = false;
   lcd("Complete");
 }
@@ -319,4 +373,5 @@ void setup() {
 void loop() {
   server.handleClient();
   ArduinoOTA.handle();
+  if(shouldPrint == true) handlePrint();
 }
