@@ -1,8 +1,10 @@
 # WirelessPrinting [![Build Status](https://travis-ci.org/probonopd/WirelessPrint.svg?branch=master)](https://travis-ci.org/probonopd/WirelessPrinting)
 
-__UNDER DEVELOPMENT__. See [Issues](https://github.com/probonopd/WirelessPrinting/issues). Pull requests welcome!
+![icon](https://cloud.githubusercontent.com/assets/2480569/23587222/bb25f740-01a7-11e7-806f-23c8f77d8b1c.png)
 
 Allows you to print from [Cura](https://ultimaker.com/en/products/cura-software) to your 3D printer connected to an [ESP8266](https://espressif.com/en/products/hardware/esp8266ex/overview) module.
+
+__UNDER DEVELOPMENT__. See [Issues](https://github.com/probonopd/WirelessPrinting/issues). Pull requests welcome!
 
 ## ESP8266WirelessPrint
 
