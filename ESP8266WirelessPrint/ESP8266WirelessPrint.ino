@@ -76,7 +76,7 @@ void handleFileUpload() {
     delay(50);
     lcd("Received");
     delay(1000); // So that we can read the message
-    // handleStart();
+    handleStart();
   }
 }
 
