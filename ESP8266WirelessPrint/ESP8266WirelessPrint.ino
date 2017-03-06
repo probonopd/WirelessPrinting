@@ -1,7 +1,6 @@
 /*
-   Works with Arduino Hourly and ESP git as of March 4, 2017
-   when using a 2 GB card formatted with the SD Association's formatter
-   and then creating a file "cache.gco" in Linux (IMPORTANT!)
+  Works with Arduino Hourly and ESP git as of March 4, 2017
+  when using a 2 GB card formatted with the SD Association's formatter
   Send G-Code stored on SD card
   This sketch reads G-Code from a file from the SD card using the
   SD library and sends it over the serial port.
@@ -10,11 +9,12 @@
   Advanced G-Code sending:
   https://github.com/Ultimaker/Cura/blob/master/plugins/USBPrinting/USBPrinterOutputDevice.py
   The circuit:
-   SD card attached to WeMos D1 mini as follows:
- ** MOSI - pin D7
- ** MISO - pin D6
- ** CLK - pin D5
- ** CS - pin D8
+  SD card attached to WeMos D1 mini as follows:
+  MOSI - pin D7
+  MISO - pin D6
+  CLK - pin D5
+  CS - pin D8
+  capacitor across power pins of SD card for getting the card recognized
 */
 
 #include <ESP8266WiFi.h>
@@ -27,7 +27,7 @@
 
 #include "private.h"
 
-#define MTU_Size 2*1460 // https://github.com/esp8266/Arduino/issues/1853
+// #define MTU_Size 2*1460 // https://github.com/esp8266/Arduino/issues/1853
 
 const char* sketch_version = "1.0";
 
@@ -41,6 +41,7 @@ String response; // The last response from 3D printer
 
 bool isPrinting = false;
 bool shouldPrint = false;
+long lineNumberLastPrinted = 0;
 
 /* Start webserver functions */
 
@@ -48,7 +49,6 @@ ESP8266WebServer server(80);
 
 static bool hasSD = false;
 File uploadFile;
-
 
 void returnOK() {
   server.send(200, "text/plain", "");
@@ -59,21 +59,16 @@ void returnFail(String msg) {
 }
 
 void handleFileUpload() {
-
   lcd("Receiving...");
-
   HTTPUpload& upload = server.upload();
   if (upload.status == UPLOAD_FILE_START) {
-    lcd("Receiving...");
     if (SD.exists((char *)uploadfilename.c_str())) SD.remove((char *)uploadfilename.c_str());
     delay(500);
     uploadFile = SD.open(uploadfilename.c_str(), FILE_WRITE);
-    // Serial.print("; Upload: START, filename: "); Serial.println(uploadfilename); // TODO: Convert to lcd()
   } else if (upload.status == UPLOAD_FILE_WRITE) {
     if (uploadFile) uploadFile.write(upload.buf, upload.currentSize);
   } else if (upload.status == UPLOAD_FILE_END) {
     if (uploadFile) uploadFile.close();
-    // Serial.print("; Upload: END, Size: "); Serial.println(upload.totalSize); // TODO: Convert to lcd()
     delay(50);
     lcd("Received");
     delay(1000); // So that we can read the message
@@ -82,7 +77,7 @@ void handleFileUpload() {
 }
 
 void handleIndex() {
-  // TODO: Don't upload if print is running. Offer stop instead.
+  // TODO: Offer stop when print is running
   String message = "<h1>WirelessPrint</h1>";
   if (isPrinting == false) {
     message += "<form enctype=\"multipart/form-data\" action=\"/print\" method=\"POST\">\n";
@@ -93,77 +88,12 @@ void handleIndex() {
     message += "<input type=\"submit\" value=\"Upload\" />\n";
     message += "</form>";
     message += "";
-    message += "<p><a href=\"start\">Print last job again</a></p>";
+    message += "<p><a href=\"/download\">Download</a></p>";
   }
   server.send(200, "text/html", message);
 }
 
-/*
- * Sending HTTP leads to issues, e.g., sub-second pauses while printing.
- * Possibly it also causes
- * https://github.com/probonopd/WirelessPrinting/issues/9
- * Hence using the following function only when reprint invoked from the web interface
- * for debugging reasons for now. Use handlePrint() instead for normal prints
- * which does not send HTTP while printing. This should also allow for status
- * querying during printing, which may be needed for 
- * https://github.com/probonopd/WirelessPrinting/issues/4
- */
- 
-void handleStart() {
-  isPrinting = true;
-  String output;
-  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  server.send(200, "text/json", "");
-  WiFiClient client = server.client();
-  client.setNoDelay(true); // https://github.com/esp8266/Arduino/issues/1853#issue-145533999
-  output = "Opening file...";
-  server.sendContent(output);
-
-  int i = 0;
-  File gcodeFile = SD.open(uploadfilename.c_str(), FILE_READ);
-  String line;
-  if (gcodeFile) {
-    while (gcodeFile.available()) {
-      i = i + 1;
-      line = gcodeFile.readStringUntil('\n'); // The G-Code line being worked on
-      int pos = line.indexOf(';');
-      if (pos != -1) {
-        line = line.substring(0, pos);
-      }
-
-      if ((line.startsWith("(")) || (line.startsWith(";")) || (line.length() == 0)) {
-        continue;
-      }
-
-      Serial.println(line); // Send to 3D Printer
-
-      String myString = "#" + String(i) + "\n--> ";
-      server.sendContent(myString);
-      server.sendContent(line);
-
-      okFound = false;
-      while (okFound == false) {
-        response = Serial.readStringUntil('\n');
-        server.sendContent("\n<-- " + response);
-        if (response.startsWith("ok")) okFound = true;
-      }
-
-      server.sendContent("\nGOT OK\n\n");
-
-    }
-
-  } else {
-    server.sendContent("The file is not available on the SD card");
-
-  }
-  server.sendContent("Complete");
-  isPrinting = false;
-  lcd("Complete");
-}
-
-/*
- * This function streams out the G-Code to the printer
- */
+/* This function streams out the G-Code to the printer */
 
 void handlePrint() {
 
@@ -175,56 +105,33 @@ void handlePrint() {
   String line;
   if (gcodeFile) {
     while (gcodeFile.available()) {
-      i = i + 1;
+      lineNumberLastPrinted = lineNumberLastPrinted + 1;
       line = gcodeFile.readStringUntil('\n'); // The G-Code line being worked on
       int pos = line.indexOf(';');
       if (pos != -1) {
         line = line.substring(0, pos);
       }
-
       if ((line.startsWith("(")) || (line.startsWith(";")) || (line.length() == 0)) {
         continue;
       }
-
+      
       Serial.println(line); // Send to 3D Printer
-
+      
       okFound = false;
       while (okFound == false) {
         response = Serial.readStringUntil('\n');
         if (response.startsWith("ok")) okFound = true;
       }
+      
     }
-
   } else {
-    lcd("The file is not available on the SD card");
-
+    lcd("File is not on SD card");
   }
   isPrinting = false;
   lcd("Complete");
 }
 
-/*
-void handleOctoprintApiPrinter() {
-  String message = "{\"state\": { \"text\": \"Operational\", \"flags\": { \"operational\": true, \"paused\": false, \"printing\": false, \"sdReady\": true, \"error\": false, \"ready\": true, \"closedOrError\": false } } }";
-  server.send(200, "text/json", message);
-  lcd(server.uri());
-}
-
-void handleOctoprintApiJob() {
-  String message = "{ }";
-  server.send(204, "text/json", message);
-  lcd(server.uri());
-}
-
-void handleOctoprintApiFiles() {
-  String message = "{ }";
-  server.send(300, "text/json", message);
-  lcd(server.uri());
-}
-*/
-
 void handleNotFound() {
-
   String message = "; File Not Found\n";
   message += "; URI: ";
   message += server.uri();
@@ -242,6 +149,29 @@ void handleNotFound() {
   lcd(server.uri());
 }
 
+void handleDownload() {
+  File dataFile = SD.open(uploadfilename);
+  int fsizeDisk = dataFile.size();
+
+  String WebString = "";
+  WebString += "HTTP/1.1 200 OK\r\n";
+  WebString += "Content-Type: text/plain\r\n";
+  WebString += "Content-Disposition: attachment; filename=\"cache.gcode\"\r\n";
+  WebString += "Content-Length: " + String(fsizeDisk) + "\r\n";
+  WebString += "\r\n";
+  server.sendContent(WebString);
+
+  char buf[1024];
+  int siz = dataFile.size();
+  while (siz > 0) {
+    size_t len = std::min((int)(sizeof(buf) - 1), siz);
+    dataFile.read((uint8_t *)buf, len);
+    server.client().write((const char*)buf, len);
+    siz -= len;
+    yield();
+  }
+  dataFile.close();
+}
 
 /* End webserver functions */
 
@@ -258,10 +188,10 @@ void lcd(String string) {
   okFound = false;
   Serial.print("M117 ");
   Serial.println(string);
-    while (okFound == false) {
+  while (okFound == false) {
     response = Serial.readStringUntil('\n');
     if (response.startsWith("ok")) okFound = true;
-    }
+  }
 }
 
 void setup() {
@@ -287,59 +217,21 @@ void setup() {
   lcd(IpAddress2String(WiFi.localIP()));
 
   if (MDNS.begin(host)) {
-    
     MDNS.addService("http", "tcp", 80);
-
     MDNS.addService("wirelessprint", "tcp", 80);
     MDNS.addServiceTxt("wirelessprint", "tcp", "version", sketch_version);
-    MDNS.addServiceTxt("wirelessprint", "tcp", "useHttps", "false");
-    MDNS.addServiceTxt("wirelessprint", "tcp", "path", "/");
-    
-    /*
-     * Since the Cura OctoPrint plugin makes more than one HTTP request at a time, we would need to use
-     * https://github.com/me-no-dev/ESPAsyncWebServer#why-should-you-care
-     */
-
-    /*
-    MDNS.addService("octoprint", "tcp", 80); // https://github.com/fieldOfView/OctoPrintPlugin/blob/master/OctoPrintOutputDevicePlugin.py
-    MDNS.addServiceTxt("octoprint", "tcp", "version", sketch_version);
-    MDNS.addServiceTxt("octoprint", "tcp", "useHttps", "false");
-    MDNS.addServiceTxt("octoprint", "tcp", "path", "/octoprint");
-    */
-    
-    /*
-     * FIXME: For this to work, we would need to implement
-     * http://docs.octoprint.org/en/master/api/
-     * Essentially the answers to what OctoPrintPlugin/OctoPrintOutputDevice.py is looking for
-     * printer, files, job
-     */
-
-    /*
-    MDNS.addService("ultimaker", "tcp", 80); // https://github.com/Ultimaker/Cura/blob/master/plugins/UM3NetworkPrinting/NetworkPrinterOutputDevicePlugin.py
-    MDNS.addServiceTxt("ultimaker", "tcp", "type", "printer");
-    MDNS.addServiceTxt("ultimaker", "tcp", "name", host);
-    MDNS.addServiceTxt("ultimaker", "tcp", "firmware_version", sketch_version);
-    MDNS.addServiceTxt("ultimaker", "tcp", "machine", "0000"); 
-    */
-    
-    /*
-     * FIXME: For this to work, we would need to implement the UM3 JSON API
-     * there is a status dump as a comment in the init method of NetworkPrinterOutputDevice.py
-     * WARNING - UM3NetworkPrinting.NetworkPrinterOutputDevice._onFinished [933]: While trying to authenticate, we got an unexpected response: 404
-     * WARNING - UM3NetworkPrinting.NetworkPrinterOutputDevice._onFinished [850]: We got an unexpected status (404) while requesting printer state
-     */
-     
-    text = "http://";
-    text = text + host;
-    text = text + ".local";
   }
 
+  text = "http://";		
+  text = text + host;		
+  text = text + ".local";
+   
   // Hostname defaults to esp8266-[ChipID]
   ArduinoOTA.setHostname(host);
 
   ArduinoOTA.begin();
 
-  server.on("/start", HTTP_GET, handleStart);
+  server.on("/download", HTTP_GET, handleDownload);
   server.on("/", HTTP_GET, handleIndex);
   server.on("/print", HTTP_POST, []() {
     returnOK();
@@ -350,17 +242,10 @@ void setup() {
     returnOK();
   }, handleFileUpload);
 
-  /*
-  server.on("/octoprint/", HTTP_GET, handleIndex); // Note the trailing slash
-  server.on("/octoprint/api/printer", HTTP_GET, handleOctoprintApiPrinter);
-  server.on("/octoprint/api/job", HTTP_GET, handleOctoprintApiJob);
-  server.on("/octoprint/api/files", HTTP_GET, handleOctoprintApiFiles);
-  */
-
-  server.onNotFound(handleNotFound);  
+  server.onNotFound(handleNotFound);
   server.begin();
 
-  if (SD.begin(SS)) { // https://github.com/esp8266/Arduino/issues/1853
+  if (SD.begin(SS, 50000000)) { // https://github.com/esp8266/Arduino/issues/1853
     hasSD = true;
     lcd("SD Card OK");
     delay(1000); // So that we can read the last message on the LCD
@@ -373,5 +258,5 @@ void setup() {
 void loop() {
   server.handleClient();
   ArduinoOTA.handle();
-  if(shouldPrint == true) handlePrint();
+  if (shouldPrint == true) handlePrint();
 }
