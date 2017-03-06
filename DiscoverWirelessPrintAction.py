@@ -63,8 +63,9 @@ class DiscoverWirelessPrintAction(MachineAction):
 
     def _onContainerAdded(self, container):
         # Add this action as a supported action to all machine definitions
-        if isinstance(container, DefinitionContainer) and container.getMetaDataEntry("type") == "machine" and container.getMetaDataEntry("supports_usb_connection"):
+        if isinstance(container, DefinitionContainer) and container.getMetaDataEntry("type") == "machine":
             Application.getInstance().getMachineActionManager().addSupportedAction(container.getId(), self.getKey())
+            Application.getInstance().getMachineActionManager().addFirstStartAction(container.getId(), self.getKey())            
 
     @pyqtProperty("QVariantList", notify = instancesChanged)
     def discoveredInstances(self):
