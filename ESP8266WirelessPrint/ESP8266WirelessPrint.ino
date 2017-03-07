@@ -51,6 +51,7 @@ bool shouldPrint = false;
 long lineNumberLastPrinted = 0;
 String lineLastSent = "";
 String lineLastReceived = "";
+String jobName = "";
 
 String priorityLine = ""; // A line that should be sent to the printer "in between"/before any other lines being sent. TODO: Extend to an array of lines
 
@@ -112,11 +113,19 @@ void returnFail(String msg) {
   server.send(500, "text/plain", msg + "\r\n");
 }
 
+/* Cura asks the printer for status periodically.
+   We should make it easy on the ESP8266 and not do too much processing here
+   because a print may be in progress at the same time.
+   So avoid JSON processing, not expensive calculations, let Cura do them */
+
 void handleStatus() {
   String message = "[Status]\n";
   message += "lineLastSent=" + lineLastSent + "\n";
   message += "lineLastReceived=" + lineLastReceived + "\n";
-  
+  message += "isPrinting=" + String(isPrinting) + "\n";
+  message += "lineNumberLastPrinted=" + String(lineNumberLastPrinted) + "\n";
+  message += "jobName=" + jobName + "\n";
+
   server.send(200, "text/plain", message + "\r\n");
 }
 
@@ -125,6 +134,7 @@ void handleFileUpload() {
   HTTPUpload& upload = server.upload();
   if (upload.status == UPLOAD_FILE_START) {
     if (SD.exists((char *)uploadfilename.c_str())) SD.remove((char *)uploadfilename.c_str());
+    jobName = upload.filename;
     delay(500);
     uploadFile = SD.open(uploadfilename.c_str(), FILE_WRITE);
   } else if (upload.status == UPLOAD_FILE_WRITE) {
@@ -162,7 +172,7 @@ void handlePrint() {
   shouldPrint = false;
   isPrinting = true;
   os_timer_disarm(&myTimer);
-  
+
   int i = 0;
   File gcodeFile = SD.open(uploadfilename.c_str(), FILE_READ);
   String line;
@@ -185,6 +195,7 @@ void handlePrint() {
     lcd("File is not on SD card");
   }
   isPrinting = false;
+  jobName = "";
   os_timer_arm(&myTimer, timerInterval, true);
   lcd("Complete");
 }
@@ -306,16 +317,18 @@ void setup() {
   /* Set up the timer to fire every 2 seconds */
   os_timer_setfn(&myTimer, timerCallback, NULL);
   os_timer_arm(&myTimer, timerInterval, true);
-  
+
 }
 
 void loop() {
   server.handleClient();
   ArduinoOTA.handle();
   if (shouldPrint == true) handlePrint();
+
+  /* When the timer has ticked and we are not printing, ask for temperature */
   if ((isPrinting == false) && (tickOccured == true)) {
     sendToPrinter("M105");
     tickOccured = false;
- }
- 
+  }
+
 }
