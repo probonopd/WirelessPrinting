@@ -27,6 +27,13 @@
 
 #include "private.h"
 
+/* Access SDK functions for timer */
+extern "C" {
+#include "user_interface.h"
+}
+
+os_timer_t myTimer;
+
 // #define MTU_Size 2*1460 // https://github.com/esp8266/Arduino/issues/1853
 
 const char* sketch_version = "1.0";
@@ -42,17 +49,48 @@ String response; // The last response from 3D printer
 bool isPrinting = false;
 bool shouldPrint = false;
 long lineNumberLastPrinted = 0;
+String lineLastSent = "";
+String lineLastReceived = "";
+
+String priorityLine = ""; // A line that should be sent to the printer "in between"/before any other lines being sent. TODO: Extend to an array of lines
+
+const int timerInterval = 2000; // Tick every 2 seconds
+bool tickOccured = false; // Whether the timer has fired
+
+void timerCallback(void *pArg) {
+  tickOccured = true;
+}
 
 String sendToPrinter(String line) {
-  
-      Serial.println(line); // Send to 3D Printer
-      
-      okFound = false;
-      while (okFound == false) {
-        response = Serial.readStringUntil('\n');
-        if (response.startsWith("ok")) okFound = true;
-      }
-      return(response);
+
+  /* Although this function does not return before okFound is true,
+     somewhere else in the sketch this function might also have been called
+     hence we make sure we have okFound before we start sending. */
+
+  while (okFound == false) {
+    yield();
+  }
+
+  /* If a priority line exists (e.g., a stop command), then send it before anything else.
+     TODO: Extend this to handle multiple priority lines. */
+  if (priorityLine != "") {
+    String originalLine = line;
+    line = priorityLine;
+    priorityLine = "";
+    sendToPrinter(line);
+    sendToPrinter(originalLine);
+  }
+
+  Serial.println(line); // Send to 3D Printer
+
+  lineLastSent = line;
+  okFound = false;
+  while (okFound == false) {
+    response = Serial.readStringUntil('\n');
+    lineLastReceived = response;
+    if (response.startsWith("ok")) okFound = true;
+  }
+  return (response);
 }
 
 void lcd(String string) {
@@ -72,6 +110,14 @@ void returnOK() {
 
 void returnFail(String msg) {
   server.send(500, "text/plain", msg + "\r\n");
+}
+
+void handleStatus() {
+  String message = "[Status]\n";
+  message += "lineLastSent=" + lineLastSent + "\n";
+  message += "lineLastReceived=" + lineLastReceived + "\n";
+  
+  server.send(200, "text/plain", message + "\r\n");
 }
 
 void handleFileUpload() {
@@ -115,7 +161,8 @@ void handlePrint() {
 
   shouldPrint = false;
   isPrinting = true;
-
+  os_timer_disarm(&myTimer);
+  
   int i = 0;
   File gcodeFile = SD.open(uploadfilename.c_str(), FILE_READ);
   String line;
@@ -130,14 +177,15 @@ void handlePrint() {
       if ((line.startsWith("(")) || (line.startsWith(";")) || (line.length() == 0)) {
         continue;
       }
-      
+
       sendToPrinter(line);
-      
+
     }
   } else {
     lcd("File is not on SD card");
   }
   isPrinting = false;
+  os_timer_arm(&myTimer, timerInterval, true);
   lcd("Complete");
 }
 
@@ -222,10 +270,10 @@ void setup() {
     MDNS.addServiceTxt("wirelessprint", "tcp", "version", sketch_version);
   }
 
-  text = "http://";		
-  text = text + host;		
+  text = "http://";
+  text = text + host;
   text = text + ".local";
-   
+
   // Hostname defaults to esp8266-[ChipID]
   ArduinoOTA.setHostname(host);
 
@@ -233,6 +281,7 @@ void setup() {
 
   server.on("/download", HTTP_GET, handleDownload);
   server.on("/", HTTP_GET, handleIndex);
+  server.on("/status", HTTP_GET, handleStatus);
   server.on("/print", HTTP_POST, []() {
     returnOK();
   }, handleFileUpload);
@@ -253,10 +302,20 @@ void setup() {
   } else {
     lcd("SD Card ERROR");
   }
+
+  /* Set up the timer to fire every 2 seconds */
+  os_timer_setfn(&myTimer, timerCallback, NULL);
+  os_timer_arm(&myTimer, timerInterval, true);
+  
 }
 
 void loop() {
   server.handleClient();
   ArduinoOTA.handle();
   if (shouldPrint == true) handlePrint();
+  if ((isPrinting == false) && (tickOccured == true)) {
+    sendToPrinter("M105");
+    tickOccured = false;
+ }
+ 
 }
