@@ -173,7 +173,7 @@ class WirelessPrintOutputDevice(PrinterOutputDevice):
             self.writeError.emit(self)
         else:
             message = Message(catalog.i18nc("@info:status", "Saved to {0} as {1}").format(self.getName(), os.path.basename(self._fileName)))
-            message.addAction("open_browser", catalog.i18nc("@action:button", "Open Browser"), "globe", catalog.i18nc("@info:tooltip", "Open browser to OctoPrint."))
+            message.addAction("open_browser", catalog.i18nc("@action:button", "Open Browser"), "globe", catalog.i18nc("@info:tooltip", "Open browser to printer."))
             message.actionTriggered.connect(self._onMessageActionTriggered)
             message.show()
             self.writeSuccess.emit(self)
@@ -184,7 +184,7 @@ class WirelessPrintOutputDevice(PrinterOutputDevice):
             QDesktopServices.openUrl(QUrl(self._address))
 
     def _onAuthRequired(self, authenticator):
-        Logger.log("e", "Not yet implemented: OctoPrint authentication other than api-key")
+        Logger.log("e", "Not yet implemented: authentication")
 
     def _onSslErrors(self, reply, errors):
         Logger.log("e", "Ssl errors: %s", repr(errors))

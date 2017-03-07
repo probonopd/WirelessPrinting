@@ -24,17 +24,24 @@ Cura.MachineAction
         {
             id: pageTitle
             width: parent.width
-            text: catalog.i18nc("@title", "Connect to WirelessPrint")
+            text: catalog.i18nc("@title", "Connect to Networked Printer")
             wrapMode: Text.WordWrap
             font.pointSize: 18
         }
+
+/*
+        Image {
+            id: image
+            source: "WirelessPrinting.png"
+        }
+*/
 
         Label
         {
             id: pageDescription
             width: parent.width
             wrapMode: Text.WordWrap
-            text: catalog.i18nc("@label", "Select your WirelessPrint instance from the list below:")
+            text: catalog.i18nc("@label", "To print directly to your printer over the network, please make sure your printer is connected to the network using a network cable or by connecting your printer to your WIFI network. If you don't connect Cura with your printer, you can still use a USB drive to transfer g-code files to your printer.\n\nSelect your printer from the list below:")
         }
 
         Row

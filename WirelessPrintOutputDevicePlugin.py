@@ -100,17 +100,17 @@ class WirelessPrintOutputDevicePlugin(OutputDevicePlugin):
     def reCheckConnections(self):
         pass
 
-#        global_container_stack = Application.getInstance().getGlobalContainerStack()
-#        if not global_container_stack:
-#            return
-#
-#        for key in self._instances:
-#            if key == global_container_stack.getMetaDataEntry("wirelessprint_id"):
-#                self._instances[key].connectionStateChanged.connect(self._onInstanceConnectionStateChanged)
-#                self._instances[key].connect()
-#            else:
-#                if self._instances[key].isConnected():
-#                    self._instances[key].close()
+        global_container_stack = Application.getInstance().getGlobalContainerStack()
+        if not global_container_stack:
+            return
+
+        for key in self._instances:
+            if key == global_container_stack.getMetaDataEntry("wirelessprint_id"):
+                self._instances[key].connectionStateChanged.connect(self._onInstanceConnectionStateChanged)
+                self._instances[key].connect()
+            else:
+                if self._instances[key].isConnected():
+                    self._instances[key].close()
 
     ##  Because the model needs to be created in the same thread as the QMLEngine, we use a signal.
     def addInstance(self, name, address, port, properties):

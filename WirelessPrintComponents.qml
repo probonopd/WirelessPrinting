@@ -11,7 +11,7 @@ Item
     id: base
 
     property bool printerConnected: Cura.MachineManager.printerOutputDevices.length != 0
-    property bool octoPrintConnected: printerConnected && Cura.MachineManager.printerOutputDevices[0].hasOwnProperty("wirelessprintVersion")
+    property bool wirelessPrintConnected: printerConnected && Cura.MachineManager.printerOutputDevices[0].hasOwnProperty("wirelessprintVersion")
 
     Button
     {
@@ -21,7 +21,7 @@ Item
         text: catalog.i18nc("@action:button", "Open WirelessPrint...")
         style: UM.Theme.styles.sidebar_action_button
         onClicked: manager.openWebPage(Cura.MachineManager.printerOutputDevices[0].baseURL)
-        visible: octoPrintConnected
+        visible: wirelessPrintConnected
     }
 
     UM.I18nCatalog{id: catalog; name:"cura"}

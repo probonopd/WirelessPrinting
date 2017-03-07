@@ -36,12 +36,28 @@ const int chipSelect = SS;
 
 const String uploadfilename = "cache.gco"; // 8+3 limitation of FAT, otherwise won't be written
 
-bool okFound; // Set to true if last response from 3D printer was "ok", otherwise false
+bool okFound = true; // Set to true if last response from 3D printer was "ok", otherwise false
 String response; // The last response from 3D printer
 
 bool isPrinting = false;
 bool shouldPrint = false;
 long lineNumberLastPrinted = 0;
+
+String sendToPrinter(String line) {
+  
+      Serial.println(line); // Send to 3D Printer
+      
+      okFound = false;
+      while (okFound == false) {
+        response = Serial.readStringUntil('\n');
+        if (response.startsWith("ok")) okFound = true;
+      }
+      return(response);
+}
+
+void lcd(String string) {
+  sendToPrinter("M117 " + string);
+}
 
 /* Start webserver functions */
 
@@ -115,13 +131,7 @@ void handlePrint() {
         continue;
       }
       
-      Serial.println(line); // Send to 3D Printer
-      
-      okFound = false;
-      while (okFound == false) {
-        response = Serial.readStringUntil('\n');
-        if (response.startsWith("ok")) okFound = true;
-      }
+      sendToPrinter(line);
       
     }
   } else {
@@ -182,16 +192,6 @@ String IpAddress2String(const IPAddress& ipAddress)
          String(ipAddress[1]) + String(".") + \
          String(ipAddress[2]) + String(".") + \
          String(ipAddress[3])  ;
-}
-
-void lcd(String string) {
-  okFound = false;
-  Serial.print("M117 ");
-  Serial.println(string);
-  while (okFound == false) {
-    response = Serial.readStringUntil('\n');
-    if (response.startsWith("ok")) okFound = true;
-  }
 }
 
 void setup() {
