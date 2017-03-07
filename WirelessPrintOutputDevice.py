@@ -21,6 +21,9 @@ from PyQt5.QtGui import QImage, QDesktopServices
 import json
 from time import time
 
+from configparser import ConfigParser
+import io
+
 catalog = i18nCatalog("cura")
 
 from enum import Enum
@@ -40,6 +43,7 @@ class WirelessPrintOutputDevice(PrinterOutputDevice):
         self._properties = properties
         self._address = address
         self._port = port
+        self._message = None
         self._progress_message = None
         self.setName(key)
         description = catalog.i18nc("@action:button", "Print on {0} ({1})").format(key, address)
@@ -53,6 +57,13 @@ class WirelessPrintOutputDevice(PrinterOutputDevice):
         self._qnam.authenticationRequired.connect(self._onAuthRequired)
         self._qnam.sslErrors.connect(self._onSslErrors)
         self._qnam.finished.connect(self._onNetworkFinished)
+
+        self._update_timer = QTimer()
+        self._update_timer.setInterval(2000)
+        self._update_timer.setSingleShot(False)
+        self._update_timer.timeout.connect(self._update)
+
+        self._filename = None
 
         self._stream = None
         self._cleanupRequest()
@@ -104,6 +115,7 @@ class WirelessPrintOutputDevice(PrinterOutputDevice):
         part = QtNetwork.QHttpPart()
         part.setHeader(QtNetwork.QNetworkRequest.ContentDispositionHeader,
                 'form-data; name="file"; filename="%s"' % fileName)
+        part.setHeader(QtNetwork.QNetworkRequest.ContentTypeHeader, "application/octet-stream")
         part.setBody(self._stream.getvalue().encode())
         self._multipart.append(part)
 
@@ -111,40 +123,21 @@ class WirelessPrintOutputDevice(PrinterOutputDevice):
         url = "http://" + self._address + "/print"
         Logger.log("d", url)
 
-####################################################
-# This is working but ugly. Pull Requests welcome.
+        self._request = QtNetwork.QNetworkRequest(QUrl(url))
+        self._request.setRawHeader('User-agent'.encode(), 'Cura WirelessPrinting Plugin'.encode())
+        self._reply = self._qnam.post(self._request, self._multipart)
 
-        fd = open('/tmp/' + fileName, "w")
-        fd.write (self._stream.getvalue())
-        fd.close()
-
-        command = 'curl -F "file=@/tmp/' + fileName + '" ' + url
-        Logger.log("d", command)
-
-        import subprocess, shlex
-        subprocess.Popen(shlex.split(command))
-
-        self._stage = OutputStage.ready
-        if self._message:
-            self._message.hide()
-        self._message = None
-
-####################################################
-
-#        self._request = QtNetwork.QNetworkRequest(QUrl(url))
-#        self._request.setRawHeader('User-agent'.encode(), 'Cura WirelessPrinting Plugin'.encode())
-#        self._reply = self._qnam.post(self._request, self._multipart)
-#
-#        # connect the reply signals
-#        self._reply.error.connect(self._onNetworkError)
-#        self._reply.uploadProgress.connect(self._onUploadProgress)
-#        self._reply.downloadProgress.connect(self._onDownloadProgress)
+        # connect the reply signals
+        self._reply.error.connect(self._onNetworkError)
+        self._reply.uploadProgress.connect(self._onUploadProgress)
+        self._reply.downloadProgress.connect(self._onDownloadProgress)
 
     def _onProgress(self, progress):
-        progress = (50 if self._stage == OutputStage.uploading else 0) + (progress / 2)
-        if self._message:
-            self._message.setProgress(progress)
-        self.writeProgress.emit(self, progress)
+        yield
+#        progress = (50 if self._stage == OutputStage.uploading else 0) + (progress / 2)
+#        if self._message:
+#            self._message.setProgress(progress)
+#        self.writeProgress.emit(self, progress)
 
     def _cleanupRequest(self):
         self._reply = None
@@ -158,26 +151,34 @@ class WirelessPrintOutputDevice(PrinterOutputDevice):
         self._fileName = None
 
     def _onNetworkFinished(self, reply):
-        Logger.log("i", "_onNetworkFinished reply: %s", repr(reply.readAll()))
-        Logger.log("i", "_onNetworkFinished reply.error(): %s", repr(reply.error()))
+        self.setConnectionState(ConnectionState.connected)
+        if reply.operation() == self._qnam.PostOperation:
+            Logger.log("i", "_onNetworkFinished reply: %s", repr(reply.readAll()))
+            Logger.log("i", "_onNetworkFinished reply.error(): %s", repr(reply.error()))
 
-        self._stage = OutputStage.ready
-        if self._message:
-            self._message.hide()
-        self._message = None
+            self._stage = OutputStage.ready
+            if self._message:
+                self._message.hide()
+            self._message = None
 
-        self.writeFinished.emit(self)
-        if reply.error():
-            message = Message(catalog.i18nc("@info:status", "Could not save to {0}: {1}").format(self.getName(), str(reply.errorString())))
-            message.show()
-            self.writeError.emit(self)
-        else:
-            message = Message(catalog.i18nc("@info:status", "Saved to {0} as {1}").format(self.getName(), os.path.basename(self._fileName)))
-            message.addAction("open_browser", catalog.i18nc("@action:button", "Open Browser"), "globe", catalog.i18nc("@info:tooltip", "Open browser to printer."))
-            message.actionTriggered.connect(self._onMessageActionTriggered)
-            message.show()
-            self.writeSuccess.emit(self)
-        self._cleanupRequest()
+            self.writeFinished.emit(self)
+            if reply.error():
+                message = Message(catalog.i18nc("@info:status", "Could not save to {0}: {1}").format(self.getName(), str(reply.errorString())))
+                message.show()
+                self.writeError.emit(self)
+            else:
+                message = Message(catalog.i18nc("@info:status", "Saved to {0} as {1}").format(self.getName(), os.path.basename(self._fileName)))
+                message.addAction("open_browser", catalog.i18nc("@action:button", "Open Browser"), "globe", catalog.i18nc("@info:tooltip", "Open browser to printer."))
+                message.actionTriggered.connect(self._onMessageActionTriggered)
+                message.show()
+                self.writeSuccess.emit(self)
+            self._cleanupRequest()
+        elif "status" in reply.url().toString():
+            config = ConfigParser(allow_no_value=True)
+            ini_string = str(reply.readAll(), 'utf8') # convert qbytearray to str
+            config.readfp(io.StringIO(ini_string))
+            Logger.log("d", config.get("Status", "lineLastReceived"))
+            Logger.log("d", config.get("Status", "jobName"))
 
     def _onMessageActionTriggered(self, message, action):
         if action == "open_browser":
@@ -224,6 +225,8 @@ class WirelessPrintOutputDevice(PrinterOutputDevice):
         self.setConnectionState(ConnectionState.closed)
         if self._progress_message:
             self._progress_message.hide()
+        # Stop update timers
+        self._update_timer.stop()
 
     def getProperties(self):
         return self._properties
@@ -299,4 +302,13 @@ class WirelessPrintOutputDevice(PrinterOutputDevice):
 
     ##  Start requesting data from the instance
     def connect(self):
-        self.setConnectionState(ConnectionState.connected)
+        self.close()  # Ensure that previous connection (if any) is killed.
+        self.setConnectionState(ConnectionState.connecting)
+        self._update()  # Manually trigger the first update, as we don't want to wait a few secs before it starts.
+        self._update_timer.start()
+
+    def _update(self):
+        url = QUrl("http://" + self._address + "/status")
+        request = QtNetwork.QNetworkRequest(QUrl(url))
+        request.setRawHeader('User-agent'.encode(), 'Cura WirelessPrinting Plugin'.encode())
+        reply = self._qnam.get(request)
