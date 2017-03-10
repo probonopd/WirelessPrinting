@@ -123,21 +123,36 @@ class WirelessPrintOutputDevice(PrinterOutputDevice):
         url = "http://" + self._address + "/print"
         Logger.log("d", url)
 
-        self._request = QtNetwork.QNetworkRequest(QUrl(url))
-        self._request.setRawHeader('User-agent'.encode(), 'Cura WirelessPrinting Plugin'.encode())
-        self._reply = self._qnam.post(self._request, self._multipart)
+        self._update_timer.stop()
 
-        # connect the reply signals
-        self._reply.error.connect(self._onNetworkError)
-        self._reply.uploadProgress.connect(self._onUploadProgress)
-        self._reply.downloadProgress.connect(self._onDownloadProgress)
+####################################################
+# This is working but ugly. Pull Requests welcome.
 
-    def _onProgress(self, progress):
-        yield
-#        progress = (50 if self._stage == OutputStage.uploading else 0) + (progress / 2)
-#        if self._message:
-#            self._message.setProgress(progress)
-#        self.writeProgress.emit(self, progress)
+        fd = open('/tmp/' + fileName, "w")
+        fd.write (self._stream.getvalue())
+        fd.close()
+
+        command = 'curl -F "file=@/tmp/' + fileName + '" ' + url
+        Logger.log("d", command)
+
+        import subprocess, shlex
+        subprocess.Popen(shlex.split(command))
+
+        self._stage = OutputStage.ready
+        if self._message:
+            self._message.hide()
+        self._message = None
+
+####################################################
+
+#        self._request = QtNetwork.QNetworkRequest(QUrl(url))
+#        self._request.setRawHeader('User-agent'.encode(), 'Cura WirelessPrinting Plugin'.encode())
+#        self._reply = self._qnam.post(self._request, self._multipart)
+#
+#        # connect the reply signals
+#        self._reply.error.connect(self._onNetworkError)
+#        self._reply.uploadProgress.connect(self._onUploadProgress)
+#        self._reply.downloadProgress.connect(self._onDownloadProgress)
 
     def _cleanupRequest(self):
         self._reply = None
@@ -160,6 +175,7 @@ class WirelessPrintOutputDevice(PrinterOutputDevice):
             if self._message:
                 self._message.hide()
             self._message = None
+            self._update_timer.start()
 
             self.writeFinished.emit(self)
             if reply.error():
@@ -312,3 +328,4 @@ class WirelessPrintOutputDevice(PrinterOutputDevice):
         request = QtNetwork.QNetworkRequest(QUrl(url))
         request.setRawHeader('User-agent'.encode(), 'Cura WirelessPrinting Plugin'.encode())
         reply = self._qnam.get(request)
+        
