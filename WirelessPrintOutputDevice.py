@@ -1,6 +1,7 @@
 import os.path
 from io import StringIO
 from time import time
+import re
 
 from UM.i18n import i18nCatalog
 from UM.Application import Application
@@ -193,7 +194,15 @@ class WirelessPrintOutputDevice(PrinterOutputDevice):
             config = ConfigParser(allow_no_value=True)
             ini_string = str(reply.readAll(), 'utf8') # convert qbytearray to str
             config.readfp(io.StringIO(ini_string))
-            Logger.log("d", config.get("Status", "lineLastReceived"))
+            lineLastReceived = config.get("Status", "lineLastReceived")
+            Logger.log("d", lineLastReceived)
+            try:
+                res = re.findall('T0:([0-9]*?\.[0-9])', lineLastReceived, re.S)
+                hotend_temperature = float(res[0])
+                # Logger.log("d", hotend_temperature)
+                self._setHotendTemperature(index=0, temperature=hotend_temperature) # TODO: Handle multiple extruders
+            except:
+                pass
             Logger.log("d", config.get("Status", "jobName"))
 
     def _onMessageActionTriggered(self, message, action):
