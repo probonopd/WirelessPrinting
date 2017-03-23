@@ -39,8 +39,8 @@
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
 #include <ESPAsyncWebServer.h>
-#include <SPI.h> // Note the '"', important for ESPAsyncWebServer
-#include <SD.h>  // Note the '"', important for ESPAsyncWebServer
+#include <SPI.h>
+#include <SD.h>
 // !!! Make sure it says
 // Multiple libraries were found for "SD.h"
 // Used: (...)/hardware/esp8266/esp8266/libraries/SD <-- MUST use this one
@@ -290,7 +290,7 @@ void setup() {
   server.onFileUpload([](AsyncWebServerRequest * request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
     lcd("Receiving...");
     if (!index) {
-      if (SD.exists((char *)uploadfilename.c_str())) SD.remove((char *)uploadfilename.c_str());
+      if (SD_exists((char *)uploadfilename.c_str())) SD.remove((char *)uploadfilename.c_str());
       jobName = request->getParam("path", true)->value();
       // delay(500);
       uploadFile = SD.open(uploadfilename, FILE_WRITE | O_TRUNC);
