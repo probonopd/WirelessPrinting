@@ -156,6 +156,7 @@ String sendToPrinter(String line) {
 }
 
 void lcd(String string) {
+  // Serial.println(string);
   sendToPrinter("M117 " + string);
 }
 
@@ -278,10 +279,10 @@ void setup() {
   });
 
   server.onFileUpload([](AsyncWebServerRequest * request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
-    lcd("Receiving...");
     if (!index) {
+      lcd("Receiving...");
       if (SD_exists((char *)uploadfilename.c_str())) SD.remove((char *)uploadfilename.c_str());
-      jobName = request->getParam("path", true)->value();
+      // jobName = request->getParam("path", true)->value(); ////////////////////////////////////////// CRASHES
       // delay(500);
       uploadFile = SD.open(uploadfilename, FILE_WRITE | O_TRUNC);
     }
