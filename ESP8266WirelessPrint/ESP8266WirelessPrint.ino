@@ -129,10 +129,10 @@ void handleStatus() {
   server.send(200, "text/plain", message + "\r\n");
 }
 
+HTTPUpload& upload = server.upload();
 void handleFileUpload() {
-  lcd("Receiving...");
-  HTTPUpload& upload = server.upload();
   if (upload.status == UPLOAD_FILE_START) {
+    lcd("Receiving...");
     if (SD.exists((char *)uploadfilename.c_str())) SD.remove((char *)uploadfilename.c_str());
     jobName = upload.filename;
     delay(500);
