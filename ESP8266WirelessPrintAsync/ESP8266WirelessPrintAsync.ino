@@ -17,19 +17,9 @@
   capacitor across power pins of SD card for getting the card recognized
 */
 
-/* Workaround for:
- * hardware/esp8266/esp8266/cores/esp8266/FS.h:48:7: error:
- * previous definition of 'class fs::File'
- * class File : public Stream
- * https://github.com/me-no-dev/ESPAsyncWebServer/issues/111#issuecomment-288265916
- * https://github.com/me-no-dev/ESPAsyncWebServer/pull/147
- * Need ESPAsyncWebServer with:
- *   using File = fs::File;
- *   using FS = fs::FS;
- * inserted at the start of
- * class AsyncWebServerRequest in ESPAsyncWebServer.h (~line 122)
- * class AsyncFileResponse in WebResponseImpl.h (~line 44)
- * class AsyncStaticWebHandler in WebHandlerImpl.h (~line 29)
+/*
+ * Need to apply https://github.com/esp8266/Arduino/pull/3079/files
+ * in order for SDFile to work
  */
 
 #define FS_NO_GLOBALS
@@ -87,7 +77,7 @@ void timerCallback(void *pArg) {
 
 bool SD_exists(String path) {
   bool exists = false;
-  File test = SD.open(path);
+  SDFile test = SD.open(path);
   if (test) {
     test.close();
     exists = true;
@@ -97,7 +87,7 @@ bool SD_exists(String path) {
 
 class AsyncSDFileResponse: public AsyncAbstractResponse {
   private:
-    File _content;
+    SDFile _content;
     String _path;
     void _setContentType(String path) {
       if (path.endsWith(".gco")) _contentType = "text/plain";
@@ -174,7 +164,7 @@ void lcd(String string) {
 AsyncWebServer server(80);
 
 static bool hasSD = false;
-File uploadFile;
+SDFile uploadFile;
 
 /* This function streams out the G-Code to the printer */
 
@@ -185,7 +175,7 @@ void handlePrint() {
   os_timer_disarm(&myTimer);
 
   int i = 0;
-  File gcodeFile = SD.open(uploadfilename.c_str(), FILE_READ);
+  SDFile gcodeFile = SD.open(uploadfilename.c_str(), FILE_READ);
   String line;
   if (gcodeFile) {
     while (gcodeFile.available()) {
