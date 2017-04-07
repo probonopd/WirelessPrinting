@@ -1,6 +1,5 @@
 /*
-  Works with Arduino Hourly and ESP git as of March 4, 2017
-  when using a 2 GB card formatted with the SD Association's formatter
+  CRASHES after receiving the code. Any help welcome. For now, use the non-async version.
   Send G-Code stored on SD card
   This sketch reads G-Code from a file from the SD card using the
   SD library and sends it over the serial port.
