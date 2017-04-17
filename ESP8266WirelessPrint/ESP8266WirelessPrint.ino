@@ -26,6 +26,8 @@
 #include <ESP8266WebServer.h>
 
 #include "private.h"
+// const char* ssid = "____";
+// const char* password = "____";
 
 /* Access SDK functions for timer */
 extern "C" {
@@ -254,7 +256,7 @@ String IpAddress2String(const IPAddress& ipAddress)
 }
 
 void setup() {
-  delay(3000); // 3D printer needs this time
+  delay(10000); // 3D printer needs this time
   Serial.begin(115200);
   Serial.setTimeout(240000); // How long we wait for "ok" in milliseconds
   WiFi.begin(ssid, password);
