@@ -55,7 +55,7 @@ Cura plugin which discovers ESP8266WirelessPrint instances using Zeroconf and en
 
 ### Installation
 
-- Make sure your Cura version is 2.4 or newer. On Linux, download [Cura-2.4.0.AppImage](http://software.ultimaker.com/current/Cura-2.4.0.AppImage).
+- Make sure your Cura version is 2.4 or newer. On Linux, download [Cura-2.5.0.AppImage](http://software.ultimaker.com/current/Cura-2.5.0.AppImage).
 - Download or clone the repository into [Cura installation folder]/plugins/WirelessPrinting 
   or in `~/.local/share/cura/plugins` on Linux. The folder of the plugin itself *must* be ```WirelessPrinting```
 
@@ -72,3 +72,4 @@ mkdir -p ~/.local/share/cura/plugins
 - Select your WirelessPrint instance from the list
 - From this point on, the print monitor should be functional and you should be
   able to switch to "Print on <devicename>" on the bottom of the sidebar.
+- A matching case for a WeMos D1 mini and microSD shield can be found at http://www.thingiverse.com/thing:2287618
