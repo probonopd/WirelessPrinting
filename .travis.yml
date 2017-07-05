@@ -16,8 +16,6 @@ install:
   - arduino-1.8.3/arduino --pref "compiler.warning_level=all" --save-prefs
 
 script:
-  - echo 'const char* ssid = "________";' > ESP8266WirelessPrint/private.h # FIXME: Remove
-  - echo 'const char* password = "________";' >> ESP8266WirelessPrint/private.h # FIXME: Remove
   - arduino-1.8.3/arduino --pref build.path=. --verify --verbose-build --board $BD $PWD/ESP8266WirelessPrint/ESP8266WirelessPrint.ino
   - BOARD=$(echo $BD | cut -d ":" -f 3)
   - mv ./ESP8266WirelessPrint.ino.bin "ESP8266WirelessPrint_${BOARD}.bin"
