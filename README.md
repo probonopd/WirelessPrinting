@@ -12,16 +12,7 @@ The [esp8266/Arduino](https://github.com/esp8266/Arduino) sketch `ESP8266Wireles
 
 ### Compiling
 
-Before you compile this, you need to create a file called `private.h` in the same direcory as the sketch. It should contain:
-
-```
-const char* ssid = "________";
-const char* password = "________";
-```
-
-This should be replaced by something more elegant. Pull requests welcome.
-
-As or March 2017, this code compiled on Arduino hourly and esp8266/Arduino git master.
+As or March 2017, this code compiled on Arduino hourly and esp8266/Arduino git master. See `.travis.yml` for how this is compiled on Travis CI.
 
 ### Connection
 
@@ -36,6 +27,17 @@ You need to connect
 ### A note on SD cards
 
 Using a SanDisk 2 GB card formatted with the [SD Card Formatter](https://www.sdcard.org/downloads/formatter_4/) from the SD Association seems to work for me. Also, putting a capacitor across the power pins of the SD card appears to increase the probability of the card being recognized.
+
+### Configuration
+
+On the SD card, create a file called `config.ini` with the following content:
+
+```
+[network]
+ssid=<the name of your wireless network>
+password=<the password of your wireless network>
+hostname=<the desired hostname for the machine, e.g., "3d">
+```
 
 ### Usage
 

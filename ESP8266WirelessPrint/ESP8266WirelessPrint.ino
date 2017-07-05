@@ -24,10 +24,7 @@
 #include <SPI.h>
 #include <SD.h>
 #include <ESP8266WebServer.h>
-
-#include "private.h"
-// const char* ssid = "____";
-// const char* password = "____";
+#include "IniFile.h"
 
 /* Access SDK functions for timer */
 extern "C" {
@@ -40,7 +37,6 @@ os_timer_t myTimer;
 
 const char* sketch_version = "1.0";
 
-const char* host = "3d";
 const int chipSelect = SS;
 
 const String uploadfilename = "cache.gco"; // 8+3 limitation of FAT, otherwise won't be written
@@ -259,6 +255,61 @@ void setup() {
   delay(10000); // 3D printer needs this time
   Serial.begin(115200);
   Serial.setTimeout(240000); // How long we wait for "ok" in milliseconds
+
+  if (SD.begin(SS, 50000000)) { // https://github.com/esp8266/Arduino/issues/1853
+    hasSD = true;
+    lcd("SD Card OK");
+  } else {
+    lcd("SD Card ERROR");
+  }
+
+  const size_t bufferLen = 80;
+  char ssid[bufferLen];
+  char password[bufferLen];
+  char host[bufferLen];
+  const char *filename = "/config.ini";
+  IniFile ini(filename);
+  if (!ini.open()) {
+    lcd("Missing ini file");
+    // Cannot do anything else
+    while (1)
+      ;
+  }
+
+  // Check the file is valid. This can be used to warn if any lines
+  // are longer than the buffer.
+  if (!ini.validate(ssid, bufferLen)) {
+    lcd("Invalid ini file");
+    while (1) // Cannot continue
+      ;
+  }
+
+/*
+config.ini
+[network]
+ssid=________
+password=________
+hostname=________
+*/
+ 
+  if(! ini.getValue("network", "ssid", ssid, bufferLen)) {
+    lcd("Read err ssid");
+    while (1) // Cannot continue
+      ;
+  }
+  
+  if(! ini.getValue("network", "password", password, bufferLen)) {
+    lcd("Read err password");
+    while (1) // Cannot continue
+      ;
+  }
+
+  if(! ini.getValue("network", "hostname", host, bufferLen)) {
+    lcd("Read err hostname");
+    while (1) // Cannot continue
+      ;
+  }
+
   WiFi.begin(ssid, password);
   String text = "Connecting to ";
   text = text + ssid;
@@ -270,22 +321,22 @@ void setup() {
     delay(500);
   }
   if (i == 21) {
-    text = "Could not connect to ";
+    text = "Conn err ";
     text = text + ssid;
     lcd(text);
     while (1) delay(500);
   }
-  lcd(IpAddress2String(WiFi.localIP()));
+  text = IpAddress2String(WiFi.localIP());
 
   if (MDNS.begin(host)) {
     MDNS.addService("http", "tcp", 80);
     MDNS.addService("wirelessprint", "tcp", 80);
     MDNS.addServiceTxt("wirelessprint", "tcp", "version", sketch_version);
+    MDNS.addServiceTxt("wirelessprint", "tcp", "ipaddr", IpAddress2String(WiFi.localIP())); // Makes it way easier on the client side
   }
 
-  text = "http://";
-  text = text + host;
-  text = text + ".local";
+  delay(1000); // So that we can read the last message on the LCD
+  lcd(text); // may be too large to fit on screen
 
   // Hostname defaults to esp8266-[ChipID]
   ArduinoOTA.setHostname(host);
@@ -306,15 +357,6 @@ void setup() {
 
   server.onNotFound(handleNotFound);
   server.begin();
-
-  if (SD.begin(SS, 50000000)) { // https://github.com/esp8266/Arduino/issues/1853
-    hasSD = true;
-    lcd("SD Card OK");
-    delay(1000); // So that we can read the last message on the LCD
-    lcd(text); // may be too large to fit on screen
-  } else {
-    lcd("SD Card ERROR");
-  }
 
   /* Set up the timer to fire every 2 seconds */
   os_timer_setfn(&myTimer, timerCallback, NULL);
