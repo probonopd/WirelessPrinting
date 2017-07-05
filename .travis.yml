@@ -21,5 +21,5 @@ script:
   - arduino-1.8.3/arduino --pref build.path=. --verify --verbose-build --board $BD $PWD/ESP8266WirelessPrint/ESP8266WirelessPrint.ino
   - BOARD=$(echo $BD | cut -d ":" -f 3)
   - ls *.hex
-  - mv "ESP8266WirelessPrint.hex" "ESP8266WirelessPrint_${BOARD}.hex"
+  - mv ./ESP8266WirelessPrint.ino.hex "ESP8266WirelessPrint_${BOARD}.hex"
   - curl --upload-file "ESP8266WirelessPrint_${BOARD}.hex" https://transfer.sh/"ESP8266WirelessPrint_${BOARD}_$(git rev-parse --short HEAD).hex".zip
