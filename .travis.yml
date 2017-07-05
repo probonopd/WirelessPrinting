@@ -13,7 +13,7 @@ install:
   - arduino-1.8.3/arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json" --save-prefs
   - arduino-1.8.3/arduino --install-boards esp8266:esp8266
   - arduino-1.8.3/arduino --board $BD --save-prefs
-  - arduino --pref "compiler.warning_level=all" --save-prefs
+  - arduino-1.8.3/arduino --pref "compiler.warning_level=all" --save-prefs
 
 script:
   - echo 'const char* ssid = "________";' > ESP8266WirelessPrint/private.h # FIXME: Remove
