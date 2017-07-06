@@ -332,7 +332,6 @@ hostname=________
     MDNS.addService("http", "tcp", 80);
     MDNS.addService("wirelessprint", "tcp", 80);
     MDNS.addServiceTxt("wirelessprint", "tcp", "version", sketch_version);
-    MDNS.addServiceTxt("wirelessprint", "tcp", "ipaddr", IpAddress2String(WiFi.localIP())); // Makes it way easier on the client side
   }
 
   delay(1000); // So that we can read the last message on the LCD
