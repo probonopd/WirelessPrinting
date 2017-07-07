@@ -258,7 +258,6 @@ void setup() {
 
   if (SD.begin(SS, 50000000)) { // https://github.com/esp8266/Arduino/issues/1853
     hasSD = true;
-    lcd("SD Card OK");
   } else {
     lcd("SD Card ERROR");
   }
@@ -310,22 +309,19 @@ hostname=________
       ;
   }
 
-  WiFi.begin(ssid, password);
-  String text = "Connecting to ";
-  text = text + ssid;
-  lcd(text);
+  String text;
 
   // Wait for connection
-  uint8_t i = 0;
-  while (WiFi.status() != WL_CONNECTED && i++ < 20) {//wait 10 seconds
-    delay(500);
+  pinMode(LED_BUILTIN, OUTPUT);     // Initialize the LED_BUILTIN pin as an output
+  digitalWrite(LED_BUILTIN, LOW);   // Turn the LED on (Note that LOW is the voltage level
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  while (WiFi.waitForConnectResult() != WL_CONNECTED) {
+    lcd("Connection Failed! Rebooting...");
+    delay(5000);
+    ESP.restart();
   }
-  if (i == 21) {
-    text = "Conn err ";
-    text = text + ssid;
-    lcd(text);
-    while (1) delay(500);
-  }
+  digitalWrite(LED_BUILTIN, HIGH);   // Turn the LED off (Note that LOW is the voltage level
   text = IpAddress2String(WiFi.localIP());
 
   if (MDNS.begin(host)) {
