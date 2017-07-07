@@ -10,7 +10,7 @@ before_install:
   - tar xf arduino-1.8.3-linux64.tar.xz
   
 install:
-  - arduino-1.8.3/arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json" --save-prefs
+  - arduino-1.8.3/arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/staging/package_esp8266com_index.json" --save-prefs
   - arduino-1.8.3/arduino --install-boards esp8266:esp8266
   - arduino-1.8.3/arduino --board $BD --save-prefs
   - arduino-1.8.3/arduino --pref "compiler.warning_level=all" --save-prefs
