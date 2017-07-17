@@ -347,13 +347,18 @@ hostname=________
   server.on("/download", HTTP_GET, handleDownload);
   server.on("/", HTTP_GET, handleIndex);
   server.on("/status", HTTP_GET, handleStatus);
-  server.on("/api/version", HTTP_GET, handleStatus); // For Slic3r Octoprint compatibility
+  server.on("/api/version", HTTP_GET, handleStatus); // For Slic3r OctoPrint compatibility
   server.on("/print", HTTP_POST, []() {
     returnOK();
   }, handleFileUpload);
 
   // For Cura
   server.on("/api/print", HTTP_POST, []() {
+    returnOK();
+  }, handleFileUpload);
+
+  // For Slic3r OctoPrint compatibility
+  server.on("/api/files/local", HTTP_POST, []() {
     returnOK();
   }, handleFileUpload);
 
