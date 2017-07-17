@@ -328,6 +328,12 @@ hostname=________
     MDNS.addService("http", "tcp", 80);
     MDNS.addService("wirelessprint", "tcp", 80);
     MDNS.addServiceTxt("wirelessprint", "tcp", "version", sketch_version);
+
+    // For compatibility with Slic3r; unfortunately, Slic3r doesn't seem to recognize it
+    MDNS.addService("octoprint", "tcp", 80);
+    MDNS.addServiceTxt("octoprint", "tcp", "path", "/");
+    MDNS.addServiceTxt("octoprint", "tcp", "api", "0.1");
+    MDNS.addServiceTxt("octoprint", "tcp", "version", "1.2.10");
   }
 
   delay(1000); // So that we can read the last message on the LCD
@@ -341,6 +347,7 @@ hostname=________
   server.on("/download", HTTP_GET, handleDownload);
   server.on("/", HTTP_GET, handleIndex);
   server.on("/status", HTTP_GET, handleStatus);
+  server.on("/api/version", HTTP_GET, handleStatus); // For Slic3r Octoprint compatibility
   server.on("/print", HTTP_POST, []() {
     returnOK();
   }, handleFileUpload);
