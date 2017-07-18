@@ -325,7 +325,6 @@ hostname=________
   text = IpAddress2String(WiFi.localIP());
 
   if (MDNS.begin(host)) {
-    MDNS.addService("http", "tcp", 80);
     MDNS.addService("wirelessprint", "tcp", 80);
     MDNS.addServiceTxt("wirelessprint", "tcp", "version", sketch_version);
 
@@ -334,6 +333,12 @@ hostname=________
     MDNS.addServiceTxt("octoprint", "tcp", "path", "/");
     MDNS.addServiceTxt("octoprint", "tcp", "api", "0.1");
     MDNS.addServiceTxt("octoprint", "tcp", "version", "1.2.10");
+
+    // For compatibility with Slic3r; unfortunately, Slic3r doesn't seem to recognize it either. Library bug?
+    MDNS.addService("http", "tcp", 80);
+    MDNS.addServiceTxt("http", "tcp", "path", "/");
+    MDNS.addServiceTxt("http", "tcp", "api", "0.1");
+    MDNS.addServiceTxt("http", "tcp", "version", "1.2.10");
   }
 
   delay(1000); // So that we can read the last message on the LCD
