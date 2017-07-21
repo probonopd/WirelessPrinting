@@ -1,59 +1,26 @@
-/*
-  CRASHES after receiving the code. Any help welcome. For now, use the non-async version.
-  Send G-Code stored on SD card
-  This sketch reads G-Code from a file from the SD card using the
-  SD library and sends it over the serial port.
-  Basic G-Code sending:
-  http://fightpc.blogspot.de/2016/08/g-code-over-wifi.html
-  Advanced G-Code sending:
-  https://github.com/Ultimaker/Cura/blob/master/plugins/USBPrinting/USBPrinterOutputDevice.py
-  The circuit:
-  SD card attached to WeMos D1 mini as follows:
-  MOSI - pin D7
-  MISO - pin D6
-  CLK - pin D5
-  CS - pin D8
-  capacitor across power pins of SD card for getting the card recognized
-*/
-
-/*
- * Need to apply https://github.com/esp8266/Arduino/pull/3079/files
- * in order for SDFile to work
- */
-
-#define FS_NO_GLOBALS
-
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
-#include <WiFiUdp.h>
 #include <ArduinoOTA.h>
-#include <ESPAsyncWebServer.h>
-#include <SPI.h>
-#include <SD.h>
-// !!! Make sure it says
-// Multiple libraries were found for "SD.h"
-// Used: (...)/hardware/esp8266/esp8266/libraries/SD <-- MUST use this one
-// Not used: (...)/libraries/SD <-- Must NOT use this one
+#include <FS.h>
+#include <SPIFFSEditor.h>
+#include <DNSServer.h>
 
-#include "private.h"
-// const char* ssid = "____";
-// const char* password = "____";
+#include <ESPAsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include <ESPAsyncWiFiManager.h> // https://github.com/alanswx/ESPAsyncWiFiManager/
+
+AsyncWebServer server(80);
+DNSServer dns;
+
+const char * host = "WirelessPrintingSPIFFS";
+
+const char* sketch_version = "1.0";
 
 /* Access SDK functions for timer */
 extern "C" {
 #include "user_interface.h"
 }
-
 os_timer_t myTimer;
-
-// #define MTU_Size 2*1460 // https://github.com/esp8266/Arduino/issues/1853
-
-const char* sketch_version = "1.0";
-
-const char* host = "3d";
-const int chipSelect = SS;
-
-const String uploadfilename = "cache.gco"; // 8+3 limitation of FAT, otherwise won't be written
 
 bool okFound = true; // Set to true if last response from 3D printer was "ok", otherwise false
 String response; // The last response from 3D printer
@@ -63,7 +30,6 @@ bool shouldPrint = false;
 long lineNumberLastPrinted = 0;
 String lineLastSent = "";
 String lineLastReceived = "";
-String jobName = "";
 
 String priorityLine = ""; // A line that should be sent to the printer "in between"/before any other lines being sent. TODO: Extend to an array of lines
 
@@ -74,53 +40,14 @@ void timerCallback(void *pArg) {
   tickOccured = true;
 }
 
-bool SD_exists(String path) {
-  bool exists = false;
-  SDFile test = SD.open(path);
-  if (test) {
-    test.close();
-    exists = true;
-  }
-  return exists;
+// https://forum.arduino.cc/index.php?topic=228884.msg2670971#msg2670971
+String IpAddress2String(const IPAddress& ipAddress)
+{
+  return String(ipAddress[0]) + String(".") + \
+         String(ipAddress[1]) + String(".") + \
+         String(ipAddress[2]) + String(".") + \
+         String(ipAddress[3])  ;
 }
-
-class AsyncSDFileResponse: public AsyncAbstractResponse {
-  private:
-    SDFile _content;
-    String _path;
-    void _setContentType(String path) {
-      if (path.endsWith(".gco")) _contentType = "text/plain";
-      else _contentType = "application/octet-stream";
-    }
-
-  public:
-    AsyncSDFileResponse(String path, String contentType = String(), bool download = false) {
-      _code = 200;
-      _path = uploadfilename;
-      if (download)
-        _contentType = "application/octet-stream";
-      else
-        _setContentType(path);
-      _content = SD.open(_path);
-      _contentLength = _content.size();
-    }
-    ~AsyncSDFileResponse() {
-      if (_content)
-        _content.close();
-    }
-    bool _sourceValid() {
-      return !!(_content);
-    }
-    size_t _fillBuffer(uint8_t *buf, size_t maxLen) {
-      int r = _content.read(buf, maxLen);
-      if (r < 0) {
-        os_printf("Error\n");
-        _content.close();
-        return 0;
-      }
-      return r;
-    }
-};
 
 String sendToPrinter(String line) {
 
@@ -131,6 +58,8 @@ String sendToPrinter(String line) {
   while (okFound == false) {
     yield();
   }
+
+  Serial.setTimeout(240000); // How long we wait for "ok" in milliseconds
 
   /* If a priority line exists (e.g., a stop command), then send it before anything else.
      TODO: Extend this to handle multiple priority lines. */
@@ -155,27 +84,25 @@ String sendToPrinter(String line) {
 }
 
 void lcd(String string) {
-  // Serial.println(string);
   sendToPrinter("M117 " + string);
 }
 
-/* Start webserver functions */
-
-AsyncWebServer server(80);
-
-static bool hasSD = false;
-SDFile uploadFile;
-
-/* This function streams out the G-Code to the printer */
-
 void handlePrint() {
+
+  // Do nothing if we are already printing. TODO: Give clear response
+  if (isPrinting) {
+    return;
+  }
+  
+  sendToPrinter("M300 S500 P50"); // M300: Play beep sound 
+  lcd("Printing...");
 
   shouldPrint = false;
   isPrinting = true;
   os_timer_disarm(&myTimer);
 
   int i = 0;
-  SDFile gcodeFile = SD.open(uploadfilename.c_str(), FILE_READ);
+  File gcodeFile = SPIFFS.open("/cache.gco", "r");
   String line;
   if (gcodeFile) {
     while (gcodeFile.available()) {
@@ -189,127 +116,108 @@ void handlePrint() {
         continue;
       }
       sendToPrinter(line);
+
     }
   } else {
-    lcd("File is not on SD card");
+    lcd("Cannot open file");
   }
   isPrinting = false;
-  jobName = "";
   os_timer_arm(&myTimer, timerInterval, true);
   lcd("Complete");
 }
 
-// https://forum.arduino.cc/index.php?topic=228884.msg2670971#msg2670971
-String IpAddress2String(const IPAddress& ipAddress)
-{
-  return String(ipAddress[0]) + String(".") + \
-         String(ipAddress[1]) + String(".") + \
-         String(ipAddress[2]) + String(".") + \
-         String(ipAddress[3])  ;
-}
-
 void setup() {
-  delay(3000); // 3D printer needs this time
+  delay(5000); // 3D printer needs this time
   Serial.begin(115200);
-  Serial.setTimeout(240000); // How long we wait for "ok" in milliseconds
-  WiFi.begin(ssid, password);
-  String text = "Connecting to ";
-  text = text + ssid;
-  lcd(text);
+
+  String text;
 
   // Wait for connection
-  uint8_t i = 0;
-  while (WiFi.status() != WL_CONNECTED && i++ < 20) {//wait 10 seconds
-    delay(500);
-  }
-  if (i == 21) {
-    text = "Could not connect to ";
-    text = text + ssid;
-    lcd(text);
-    while (1) delay(500);
-  }
-  lcd(IpAddress2String(WiFi.localIP()));
+  pinMode(LED_BUILTIN, OUTPUT);     // Initialize the LED_BUILTIN pin as an output
+  digitalWrite(LED_BUILTIN, LOW);   // Turn the LED on (Note that LOW is the voltage level
+  AsyncWiFiManager wifiManager(&server, &dns);
+  // wifiManager.resetSettings();   // Uncomment this to reset the settings on the device, then you will need to reflash with USB and this commented out!
+  wifiManager.autoConnect("AutoConnectAP");
+  digitalWrite(LED_BUILTIN, HIGH);  // Turn the LED off (Note that LOW is the voltage level
+  text = IpAddress2String(WiFi.localIP());
+  lcd(text);
+  sendToPrinter("M300 S500 P50"); // M300: Play beep sound 
 
   if (MDNS.begin(host)) {
-    MDNS.addService("http", "tcp", 80);
+
+    // For Cura WirelessPrint - deprecated in favor of the OctoPrint API
     MDNS.addService("wirelessprint", "tcp", 80);
     MDNS.addServiceTxt("wirelessprint", "tcp", "version", sketch_version);
+
+    // OctoPrint API
+    // Unfortunately, Slic3r doesn't seem to recognize it
+    MDNS.addService("octoprint", "tcp", 80);
+    MDNS.addServiceTxt("octoprint", "tcp", "path", "/");
+    MDNS.addServiceTxt("octoprint", "tcp", "api", "0.1");
+    MDNS.addServiceTxt("octoprint", "tcp", "version", "1.2.10");
+
+    // For compatibility with Slic3r
+    // Unfortunately, Slic3r doesn't seem to recognize it either. Library bug?
+    MDNS.addService("http", "tcp", 80);
+    MDNS.addServiceTxt("http", "tcp", "path", "/");
+    MDNS.addServiceTxt("http", "tcp", "api", "0.1");
+    MDNS.addServiceTxt("http", "tcp", "version", "1.2.10");
   }
 
-  text = "http://";
-  text = text + host;
-  text = text + ".local";
-
-  // Hostname defaults to esp8266-[ChipID]
   ArduinoOTA.setHostname(host);
-
   ArduinoOTA.begin();
 
+  MDNS.addService("http", "tcp", 80);
+
+  SPIFFS.begin();
+
+  server.addHandler(new SPIFFSEditor());
+
+  server.on("/heap", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send(200, "text/plain", String(ESP.getFreeHeap()));
+  });
+
   server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
-    // TODO: Offer stop when print is running
     String message = "<h1>WirelessPrint</h1>";
-    if (isPrinting == false) {
-      message += "<form enctype=\"multipart/form-data\" action=\"/print\" method=\"POST\">\n";
-      message += "<p>You can also print from the command line using curl:</p>\n";
-      message += "<pre>curl -F \"file=@/path/to/some.gcode\" 3d.local/print</pre>\n";
-      message += "<input type=\"hidden\" name=\"MAX_FILE_SIZE\" value=\"100000\" />\n";
-      message += "Choose a file to upload: <input name=\"file\" type=\"file\" /><br />\n";
-      message += "<input type=\"submit\" value=\"Upload\" />\n";
-      message += "</form>";
-      message += "";
-      message += "<p><a href=\"/download\">Download</a></p>";
-    }
-    request->send(200, "text/html", message + "\r\n");
+    message += "<form enctype=\"multipart/form-data\" action=\"/api/files/local\" method=\"POST\">\n";
+    message += "<p>You can also print from the command line using curl:</p>\n";
+    message += "<pre>curl -F \"file=@/path/to/some.gcode\" ";
+    message += IpAddress2String(WiFi.localIP());
+    message += "/api/files/local</pre>\n";
+    message += "<input type=\"hidden\" name=\"MAX_FILE_SIZE\" value=\"100000\" />\n";
+    message += "Choose a file to upload: <input name=\"file\" type=\"file\" /><br />\n";
+    message += "<input type=\"submit\" value=\"Upload\" />\n";
+    message += "</form>";
+    message += "";
+    message += "<p><a href=\"/download\">Download</a></p>";
+    message +=  String("<pre>") + String("lineLastSent: ") + lineLastSent + String("\n") +
+                String("lineLastReceived: ") + lineLastReceived + String("\n") + String("</pre>");
+    request->send(200, "text/html", message);
   });
 
-/* Cura asks the printer for status periodically.
-   We should make it easy on the ESP8266 and not do too much processing here
-   because a print may be in progress at the same time.
-   So avoid JSON processing, not expensive calculations, let Cura do them */
-
-  server.on("/status", HTTP_GET, [](AsyncWebServerRequest * request) {
-    String message = "[Status]\n";
-    message += "lineLastSent=" + lineLastSent + "\n";
-    message += "lineLastReceived=" + lineLastReceived + "\n";
-    message += "isPrinting=" + String(isPrinting) + "\n";
-    message += "lineNumberLastPrinted=" + String(lineNumberLastPrinted) + "\n";
-    message += "jobName=" + jobName + "\n";
-    request->send(200, "text/plain", message + "\r\n");
+  // For Slic3r OctoPrint compatibility
+  server.on("/api/files/local", HTTP_POST, [](AsyncWebServerRequest * request) {
+    request->send(200, "text/plain", "Received");
+  }, handleUpload);
+  server.on("/api/version", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send(200, "text/plain", sketch_version);
   });
 
-  server.onFileUpload([](AsyncWebServerRequest * request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
-    if (!index) {
-      lcd("Receiving...");
-      if (SD_exists((char *)uploadfilename.c_str())) SD.remove((char *)uploadfilename.c_str());
-      // jobName = request->getParam("path", true)->value(); ////////////////////////////////////////// CRASHES
-      // delay(500);
-      uploadFile = SD.open(uploadfilename, FILE_WRITE | O_TRUNC);
-    }
-    if (len && uploadFile)
-      uploadFile.write(data, len);
-    if (final) {
-      if (uploadFile) uploadFile.close();
-      delay(50);
-      lcd("Received");
-      delay(1000); // So that we can read the message
-      shouldPrint = true; // This is seen by loop() and the printing is then started, but this function can exit, hence ending the HTTP transmission
-    }
-  });
+  // For PrusaControlWireless - deprecated in favor of the OctoPrint API
+  server.on("/print", HTTP_POST, [](AsyncWebServerRequest * request) {
+    request->send(200, "text/plain", "Received");
+  }, handleUpload);
 
-  server.on("/download", HTTP_GET, [](AsyncWebServerRequest * request) {
-      request->send(new AsyncSDFileResponse("/download"));
+  // For Cura WirelessPrint - deprecated in favor of the OctoPrint API
+  server.on("/api/print", HTTP_POST, [](AsyncWebServerRequest * request) {
+    request->send(200, "text/plain", "Received");
+  }, handleUpload);
+
+  server.onNotFound([](AsyncWebServerRequest * request) {
+    request->send(404);
   });
 
   server.begin();
-
-  if (SD.begin(SS, 50000000)) { // https://github.com/esp8266/Arduino/issues/1853
-  hasSD = true;
-  lcd("SD Card OK");
-    delay(1000); // So that we can read the last message on the LCD
-    lcd(text); // may be too large to fit on screen
-  } else {
-    lcd("SD Card ERROR");
-  }
 
   /* Set up the timer to fire every 2 seconds */
   os_timer_setfn(&myTimer, timerCallback, NULL);
@@ -317,14 +225,64 @@ void setup() {
 
 }
 
+/*
+void handleUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+  //sendToPrinter("M300 S500 P50"); // M300: Play beep sound
+  // digitalWrite(LED_BUILTIN, LOW);   // Turn the LED on
+  lcd("Receiving...");
+  File f;
+  filename = "cache.gco" ; // Override whatever the client had sent
+  if (!filename.startsWith("/")) filename = "/" + filename;
+  if (!index) {
+    if (SPIFFS.exists(filename)) {
+      SPIFFS.remove(filename);
+      // TODO: check if file fits on filesystem; respond with error code if not
+    }
+    f = SPIFFS.open(filename, "w"); // create or trunicate file
+  }
+  else f = SPIFFS.open(filename, "a"); // append to file (for chunked upload)
+  f.write(data, len);
+  if (final) { // upload finished
+    f.close();
+    lcd("Received");
+    // sendToPrinter("M300 S500 P50"); // M300: Play beep sound
+    // digitalWrite(LED_BUILTIN, HIGH);  // Turn the LED off
+    shouldPrint = true;
+  }
+}
+*/
+
+// This works!!!
+File f;
+void handleUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final){
+  filename = "/cache.gco";
+  if(!filename.startsWith("/")) filename = "/" + filename;
+  
+  if(!index){
+    f = SPIFFS.open(filename, "w"); // create or trunicate file
+  }
+
+  if(len){ // uploading
+    f = SPIFFS.open(filename, "a"); // append to file (for chunked upload)
+    ESP.wdtDisable();
+    // lcd(String(len)); // Crashes it?!
+    f.write(data, len);
+    ESP.wdtEnable(10);
+  }
+  
+  if(final){ // upload finished
+    f.close();
+    shouldPrint = true;
+  }
+}
+
 void loop() {
   ArduinoOTA.handle();
   if (shouldPrint == true) handlePrint();
 
   /* When the timer has ticked and we are not printing, ask for temperature */
-  if ((isPrinting == false) && (tickOccured == true)) {
-    sendToPrinter("M105");
-    tickOccured = false;
-  }
-
+//  if ((isPrinting == false) && (tickOccured == true)) {
+//    sendToPrinter("M105");
+//    tickOccured = false;
+//  }
 }
