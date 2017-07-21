@@ -7,4 +7,5 @@ mkdir -p $HOME/Arduino/libraries/
 cd $HOME/Arduino/libraries/
 git clone https://github.com/me-no-dev/ESPAsyncWebServer.git
 git clone https://github.com/me-no-dev/ESPAsyncTCP.git
+git clone https://github.com/alanswx/ESPAsyncWiFiManager.git
 ```
