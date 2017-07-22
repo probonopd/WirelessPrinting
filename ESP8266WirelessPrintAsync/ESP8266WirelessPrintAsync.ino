@@ -1,5 +1,4 @@
 /*
-   Optionally uses SD shield; if not available uses SPIFFS (slower and smaller)
    TODO
    Remove hardcoded cache.gco
 */
