@@ -21,12 +21,11 @@ The ESP8266 module is connected with your 3D printer via the serial connection a
 You need to connect
 * TX, RX from your 3D printer to the ESP8266 module (__EXT-1__ header on RAMPS boards)
 * Power and GND from your 3D printer to the ESP8266 module (attention, the __EXT-1__ header on RAMPS boards has 5V while the ESP8266 needs 3.3V)
-* SD card to the ESP8266 module
-* A capacitor across the power pins of the SD card
+* SD card shield to the ESP8266 module (a capacitor across the power pins of the SD card; SD shields have this)
 
 ### A note on SD cards
 
-Using a SanDisk 2 GB card formatted with the [SD Card Formatter](https://www.sdcard.org/downloads/formatter_4/) from the SD Association seems to work for me. Also, putting a capacitor across the power pins of the SD card appears to increase the probability of the card being recognized.
+Using a SanDisk 2 GB card formatted with the [SD Card Formatter](https://www.sdcard.org/downloads/formatter_4/) from the SD Association seems to work for me
 
 ### Configuration
 
@@ -41,17 +40,17 @@ hostname=<the desired hostname for the machine, e.g., "3d">
 
 ### Usage
 
-To print, just open http://3d.local/ and upload a G-Code file using the form:
+To print, just open http://the-ip-address/ and upload a G-Code file using the form:
 
 ![Upload](https://cloud.githubusercontent.com/assets/2480569/23586936/fd0e3fa2-01a0-11e7-9d83-dc4e7d031f30.png)
 
 Ycan also print from the command line using curl:
 
 ```
-curl -F "file=@/path/to/some.gcode" http://3d.local/print
+curl -F "file=@/path/to/some.gcode" http://the-ip-address/print
 ```
 
-## WirelessPrinting
+## WirelessPrinting for Cura
 
 Cura plugin which discovers ESP8266WirelessPrint instances using Zeroconf and enables printing directly to ESP8266WirelessPrint.
 
