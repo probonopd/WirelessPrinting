@@ -1,8 +1,22 @@
+/*
+   Optionally uses SD shield; if not available uses SPIFFS (slower and smaller)
+   TODO
+   Remove hardcoded cache.gco
+*/
+
+
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <ArduinoOTA.h>
+
+#define FS_NO_GLOBALS //allow spiffs to coexist with SD card, define BEFORE including FS.h
+
+#include <SPI.h>
+#include <SD.h>
+
 #include <FS.h>
 #include <SPIFFSEditor.h>
+
 #include <DNSServer.h>
 
 #include <ESPAsyncTCP.h>
@@ -12,7 +26,7 @@
 AsyncWebServer server(80);
 DNSServer dns;
 
-const char * host = "WirelessPrintingSPIFFS";
+const char * host = "WirelessPrintingAsync";
 
 const char* sketch_version = "1.0";
 
@@ -30,6 +44,7 @@ bool shouldPrint = false;
 long lineNumberLastPrinted = 0;
 String lineLastSent = "";
 String lineLastReceived = "";
+bool hasSD = false; // will be set true if SD card is detected and usable; otherwise use SPIFFS
 
 String priorityLine = ""; // A line that should be sent to the printer "in between"/before any other lines being sent. TODO: Extend to an array of lines
 
@@ -93,8 +108,8 @@ void handlePrint() {
   if (isPrinting) {
     return;
   }
-  
-  sendToPrinter("M300 S500 P50"); // M300: Play beep sound 
+
+  sendToPrinter("M300 S500 P50"); // M300: Play beep sound
   lcd("Printing...");
 
   shouldPrint = false;
@@ -102,31 +117,68 @@ void handlePrint() {
   os_timer_disarm(&myTimer);
 
   int i = 0;
-  File gcodeFile = SPIFFS.open("/cache.gco", "r");
   String line;
-  if (gcodeFile) {
-    while (gcodeFile.available()) {
-      lineNumberLastPrinted = lineNumberLastPrinted + 1;
-      line = gcodeFile.readStringUntil('\n'); // The G-Code line being worked on
-      int pos = line.indexOf(';');
-      if (pos != -1) {
-        line = line.substring(0, pos);
-      }
-      if ((line.startsWith("(")) || (line.startsWith(";")) || (line.length() == 0)) {
-        continue;
-      }
-      sendToPrinter(line);
 
+  if (!hasSD) {
+    fs::File gcodeFile = SPIFFS.open("/cache.gco", "r");
+
+    if (gcodeFile) {
+      while (gcodeFile.available()) {
+        lineNumberLastPrinted = lineNumberLastPrinted + 1;
+        line = gcodeFile.readStringUntil('\n'); // The G-Code line being worked on
+        int pos = line.indexOf(';');
+        if (pos != -1) {
+          line = line.substring(0, pos);
+        }
+        if ((line.startsWith("(")) || (line.startsWith(";")) || (line.length() == 0)) {
+          continue;
+        }
+        sendToPrinter(line);
+
+      }
+    } else {
+      lcd("Cannot open file");
     }
+    isPrinting = false;
+    os_timer_arm(&myTimer, timerInterval, true);
+    lcd("Complete");
+    gcodeFile.close();
   } else {
-    lcd("Cannot open file");
+    File gcodeFile = SD.open("cache.gco", FILE_READ);
+
+    if (gcodeFile) {
+      while (gcodeFile.available()) {
+        lineNumberLastPrinted = lineNumberLastPrinted + 1;
+        line = gcodeFile.readStringUntil('\n'); // The G-Code line being worked on
+        int pos = line.indexOf(';');
+        if (pos != -1) {
+          line = line.substring(0, pos);
+        }
+        if ((line.startsWith("(")) || (line.startsWith(";")) || (line.length() == 0)) {
+          continue;
+        }
+        sendToPrinter(line);
+
+      }
+    } else {
+      lcd("Cannot open file");
+    }
+    isPrinting = false;
+    os_timer_arm(&myTimer, timerInterval, true);
+    lcd("Complete");
+    gcodeFile.close();
+
   }
-  isPrinting = false;
-  os_timer_arm(&myTimer, timerInterval, true);
-  lcd("Complete");
+
 }
 
 void setup() {
+
+
+  if (SD.begin(SS, 50000000)) { // https://github.com/esp8266/Arduino/issues/1853
+    hasSD = true;
+  }
+
   delay(5000); // 3D printer needs this time
   Serial.begin(115200);
 
@@ -140,8 +192,11 @@ void setup() {
   wifiManager.autoConnect("AutoConnectAP");
   digitalWrite(LED_BUILTIN, HIGH);  // Turn the LED off (Note that LOW is the voltage level
   text = IpAddress2String(WiFi.localIP());
+  if (hasSD) {
+    text += " SD";
+  }
   lcd(text);
-  sendToPrinter("M300 S500 P50"); // M300: Play beep sound 
+  sendToPrinter("M300 S500 P50"); // M300: Play beep sound
 
   if (MDNS.begin(host)) {
 
@@ -169,9 +224,10 @@ void setup() {
 
   MDNS.addService("http", "tcp", 80);
 
-  SPIFFS.begin();
-
-  server.addHandler(new SPIFFSEditor());
+  if (!hasSD) {
+    SPIFFS.begin();
+    server.addHandler(new SPIFFSEditor());
+  }
 
   server.on("/heap", HTTP_GET, [](AsyncWebServerRequest * request) {
     request->send(200, "text/plain", String(ESP.getFreeHeap()));
@@ -195,6 +251,8 @@ void setup() {
     request->send(200, "text/html", message);
   });
 
+
+
   // For Slic3r OctoPrint compatibility
   server.on("/api/files/local", HTTP_POST, [](AsyncWebServerRequest * request) {
     request->send(200, "text/plain", "Received");
@@ -213,6 +271,7 @@ void setup() {
     request->send(200, "text/plain", "Received");
   }, handleUpload);
 
+
   server.onNotFound([](AsyncWebServerRequest * request) {
     request->send(404);
   });
@@ -226,7 +285,7 @@ void setup() {
 }
 
 /*
-void handleUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+  void handleUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
   //sendToPrinter("M300 S500 P50"); // M300: Play beep sound
   // digitalWrite(LED_BUILTIN, LOW);   // Turn the LED on
   lcd("Receiving...");
@@ -249,15 +308,14 @@ void handleUpload(AsyncWebServerRequest *request, String filename, size_t index,
     // digitalWrite(LED_BUILTIN, HIGH);  // Turn the LED off
     shouldPrint = true;
   }
-}
-*/
+  }
 
-// This works!!!
-File f;
-void handleUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final){
+  // This works!!!
+  File f;
+  void handleUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final){
   filename = "/cache.gco";
   if(!filename.startsWith("/")) filename = "/" + filename;
-  
+
   if(!index){
     f = SPIFFS.open(filename, "w"); // create or trunicate file
   }
@@ -269,10 +327,63 @@ void handleUpload(AsyncWebServerRequest *request, String filename, size_t index,
     f.write(data, len);
     ESP.wdtEnable(10);
   }
-  
+
   if(final){ // upload finished
     f.close();
     shouldPrint = true;
+  }
+  }
+
+*/
+
+
+fs::File f; // SPIFFS
+File uploadFile; // SD card
+
+void handleUpload(AsyncWebServerRequest * request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+  if (!hasSD) {
+  
+
+    filename = "/cache.gco";
+    if (!filename.startsWith("/")) filename = "/" + filename;
+
+    if (!index) {
+      f = SPIFFS.open(filename, "w"); // create or truncate file
+    }
+
+    if (len) { // uploading
+      f = SPIFFS.open(filename, "a"); // append to file (for chunked upload) //////////// REALLY NEEDED???
+      ESP.wdtDisable();
+      // lcd(String(len)); // Crashes it?!
+      f.write(data, len);
+      ESP.wdtEnable(10);
+    }
+
+    if (final) { // upload finished
+      f.close();
+      shouldPrint = true;
+    }
+
+
+  } else {
+
+    filename = "cache.gco";
+
+    if (!index) {
+      if (SD.exists((char *)filename.c_str())) SD.remove((char *)filename.c_str());
+      uploadFile = SD.open(filename.c_str(), FILE_WRITE);
+    }
+
+    if (len) { // uploading
+      for (size_t i = 0; i < len; i++) {
+        uploadFile.write(data[i]);
+      }
+    }
+
+    if (final) { // upload finished
+      uploadFile.close();
+      shouldPrint = true;
+    }
   }
 }
 
@@ -281,8 +392,8 @@ void loop() {
   if (shouldPrint == true) handlePrint();
 
   /* When the timer has ticked and we are not printing, ask for temperature */
-//  if ((isPrinting == false) && (tickOccured == true)) {
-//    sendToPrinter("M105");
-//    tickOccured = false;
-//  }
+  //  if ((isPrinting == false) && (tickOccured == true)) {
+  //    sendToPrinter("M105");
+  //    tickOccured = false;
+  //  }
 }
