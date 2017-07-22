@@ -23,10 +23,10 @@ install:
   - cd -
 
 script:
-  - arduino-1.8.3/arduino --pref build.path=. --verify --verbose-build --board $BD $PWD/ESP8266WirelessPrint/ESP8266WirelessPrint.ino
-  - BOARD=$(echo $BD | cut -d ":" -f 3)
-  - mv ./ESP8266WirelessPrint.ino.bin "ESP8266WirelessPrint_${BOARD}.bin"
-  - curl --upload-file "ESP8266WirelessPrint_${BOARD}.bin" "https://transfer.sh/ESP8266WirelessPrint_${BOARD}_$(git rev-parse --short HEAD).bin"
+  - #arduino-1.8.3/arduino --pref build.path=. --verify --verbose-build --board $BD $PWD/ESP8266WirelessPrint/ESP8266WirelessPrint.ino
+  - #BOARD=$(echo $BD | cut -d ":" -f 3)
+  - #mv ./ESP8266WirelessPrint.ino.bin "ESP8266WirelessPrint_${BOARD}.bin"
+  - #curl --upload-file "ESP8266WirelessPrint_${BOARD}.bin" "https://transfer.sh/ESP8266WirelessPrint_${BOARD}_$(git rev-parse --short HEAD).bin"
   - arduino-1.8.3/arduino --pref build.path=. --verify --verbose-build --board $BD $PWD/ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
   - BOARD=$(echo $BD | cut -d ":" -f 3)
   - mv ./ESP8266WirelessPrintAsync.ino.bin "ESP8266WirelessPrintAsync_${BOARD}.bin"
