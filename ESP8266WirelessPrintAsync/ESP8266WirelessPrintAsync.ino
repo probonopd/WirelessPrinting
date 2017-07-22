@@ -25,6 +25,10 @@
 AsyncWebServer server(80);
 DNSServer dns;
 
+// For implementing (a subset of) the OctoPrint API
+// #include "AsyncJson.h"
+// #include "ArduinoJson.h"
+
 const char * host = "WirelessPrintingAsync";
 
 const char* sketch_version = "1.0";
@@ -250,28 +254,57 @@ void setup() {
     request->send(200, "text/html", message);
   });
 
-
-
   // For Slic3r OctoPrint compatibility
+  
   server.on("/api/files/local", HTTP_POST, [](AsyncWebServerRequest * request) {
-    request->send(200, "text/plain", "Received");
+    // http://docs.octoprint.org/en/master/api/files.html#upload-response
+    request->send(200, "application/json", "{\r\n  \"files\": {\r\n    \"local\": {\r\n      \"name\": \"cache.gco\",\r\n      \"origin\": \"local\",\r\n      \"refs\": {\r\n        \"resource\": \"\",\r\n        \"download\": \"\"\r\n      }\r\n    }\r\n  },\r\n  \"done\": true\r\n}\r\n");
   }, handleUpload);
+  // FIXME: Cura seems to send data in another way, seems not to even trigger the handleUpload function. Need handleBody?
+  
   server.on("/api/version", HTTP_GET, [](AsyncWebServerRequest * request) {
-    request->send(200, "text/plain", sketch_version);
+    request->send(200, "application/json", "{\"api\": \"0.1\", \"server\": \"1.1.0\"}");
   });
 
-  // For PrusaControlWireless - deprecated in favor of the OctoPrint API
+  // For Cura 2.6.0 OctoPrint compatibility
+  // Must be valid JSON
+  // http://docs.octoprint.org/en/master/api
+  // TODO: Fill with values that actually make sense; currently this is enough for Cura 2.6.0 not to crash
+
+  // Poor Man's JSON:
+  // https://jsonformatter.curiousconcept.com/
+  // https://www.freeformatter.com/json-escape.html
+  
+  server.on("/api/job", HTTP_GET, [](AsyncWebServerRequest * request) {
+    // http://docs.octoprint.org/en/master/api/datamodel.html#sec-api-datamodel-jobs-job
+    request->send(200, "application/json", "{\r\n  \"job\": {\r\n    \"file\": {\r\n      \"name\": \"Unknown\",\r\n      \"origin\": \"local\",\r\n      \"size\": 1468987,\r\n      \"date\": 1378847754\r\n    },\r\n    \"estimatedPrintTime\": 8811,\r\n    \"filament\": {\r\n      \"length\": 810,\r\n      \"volume\": 5.36\r\n    }\r\n  },\r\n  \"progress\": {\r\n    \"completion\": 0.2298468264184775,\r\n    \"filepos\": 337942,\r\n    \"printTime\": 0,\r\n    \"printTimeLeft\": 0\r\n  }\r\n}");
+  });
+  // TODO: Implement POST. Cura uses this to pause and abort prints.
+  
+  server.on("/api/printer", HTTP_GET, [](AsyncWebServerRequest * request) {
+    // http://docs.octoprint.org/en/master/api/datamodel.html#printer-state
+    request->send(200, "application/json", "{\r\n  \"temperature\": {\r\n    \"tool0\": {\r\n      \"actual\": 214.8821,\r\n      \"target\": 220.0,\r\n      \"offset\": 0\r\n    },\r\n    \"bed\": {\r\n      \"actual\": 50.221,\r\n      \"target\": 70.0,\r\n      \"offset\": 5\r\n    }\r\n  },\r\n  \"sd\": {\r\n    \"ready\": true\r\n  },\r\n  \"state\": {\r\n    \"text\": \"Operational\",\r\n    \"flags\": {\r\n      \"operational\": true,\r\n      \"paused\": false,\r\n      \"printing\": true,\r\n      \"sdReady\": true,\r\n      \"error\": false,\r\n      \"ready\": true,\r\n      \"closedOrError\": false\r\n    }\r\n  }\r\n}");
+  });
+
+  // Cura uses this to Pre-heat the build plate (M140)
+  // http://docs.octoprint.org/en/master/api/printer.html#send-an-arbitrary-command-to-the-printer
+  server.on("/api/printer/command", HTTP_POST, [](AsyncWebServerRequest * request) {
+    lcd("TODO!!!");
+  });
+  
+  // For legacy PrusaControlWireless - deprecated in favor of the OctoPrint API
   server.on("/print", HTTP_POST, [](AsyncWebServerRequest * request) {
     request->send(200, "text/plain", "Received");
   }, handleUpload);
 
-  // For Cura WirelessPrint - deprecated in favor of the OctoPrint API
+  // For legacy Cura WirelessPrint - deprecated in favor of the OctoPrint API
   server.on("/api/print", HTTP_POST, [](AsyncWebServerRequest * request) {
     request->send(200, "text/plain", "Received");
   }, handleUpload);
 
 
   server.onNotFound([](AsyncWebServerRequest * request) {
+    // lcd(request->url()); // For debugging the APIs only ---- does it crash the device???
     request->send(404);
   });
 
@@ -347,6 +380,8 @@ void handleUpload(AsyncWebServerRequest * request, String filename, size_t index
     if (!filename.startsWith("/")) filename = "/" + filename;
 
     if (!index) {
+      // sendToPrinter("M300 S500 P50"); // M300: Play beep sound // Crashes with SPIFFS?
+      // lcd("Receiving..."); // Crashes with SPIFFS?
       f = SPIFFS.open(filename, "w"); // create or truncate file
     }
 
@@ -369,6 +404,8 @@ void handleUpload(AsyncWebServerRequest * request, String filename, size_t index
     filename = "cache.gco";
 
     if (!index) {
+      sendToPrinter("M300 S500 P50"); // M300: Play beep sound // Works with SD
+      lcd("Receiving..."); // Works with SD
       if (SD.exists((char *)filename.c_str())) SD.remove((char *)filename.c_str());
       uploadFile = SD.open(filename.c_str(), FILE_WRITE);
     }
