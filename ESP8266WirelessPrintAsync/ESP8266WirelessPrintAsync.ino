@@ -182,7 +182,7 @@ void setup() {
     hasSD = true;
   }
 
-  delay(5000); // 3D printer needs this time
+  // delay(5000); // 3D printer needs this time
   Serial.begin(115200);
 
   String text;
@@ -257,14 +257,19 @@ void setup() {
   // For Slic3r OctoPrint compatibility
   
   server.on("/api/files/local", HTTP_POST, [](AsyncWebServerRequest * request) {
+    // sendToPrinter("M300 S500 P50"); // M300: Play beep sound - THIS LEADS TO CRASHES DURING UPLOAD!
+    // lcd("Receiving..."); - THIS LEADS TO CRASHES DURING UPLOAD!
+    // lcd(request->contentType()); - THIS LEADS TO CRASHES DURING UPLOAD!
     // http://docs.octoprint.org/en/master/api/files.html#upload-response
+    /*
+    if(!request->hasParam("file", true, true)){
+      lcd("FILE is missing!!!"); // Cura
+      // FIXME: Cura seems to send data in another way, seems not to even trigger the handleUpload function. Need handleBody?
+      // To call handleBody instead of handleUpload, we need a filter since we can only hardwire one handler to server.on. How to do this? https://github.com/me-no-dev/ESPAsyncWebServer/issues/190
+    }
+    */
     request->send(200, "application/json", "{\r\n  \"files\": {\r\n    \"local\": {\r\n      \"name\": \"cache.gco\",\r\n      \"origin\": \"local\",\r\n      \"refs\": {\r\n        \"resource\": \"\",\r\n        \"download\": \"\"\r\n      }\r\n    }\r\n  },\r\n  \"done\": true\r\n}\r\n");
   }, handleUpload);
-  // FIXME: Cura seems to send data in another way, seems not to even trigger the handleUpload function. Need handleBody?
-  
-  server.on("/api/version", HTTP_GET, [](AsyncWebServerRequest * request) {
-    request->send(200, "application/json", "{\"api\": \"0.1\", \"server\": \"1.1.0\"}");
-  });
 
   // For Cura 2.6.0 OctoPrint compatibility
   // Must be valid JSON
@@ -283,7 +288,7 @@ void setup() {
   
   server.on("/api/printer", HTTP_GET, [](AsyncWebServerRequest * request) {
     // http://docs.octoprint.org/en/master/api/datamodel.html#printer-state
-    request->send(200, "application/json", "{\r\n  \"temperature\": {\r\n    \"tool0\": {\r\n      \"actual\": 214.8821,\r\n      \"target\": 220.0,\r\n      \"offset\": 0\r\n    },\r\n    \"bed\": {\r\n      \"actual\": 50.221,\r\n      \"target\": 70.0,\r\n      \"offset\": 5\r\n    }\r\n  },\r\n  \"sd\": {\r\n    \"ready\": true\r\n  },\r\n  \"state\": {\r\n    \"text\": \"Operational\",\r\n    \"flags\": {\r\n      \"operational\": true,\r\n      \"paused\": false,\r\n      \"printing\": true,\r\n      \"sdReady\": true,\r\n      \"error\": false,\r\n      \"ready\": true,\r\n      \"closedOrError\": false\r\n    }\r\n  }\r\n}");
+    request->send(200, "application/json", "{\r\n  \"temperature\": {\r\n    \"tool0\": {\r\n      \"actual\": 214.8821,\r\n      \"target\": 220.0,\r\n      \"offset\": 0\r\n    },\r\n    \"bed\": {\r\n      \"actual\": 50.221,\r\n      \"target\": 70.0,\r\n      \"offset\": 5\r\n    }\r\n  },\r\n  \"sd\": {\r\n    \"ready\": true\r\n  },\r\n  \"state\": {\r\n    \"text\": \"Operational\",\r\n    \"flags\": {\r\n      \"operational\": true,\r\n      \"paused\": false,\r\n      \"printing\": false,\r\n      \"sdReady\": true,\r\n      \"error\": false,\r\n      \"ready\": true,\r\n      \"closedOrError\": false\r\n    }\r\n  }\r\n}");
   });
 
   // Cura uses this to Pre-heat the build plate (M140)
@@ -316,79 +321,22 @@ void setup() {
 
 }
 
-/*
-  void handleUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
-  //sendToPrinter("M300 S500 P50"); // M300: Play beep sound
-  // digitalWrite(LED_BUILTIN, LOW);   // Turn the LED on
-  lcd("Receiving...");
-  File f;
-  filename = "cache.gco" ; // Override whatever the client had sent
-  if (!filename.startsWith("/")) filename = "/" + filename;
-  if (!index) {
-    if (SPIFFS.exists(filename)) {
-      SPIFFS.remove(filename);
-      // TODO: check if file fits on filesystem; respond with error code if not
-    }
-    f = SPIFFS.open(filename, "w"); // create or trunicate file
-  }
-  else f = SPIFFS.open(filename, "a"); // append to file (for chunked upload)
-  f.write(data, len);
-  if (final) { // upload finished
-    f.close();
-    lcd("Received");
-    // sendToPrinter("M300 S500 P50"); // M300: Play beep sound
-    // digitalWrite(LED_BUILTIN, HIGH);  // Turn the LED off
-    shouldPrint = true;
-  }
-  }
-
-  // This works!!!
-  File f;
-  void handleUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final){
-  filename = "/cache.gco";
-  if(!filename.startsWith("/")) filename = "/" + filename;
-
-  if(!index){
-    f = SPIFFS.open(filename, "w"); // create or trunicate file
-  }
-
-  if(len){ // uploading
-    f = SPIFFS.open(filename, "a"); // append to file (for chunked upload)
-    ESP.wdtDisable();
-    // lcd(String(len)); // Crashes it?!
-    f.write(data, len);
-    ESP.wdtEnable(10);
-  }
-
-  if(final){ // upload finished
-    f.close();
-    shouldPrint = true;
-  }
-  }
-
-*/
-
-
 fs::File f; // SPIFFS
 File uploadFile; // SD card
 
 void handleUpload(AsyncWebServerRequest * request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
-  if (!hasSD) {
+  if (!hasSD) { // No SD, hence use SPIFFS
   
-
     filename = "/cache.gco";
     if (!filename.startsWith("/")) filename = "/" + filename;
 
     if (!index) {
-      // sendToPrinter("M300 S500 P50"); // M300: Play beep sound // Crashes with SPIFFS?
-      // lcd("Receiving..."); // Crashes with SPIFFS?
       f = SPIFFS.open(filename, "w"); // create or truncate file
     }
 
     if (len) { // uploading
       f = SPIFFS.open(filename, "a"); // append to file (for chunked upload) //////////// REALLY NEEDED???
       ESP.wdtDisable();
-      // lcd(String(len)); // Crashes it?!
       f.write(data, len);
       ESP.wdtEnable(10);
     }
@@ -398,14 +346,11 @@ void handleUpload(AsyncWebServerRequest * request, String filename, size_t index
       shouldPrint = true;
     }
 
-
-  } else {
+  } else { // has SD, hence use it
 
     filename = "cache.gco";
 
     if (!index) {
-      sendToPrinter("M300 S500 P50"); // M300: Play beep sound // Works with SD
-      lcd("Receiving..."); // Works with SD
       if (SD.exists((char *)filename.c_str())) SD.remove((char *)filename.c_str());
       uploadFile = SD.open(filename.c_str(), FILE_WRITE);
     }
@@ -423,6 +368,53 @@ void handleUpload(AsyncWebServerRequest * request, String filename, size_t index
   }
 }
 
+// Cura seems to upload files in a different way so that we need this, largely redundant, function. Argh.
+// If only ArduinoJson would handle this automatically. It should be doable:
+// The only change is that the "filename" parameter is not passed in, and that instead of "if (final)" we need to use "if(index + len == total)". Argh.
+void handleBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
+  String filename;
+  if (!hasSD) { // No SD, hence use SPIFFS
+  
+    filename = "/cache.gco";
+    if (!filename.startsWith("/")) filename = "/" + filename;
+
+    if (!index) {
+      f = SPIFFS.open(filename, "w"); // create or truncate file
+    }
+
+    if (len) { // uploading
+      f = SPIFFS.open(filename, "a"); // append to file (for chunked upload) //////////// REALLY NEEDED???
+      ESP.wdtDisable();
+      f.write(data, len);
+      ESP.wdtEnable(10);
+    }
+
+    if(index + len == total){ // upload finished
+      f.close();
+      shouldPrint = true;
+    }
+
+  } else { // has SD, hence use it
+
+    filename = "cache.gco";
+
+    if (!index) {
+      if (SD.exists((char *)filename.c_str())) SD.remove((char *)filename.c_str());
+      uploadFile = SD.open(filename.c_str(), FILE_WRITE);
+    }
+
+    if (len) { // uploading
+      for (size_t i = 0; i < len; i++) {
+        uploadFile.write(data[i]);
+      }
+    }
+
+    if(index + len == total){ // upload finished
+      uploadFile.close();
+      shouldPrint = true;
+    }
+  }
+}
 void loop() {
   ArduinoOTA.handle();
   if (shouldPrint == true) handlePrint();
