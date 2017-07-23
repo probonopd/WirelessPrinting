@@ -287,7 +287,7 @@ void setup() {
   
   server.on("/api/printer", HTTP_GET, [](AsyncWebServerRequest * request) {
     // http://docs.octoprint.org/en/master/api/datamodel.html#printer-state
-    request->send(200, "application/json", "{\r\n  \"temperature\": {\r\n    \"tool0\": {\r\n      \"actual\": 214.8821,\r\n      \"target\": 220.0,\r\n      \"offset\": 0\r\n    },\r\n    \"bed\": {\r\n      \"actual\": 50.221,\r\n      \"target\": 70.0,\r\n      \"offset\": 5\r\n    }\r\n  },\r\n  \"sd\": {\r\n    \"ready\": true\r\n  },\r\n  \"state\": {\r\n    \"text\": \"Operational\",\r\n    \"flags\": {\r\n      \"operational\": true,\r\n      \"paused\": false,\r\n      \"printing\": false,\r\n      \"sdReady\": true,\r\n      \"error\": false,\r\n      \"ready\": true,\r\n      \"closedOrError\": false\r\n    }\r\n  }\r\n}");
+    request->send(200, "application/json", "{\r\n  \"temperature\": {\r\n    \"tool0\": {\r\n      \"actual\": 214.8821,\r\n      \"target\": 220.0,\r\n      \"offset\": 0\r\n    },\r\n    \"bed\": {\r\n      \"actual\": 50.221,\r\n      \"target\": 70.0,\r\n      \"offset\": 5\r\n    }\r\n  },\r\n  \"sd\": {\r\n    \"ready\": true\r\n  },\r\n  \"state\": {\r\n    \"text\": \"Operational\",\r\n    \"flags\": {\r\n      \"operational\": true,\r\n      \"paused\": false,\r\n      \"printing\": " + String(isPrinting) + ",\r\n      \"sdReady\": true,\r\n      \"error\": false,\r\n      \"ready\": true,\r\n      \"closedOrError\": false\r\n    }\r\n  }\r\n}");
   });
 
   // Cura uses this to Pre-heat the build plate (M140)
@@ -372,8 +372,8 @@ void loop() {
   if (shouldPrint == true) handlePrint();
 
   /* When the timer has ticked and we are not printing, ask for temperature */
-  //  if ((isPrinting == false) && (tickOccured == true)) {
-  //    sendToPrinter("M105");
-  //    tickOccured = false;
-  //  }
+  if ((isPrinting == false) && (tickOccured == true)) {
+     sendToPrinter("M105");
+     tickOccured = false;
+  }
 }
