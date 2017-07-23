@@ -261,13 +261,12 @@ void setup() {
     // lcd("Receiving..."); - THIS LEADS TO CRASHES DURING UPLOAD!
     // lcd(request->contentType()); - THIS LEADS TO CRASHES DURING UPLOAD!
     // http://docs.octoprint.org/en/master/api/files.html#upload-response
-    /*
+
     if(!request->hasParam("file", true, true)){
-      lcd("FILE is missing!!!"); // Cura
-      // FIXME: Cura seems to send data in another way, seems not to even trigger the handleUpload function. Need handleBody?
-      // To call handleBody instead of handleUpload, we need a filter since we can only hardwire one handler to server.on. How to do this? https://github.com/me-no-dev/ESPAsyncWebServer/issues/190
+      lcd("Needs PR #192"); // Cura
+      // Cura needs https://github.com/me-no-dev/ESPAsyncWebServer/pull/192
     }
-    */
+
     request->send(200, "application/json", "{\r\n  \"files\": {\r\n    \"local\": {\r\n      \"name\": \"cache.gco\",\r\n      \"origin\": \"local\",\r\n      \"refs\": {\r\n        \"resource\": \"\",\r\n        \"download\": \"\"\r\n      }\r\n    }\r\n  },\r\n  \"done\": true\r\n}\r\n");
   }, handleUpload);
 
@@ -368,53 +367,6 @@ void handleUpload(AsyncWebServerRequest * request, String filename, size_t index
   }
 }
 
-// Cura seems to upload files in a different way so that we need this, largely redundant, function. Argh.
-// If only ArduinoJson would handle this automatically. It should be doable:
-// The only change is that the "filename" parameter is not passed in, and that instead of "if (final)" we need to use "if(index + len == total)". Argh.
-void handleBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
-  String filename;
-  if (!hasSD) { // No SD, hence use SPIFFS
-  
-    filename = "/cache.gco";
-    if (!filename.startsWith("/")) filename = "/" + filename;
-
-    if (!index) {
-      f = SPIFFS.open(filename, "w"); // create or truncate file
-    }
-
-    if (len) { // uploading
-      f = SPIFFS.open(filename, "a"); // append to file (for chunked upload) //////////// REALLY NEEDED???
-      ESP.wdtDisable();
-      f.write(data, len);
-      ESP.wdtEnable(10);
-    }
-
-    if(index + len == total){ // upload finished
-      f.close();
-      shouldPrint = true;
-    }
-
-  } else { // has SD, hence use it
-
-    filename = "cache.gco";
-
-    if (!index) {
-      if (SD.exists((char *)filename.c_str())) SD.remove((char *)filename.c_str());
-      uploadFile = SD.open(filename.c_str(), FILE_WRITE);
-    }
-
-    if (len) { // uploading
-      for (size_t i = 0; i < len; i++) {
-        uploadFile.write(data[i]);
-      }
-    }
-
-    if(index + len == total){ // upload finished
-      uploadFile.close();
-      shouldPrint = true;
-    }
-  }
-}
 void loop() {
   ArduinoOTA.handle();
   if (shouldPrint == true) handlePrint();
