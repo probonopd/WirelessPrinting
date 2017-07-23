@@ -7,6 +7,7 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <ArduinoOTA.h>
+#include <Ticker.h>
 
 #define FS_NO_GLOBALS //allow spiffs to coexist with SD card, define BEFORE including FS.h
 
@@ -33,12 +34,6 @@ const char * host = "WirelessPrintingAsync";
 
 const char* sketch_version = "1.0";
 
-/* Access SDK functions for timer */
-extern "C" {
-#include "user_interface.h"
-}
-os_timer_t myTimer;
-
 bool okFound = true; // Set to true if last response from 3D printer was "ok", otherwise false
 String response; // The last response from 3D printer
 
@@ -51,12 +46,10 @@ bool hasSD = false; // will be set true if SD card is detected and usable; other
 
 String priorityLine = ""; // A line that should be sent to the printer "in between"/before any other lines being sent. TODO: Extend to an array of lines
 
-const int timerInterval = 2000; // Tick every 2 seconds
-bool tickOccured = false; // Whether the timer has fired
+Ticker statusTimer;
+int statusInterval(2); // Ask the printer for its status every 2 seconds
 
-void timerCallback(void *pArg) {
-  tickOccured = true;
-}
+Ticker blinker;
 
 // https://forum.arduino.cc/index.php?topic=228884.msg2670971#msg2670971
 String IpAddress2String(const IPAddress& ipAddress)
@@ -65,6 +58,21 @@ String IpAddress2String(const IPAddress& ipAddress)
          String(ipAddress[1]) + String(".") + \
          String(ipAddress[2]) + String(".") + \
          String(ipAddress[3])  ;
+}
+
+void flip()
+{
+  int state = digitalRead(LED_BUILTIN);  // get the current state of GPIO1 pin
+  digitalWrite(LED_BUILTIN, !state);     // set pin to the opposite state
+}
+
+void startBlinking(float secs) {
+  blinker.attach(secs, flip);
+}
+
+void stopBlinking() {
+  digitalWrite(LED_BUILTIN, HIGH);
+  blinker.detach();
 }
 
 String sendToPrinter(String line) {
@@ -105,6 +113,12 @@ void lcd(String string) {
   sendToPrinter("M117 " + string);
 }
 
+void askPrinterForStatus() {
+  if (isPrinting == false) {
+    sendToPrinter("M105");
+  }
+}
+
 void handlePrint() {
 
   // Do nothing if we are already printing. TODO: Give clear response
@@ -117,7 +131,7 @@ void handlePrint() {
 
   shouldPrint = false;
   isPrinting = true;
-  os_timer_disarm(&myTimer);
+  statusTimer.detach();
 
   int i = 0;
   String line;
@@ -143,7 +157,7 @@ void handlePrint() {
       lcd("Cannot open file");
     }
     isPrinting = false;
-    os_timer_arm(&myTimer, timerInterval, true);
+    statusTimer.attach(statusInterval, askPrinterForStatus);
     lcd("Complete");
     gcodeFile.close();
   } else {
@@ -167,7 +181,7 @@ void handlePrint() {
       lcd("Cannot open file");
     }
     isPrinting = false;
-    os_timer_arm(&myTimer, timerInterval, true);
+    statusTimer.attach(statusInterval, askPrinterForStatus);
     lcd("Complete");
     gcodeFile.close();
 
@@ -255,14 +269,14 @@ void setup() {
   });
 
   // For Slic3r OctoPrint compatibility
-  
+
   server.on("/api/files/local", HTTP_POST, [](AsyncWebServerRequest * request) {
     // sendToPrinter("M300 S500 P50"); // M300: Play beep sound - THIS LEADS TO CRASHES DURING UPLOAD!
     // lcd("Receiving..."); - THIS LEADS TO CRASHES DURING UPLOAD!
     // lcd(request->contentType()); - THIS LEADS TO CRASHES DURING UPLOAD!
     // http://docs.octoprint.org/en/master/api/files.html#upload-response
 
-    if(!request->hasParam("file", true, true)){
+    if (!request->hasParam("file", true, true)) {
       lcd("Needs PR #192"); // Cura
       // Cura needs https://github.com/me-no-dev/ESPAsyncWebServer/pull/192
     }
@@ -278,13 +292,13 @@ void setup() {
   // Poor Man's JSON:
   // https://jsonformatter.curiousconcept.com/
   // https://www.freeformatter.com/json-escape.html
-  
+
   server.on("/api/job", HTTP_GET, [](AsyncWebServerRequest * request) {
     // http://docs.octoprint.org/en/master/api/datamodel.html#sec-api-datamodel-jobs-job
     request->send(200, "application/json", "{\r\n  \"job\": {\r\n    \"file\": {\r\n      \"name\": \"Unknown\",\r\n      \"origin\": \"local\",\r\n      \"size\": 1468987,\r\n      \"date\": 1378847754\r\n    },\r\n    \"estimatedPrintTime\": 8811,\r\n    \"filament\": {\r\n      \"length\": 810,\r\n      \"volume\": 5.36\r\n    }\r\n  },\r\n  \"progress\": {\r\n    \"completion\": 0.2298468264184775,\r\n    \"filepos\": 337942,\r\n    \"printTime\": 0,\r\n    \"printTimeLeft\": 0\r\n  }\r\n}");
   });
   // TODO: Implement POST. Cura uses this to pause and abort prints.
-  
+
   server.on("/api/printer", HTTP_GET, [](AsyncWebServerRequest * request) {
     // http://docs.octoprint.org/en/master/api/datamodel.html#printer-state
     request->send(200, "application/json", "{\r\n  \"temperature\": {\r\n    \"tool0\": {\r\n      \"actual\": 214.8821,\r\n      \"target\": 220.0,\r\n      \"offset\": 0\r\n    },\r\n    \"bed\": {\r\n      \"actual\": 50.221,\r\n      \"target\": 70.0,\r\n      \"offset\": 5\r\n    }\r\n  },\r\n  \"sd\": {\r\n    \"ready\": true\r\n  },\r\n  \"state\": {\r\n    \"text\": \"Operational\",\r\n    \"flags\": {\r\n      \"operational\": true,\r\n      \"paused\": false,\r\n      \"printing\": " + String(isPrinting) + ",\r\n      \"sdReady\": true,\r\n      \"error\": false,\r\n      \"ready\": true,\r\n      \"closedOrError\": false\r\n    }\r\n  }\r\n}");
@@ -295,7 +309,7 @@ void setup() {
   server.on("/api/printer/command", HTTP_POST, [](AsyncWebServerRequest * request) {
     lcd("TODO!!!");
   });
-  
+
   // For legacy PrusaControlWireless - deprecated in favor of the OctoPrint API
   server.on("/print", HTTP_POST, [](AsyncWebServerRequest * request) {
     request->send(200, "text/plain", "Received");
@@ -315,8 +329,7 @@ void setup() {
   server.begin();
 
   /* Set up the timer to fire every 2 seconds */
-  os_timer_setfn(&myTimer, timerCallback, NULL);
-  os_timer_arm(&myTimer, timerInterval, true);
+  statusTimer.attach(statusInterval, askPrinterForStatus);
 
 }
 
@@ -325,7 +338,7 @@ File uploadFile; // SD card
 
 void handleUpload(AsyncWebServerRequest * request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
   if (!hasSD) { // No SD, hence use SPIFFS
-  
+
     filename = "/cache.gco";
     if (!filename.startsWith("/")) filename = "/" + filename;
 
@@ -370,10 +383,4 @@ void handleUpload(AsyncWebServerRequest * request, String filename, size_t index
 void loop() {
   ArduinoOTA.handle();
   if (shouldPrint == true) handlePrint();
-
-  /* When the timer has ticked and we are not printing, ask for temperature */
-  if ((isPrinting == false) && (tickOccured == true)) {
-     sendToPrinter("M105");
-     tickOccured = false;
-  }
 }
