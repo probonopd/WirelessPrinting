@@ -51,6 +51,14 @@ int statusInterval(2); // Ask the printer for its status every 2 seconds
 
 Ticker blinker;
 
+// Variables for printer status reporting
+String temperature_actual = "0.0";
+String temperature_target = "0.0";
+String temperature_tool0_actual = "0.0";
+String temperature_tool0_target = "0.0";
+String temperature_bed_actual = "0.0";
+String temperature_bed_target = "0.0";
+
 // https://forum.arduino.cc/index.php?topic=228884.msg2670971#msg2670971
 String IpAddress2String(const IPAddress& ipAddress)
 {
@@ -73,6 +81,37 @@ void startBlinking(float secs) {
 void stopBlinking() {
   digitalWrite(LED_BUILTIN, HIGH);
   blinker.detach();
+}
+
+// Parse temperatures from printer responses like
+// ok T:32.8 /0.0 B:31.8 /0.0 T0:32.8 /0.0 @:0 B@:0
+String parseTemp(String response, String whichTemp, bool getTarget = false) {
+  String temperature;
+  int Tpos = response.indexOf(whichTemp + ":");
+  if (Tpos > -1) { // This response contains a temperature
+    int slashpos = response.indexOf(" /", Tpos);
+    int spacepos = response.indexOf(" ", slashpos + 1);
+    //if match mask T:xxx.xx /xxx.xx
+    if (spacepos - Tpos < 17) {
+      if (! getTarget) {
+        temperature = response.substring(Tpos + whichTemp.length() + 1, slashpos);
+      } else {
+        temperature = response.substring(slashpos + 2, spacepos);
+      }
+    } else {
+      temperature = "0.0";
+    }
+  }
+  return (temperature);
+}
+
+void parseTemperatures(String response) {
+  temperature_actual = parseTemp(response, "T");
+  temperature_target = parseTemp(response, "T", true);
+  temperature_tool0_actual = parseTemp(response, "T0");
+  temperature_tool0_target = parseTemp(response, "T0", true);
+  temperature_bed_actual = parseTemp(response, "B");
+  temperature_bed_target = parseTemp(response, "B", true);
 }
 
 String sendToPrinter(String line) {
@@ -103,6 +142,7 @@ String sendToPrinter(String line) {
   okFound = false;
   while (okFound == false) {
     response = Serial.readStringUntil('\n');
+    parseTemperatures(response);
     lineLastReceived = response;
     if (response.startsWith("ok")) okFound = true;
   }
@@ -301,6 +341,7 @@ void setup() {
 
   server.on("/api/printer", HTTP_GET, [](AsyncWebServerRequest * request) {
     // http://docs.octoprint.org/en/master/api/datamodel.html#printer-state
+    // FIXME: Fill with the parsed values. Will it crash? Hence use ArduinoJson?
     request->send(200, "application/json", "{\r\n  \"temperature\": {\r\n    \"tool0\": {\r\n      \"actual\": 0.0,\r\n      \"target\": 0.0,\r\n      \"offset\": 0\r\n    },\r\n    \"bed\": {\r\n      \"actual\": 0.0,\r\n      \"target\": 0.0,\r\n      \"offset\": 0\r\n    }\r\n  },\r\n  \"sd\": {\r\n    \"ready\": true\r\n  },\r\n  \"state\": {\r\n    \"text\": \"Operational\",\r\n    \"flags\": {\r\n      \"operational\": true,\r\n      \"paused\": false,\r\n      \"printing\": " + String(isPrinting) + ",\r\n      \"sdReady\": true,\r\n      \"error\": false,\r\n      \"ready\": true,\r\n      \"closedOrError\": false\r\n    }\r\n  }\r\n}");
   });
 
