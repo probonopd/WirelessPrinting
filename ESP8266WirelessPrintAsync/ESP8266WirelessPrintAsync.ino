@@ -375,7 +375,7 @@ void setup() {
   // Cura uses this to Pre-heat the build plate (M140)
   // http://docs.octoprint.org/en/master/api/printer.html#send-an-arbitrary-command-to-the-printer
   server.on("/api/printer/command", HTTP_POST, [](AsyncWebServerRequest * request) {
-    lcd("TODO!!!");
+    lcd("TODO!!!"); // https://github.com/me-no-dev/ESPAsyncWebServer/issues/195
   });
 
   // For legacy PrusaControlWireless - deprecated in favor of the OctoPrint API
