@@ -42,10 +42,13 @@ bool shouldPrint = false;
 long lineNumberLastPrinted = 0;
 String lineLastSent = "";
 String lineLastReceived = "";
+String lineSecondLastReceived = "";
 bool hasSD = false; // will be set true if SD card is detected and usable; otherwise use SPIFFS
 
 String priorityLine = ""; // A line that should be sent to the printer "in between"/before any other lines being sent. TODO: Extend to an array of lines
 
+String fwMACHINE_TYPE = "Unknown"; // Will be parsed from M115
+  
 Ticker statusTimer;
 int statusInterval(2); // Ask the printer for its status every 2 seconds
 bool shouldAskPrinterForStatus = false;
@@ -99,8 +102,6 @@ String parseTemp(String response, String whichTemp, bool getTarget = false) {
       } else {
         temperature = response.substring(slashpos + 2, spacepos);
       }
-    } else {
-      temperature = "0.0";
     }
   }
   return (temperature);
@@ -144,6 +145,7 @@ String sendToPrinter(String line) {
   while (okFound == false) {
     response = Serial.readStringUntil('\n');
     parseTemperatures(response);
+    lineSecondLastReceived = lineLastReceived;
     lineLastReceived = response;
     if (response.startsWith("ok")) okFound = true;
   }
@@ -171,7 +173,7 @@ void handlePrint() {
     return;
   }
 
-  sendToPrinter("M300 S500 P50"); // M300: Play beep sound
+  sendToPrinter("M300 S500 P50"); // M300 - Play beep sound
   lcd("Printing...");
 
   shouldPrint = false;
@@ -241,8 +243,11 @@ void setup() {
     hasSD = true;
   }
 
-  // delay(5000); // 3D printer needs this time
   Serial.begin(115200);
+
+  // Wait until we detect a printer - seemingly not needed? Using this would have the disadvantage that you always need to reset the printer as well as the ESP
+  // Serial.flush(); //flush all previous received and transmitted data
+  // while(!Serial.available()) ; // hang program until a byte is received notice the ; after the while()
 
   String text;
 
@@ -258,7 +263,14 @@ void setup() {
     text += " SD";
   }
   lcd(text);
-  sendToPrinter("M300 S500 P50"); // M300: Play beep sound
+  sendToPrinter("M300 S500 P50"); // M300 - Play beep sound
+
+  sendToPrinter("M115"); // M115 - Firmware Info
+
+  // Parse the name of the machine from M115
+  if((lineSecondLastReceived.indexOf("MACHINE_TYPE:") > -1) && (lineSecondLastReceived.indexOf("EXTRUDER_COUNT:") > -1)){
+    fwMACHINE_TYPE = lineSecondLastReceived.substring(lineSecondLastReceived.indexOf("MACHINE_TYPE:")+13, lineSecondLastReceived.indexOf("EXTRUDER_COUNT:"));
+  }
 
   if (MDNS.begin(host)) {
 
@@ -309,6 +321,7 @@ void setup() {
     message += "";
     message += "<p><a href=\"/download\">Download</a></p>";
     message +=  String("<pre>") + String("lineLastSent: ") + lineLastSent + String("\n") +
+                String("lineSecondLastReceived: ") + lineSecondLastReceived + String("\n") +
                 String("lineLastReceived: ") + lineLastReceived + String("\n") + String("</pre>");
     request->send(200, "text/html", message);
   });
@@ -316,7 +329,7 @@ void setup() {
   // For Slic3r OctoPrint compatibility
 
   server.on("/api/files/local", HTTP_POST, [](AsyncWebServerRequest * request) {
-    // sendToPrinter("M300 S500 P50"); // M300: Play beep sound - THIS LEADS TO CRASHES DURING UPLOAD!
+    // sendToPrinter("M300 S500 P50"); // M300 - Play beep sound - THIS LEADS TO CRASHES DURING UPLOAD!
     // lcd("Receiving..."); - THIS LEADS TO CRASHES DURING UPLOAD!
     // lcd(request->contentType()); - THIS LEADS TO CRASHES DURING UPLOAD!
     // http://docs.octoprint.org/en/master/api/files.html#upload-response
