@@ -107,12 +107,12 @@ String parseTemp(String response, String whichTemp, bool getTarget = false) {
 }
 
 void parseTemperatures(String response) {
-  temperature_actual = parseTemp(response, "T");
-  temperature_target = parseTemp(response, "T", true);
-  temperature_tool0_actual = parseTemp(response, "T0");
-  temperature_tool0_target = parseTemp(response, "T0", true);
-  temperature_bed_actual = parseTemp(response, "B");
-  temperature_bed_target = parseTemp(response, "B", true);
+  if(parseTemp(response, "T") != "") temperature_actual = parseTemp(response, "T");
+  if(parseTemp(response, "T", true) != "") temperature_target = parseTemp(response, "T", true);
+  if(parseTemp(response, "T0") != "") temperature_tool0_actual = parseTemp(response, "T0");
+  if(parseTemp(response, "T0", true) != "") temperature_tool0_target = parseTemp(response, "T0", true);
+  if(parseTemp(response, "B") != "") temperature_bed_actual = parseTemp(response, "B");
+  if(parseTemp(response, "B", true) != "") temperature_bed_target = parseTemp(response, "B", true);
 }
 
 String sendToPrinter(String line) {
