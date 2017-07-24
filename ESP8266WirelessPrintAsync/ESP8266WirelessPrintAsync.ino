@@ -48,6 +48,7 @@ String priorityLine = ""; // A line that should be sent to the printer "in betwe
 
 Ticker statusTimer;
 int statusInterval(2); // Ask the printer for its status every 2 seconds
+bool shouldAskPrinterForStatus = false;
 
 Ticker blinker;
 
@@ -155,7 +156,11 @@ void lcd(String string) {
 
 void askPrinterForStatus() {
   if (isPrinting == false) {
-    sendToPrinter("M105");
+    // Doing the following here takes too long and can crash:
+    // sendToPrinter("M105");
+    // Hence we just indicate that this should be done via setting a variable
+    // and do the actual work from loop()
+    shouldAskPrinterForStatus = true;
   }
 }
 
@@ -424,4 +429,10 @@ void handleUpload(AsyncWebServerRequest * request, String filename, size_t index
 void loop() {
   ArduinoOTA.handle();
   if (shouldPrint == true) handlePrint();
+
+  if(shouldAskPrinterForStatus){
+    shouldAskPrinterForStatus = false;
+    sendToPrinter("M105"); // Doing this in the ticker callback would take too long and crash it
+  }
+  
 }
