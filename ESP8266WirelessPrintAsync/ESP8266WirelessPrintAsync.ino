@@ -30,8 +30,6 @@ DNSServer dns;
 // #include "AsyncJson.h"
 // #include "ArduinoJson.h"
 
-const char * host = "WirelessPrintingAsync";
-
 const char* sketch_version = "1.0";
 
 bool okFound = true; // Set to true if last response from 3D printer was "ok", otherwise false
@@ -47,7 +45,8 @@ bool hasSD = false; // will be set true if SD card is detected and usable; other
 
 String priorityLine = ""; // A line that should be sent to the printer "in between"/before any other lines being sent. TODO: Extend to an array of lines
 
-String fwMACHINE_TYPE = "Unknown"; // Will be parsed from M115
+String fwM115 = "Unknown"; // Result of M115
+String device_name = "Unknown"; // Will be parsed from M115
   
 Ticker statusTimer;
 int statusInterval(2); // Ask the printer for its status every 2 seconds
@@ -256,6 +255,7 @@ void setup() {
   digitalWrite(LED_BUILTIN, LOW);   // Turn the LED on (Note that LOW is the voltage level
   AsyncWiFiManager wifiManager(&server, &dns);
   // wifiManager.resetSettings();   // Uncomment this to reset the settings on the device, then you will need to reflash with USB and this commented out!
+  wifiManager.setDebugOutput(false); // So that it does not send stuff to the printer that the printer does not understand
   wifiManager.autoConnect("AutoConnectAP");
   digitalWrite(LED_BUILTIN, HIGH);  // Turn the LED off (Note that LOW is the voltage level
   text = IpAddress2String(WiFi.localIP());
@@ -268,11 +268,18 @@ void setup() {
   sendToPrinter("M115"); // M115 - Firmware Info
 
   // Parse the name of the machine from M115
+  fwM115 = lineSecondLastReceived;
+  String fwMACHINE_TYPE = "Unknown";
   if((lineSecondLastReceived.indexOf("MACHINE_TYPE:") > -1) && (lineSecondLastReceived.indexOf("EXTRUDER_COUNT:") > -1)){
-    fwMACHINE_TYPE = lineSecondLastReceived.substring(lineSecondLastReceived.indexOf("MACHINE_TYPE:")+13, lineSecondLastReceived.indexOf("EXTRUDER_COUNT:"));
+    fwMACHINE_TYPE = lineSecondLastReceived.substring(lineSecondLastReceived.indexOf("MACHINE_TYPE:")+13, lineSecondLastReceived.indexOf("EXTRUDER_COUNT:")-1);
   }
 
-  if (MDNS.begin(host)) {
+  char output[9];
+  itoa(ESP.getChipId(), output, 16);
+  String chip_id = String(output);
+  device_name = fwMACHINE_TYPE + " (" + chip_id + ")";
+  
+  if (MDNS.begin(device_name.c_str())) {
 
     // For Cura WirelessPrint - deprecated in favor of the OctoPrint API
     MDNS.addService("wirelessprint", "tcp", 80);
@@ -293,7 +300,7 @@ void setup() {
     MDNS.addServiceTxt("http", "tcp", "version", "1.2.10");
   }
 
-  ArduinoOTA.setHostname(host);
+  // ArduinoOTA.setHostname(host);
   ArduinoOTA.begin();
 
   MDNS.addService("http", "tcp", 80);
@@ -308,7 +315,7 @@ void setup() {
   });
 
   server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
-    String message = "<h1>WirelessPrint</h1>";
+    String message = "<h1>" + device_name + "</h1>";
     message += "<form enctype=\"multipart/form-data\" action=\"/api/files/local\" method=\"POST\">\n";
     message += "<p>You can also print from the command line using curl:</p>\n";
     message += "<pre>curl -F \"file=@/path/to/some.gcode\" ";
@@ -320,7 +327,9 @@ void setup() {
     message += "</form>";
     message += "";
     message += "<p><a href=\"/download\">Download</a></p>";
-    message +=  String("<pre>") + String("lineLastSent: ") + lineLastSent + String("\n") +
+    message +=  String("<pre>") + 
+                String("fwM115: ") + fwM115 + String("\n") +
+                String("lineLastSent: ") + lineLastSent + String("\n") +
                 String("lineSecondLastReceived: ") + lineSecondLastReceived + String("\n") +
                 String("lineLastReceived: ") + lineLastReceived + String("\n") + String("</pre>");
     request->send(200, "text/html", message);
