@@ -6,7 +6,20 @@ Print wirelessly from [Cura](https://ultimaker.com/en/products/cura-software), [
 
 __UNDER DEVELOPMENT__. See [Issues](https://github.com/probonopd/WirelessPrinting/issues). Pull requests welcome!
 
-### Hardware
+## Comparison with other printer hosts
+
+| Printer SD card slot | OctoPrint | WirelessPrint |
+| --- | --- | --- |
+| Need to plug SD card into computer and then into printer for each print | Ethernet and wireless | Wireless |
+| No cost (comes with many printers) | High cost (Raspberry Pi, Power supply, SD card) | Inexpensive | 
+| No clutter on desktop | Clutter on desktop (Raspberry Pi, cable) | No clutter (can be placed inside printer electronics box) |
+| No set-up needed | Set-up needed (full Linux operating system, hundreds of megabytes) | Only quick wireless network setup needed | 
+| No maintenance needed (other than replacing broken SD card slots) | High maintenance needed (OS updates) | Low maintenance needed (Firmware updates for bugfixes and new features) |
+| No extra power consumption | 2.5 W power consumption | Under 1 W power consumption |
+| No webcam | Webcam can be attached | No webcam |
+| No notifications | Notifications, e.g., "print ready" | Notifications possible (send pull requests) |
+
+## Hardware
 
 _Readymade, pre-assembled, flashed and tested hardware may be available, please contact me for information._
 
