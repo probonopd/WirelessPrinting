@@ -27,8 +27,8 @@ AsyncWebServer server(80);
 DNSServer dns;
 
 // For implementing (a subset of) the OctoPrint API
-// #include "AsyncJson.h"
-// #include "ArduinoJson.h"
+#include "AsyncJson.h"
+#include "ArduinoJson.h"
 
 const char* sketch_version = "1.0";
 
@@ -44,6 +44,7 @@ String lineSecondLastReceived = "";
 bool hasSD = false; // will be set true if SD card is detected and usable; otherwise use SPIFFS
 
 String priorityLine = ""; // A line that should be sent to the printer "in between"/before any other lines being sent. TODO: Extend to an array of lines
+String commandLine = "";
 
 String fwM115 = "Unknown"; // Result of M115
 String device_name = "Unknown"; // Will be parsed from M115
@@ -372,11 +373,28 @@ void setup() {
     // request->send(200, "application/json", "{\r\n  \"temperature\": {\r\n    \"tool0\": {\r\n      \"actual\": 0.0,\r\n      \"target\": 0.0,\r\n      \"offset\": 0\r\n    },\r\n    \"bed\": {\r\n      \"actual\": 0.0,\r\n      \"target\": 0.0,\r\n      \"offset\": 0\r\n    }\r\n  },\r\n  \"sd\": {\r\n    \"ready\": true\r\n  },\r\n  \"state\": {\r\n    \"text\": \"Operational\",\r\n    \"flags\": {\r\n      \"operational\": true,\r\n      \"paused\": false,\r\n      \"printing\": " + String(isPrinting) + ",\r\n      \"sdReady\": true,\r\n      \"error\": false,\r\n      \"ready\": true,\r\n      \"closedOrError\": false\r\n    }\r\n  }\r\n}");
   });
 
-  // Cura uses this to Pre-heat the build plate (M140)
-  // http://docs.octoprint.org/en/master/api/printer.html#send-an-arbitrary-command-to-the-printer
-  server.on("/api/printer/command", HTTP_POST, [](AsyncWebServerRequest * request) {
-    lcd("TODO!!!"); // https://github.com/me-no-dev/ESPAsyncWebServer/issues/195
+/*
+
+  // Parse POST JSON data, https://github.com/me-no-dev/ESPAsyncWebServer/issues/195
+  server.onRequestBody([](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total) {
+    Serial.println("Running");
+    DynamicJsonBuffer jsonBuffer;
+    if (request->url() == "/api/printer/command") {
+      
+      JsonObject& root = jsonBuffer.parseObject((const char*)data);
+      if (root.success()) {
+        if (root.containsKey("command")) {
+          // Cura uses this to Pre-heat the build plate (M140)
+          // http://docs.octoprint.org/en/master/api/printer.html#send-an-arbitrary-command-to-the-printer
+          // sendToPrinter(root["command"]); // Crashes when done here. Takes too long for inside a callback?
+          commandLine = root["command"].asString();
+        }
+      }
+      request->send(204);
+    }
   });
+
+*/
 
   // For legacy PrusaControlWireless - deprecated in favor of the OctoPrint API
   server.on("/print", HTTP_POST, [](AsyncWebServerRequest * request) {
@@ -451,6 +469,11 @@ void handleUpload(AsyncWebServerRequest * request, String filename, size_t index
 void loop() {
   ArduinoOTA.handle();
   if (shouldPrint == true) handlePrint();
+
+  if(commandLine != ""){
+    sendToPrinter(commandLine);
+    commandLine = "";
+  }
 
   if(shouldAskPrinterForStatus){
     shouldAskPrinterForStatus = false;
