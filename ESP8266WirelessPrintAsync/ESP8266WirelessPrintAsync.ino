@@ -23,6 +23,9 @@
 #include <ESPAsyncWebServer.h>
 #include <ESPAsyncWiFiManager.h> // https://github.com/alanswx/ESPAsyncWiFiManager/
 
+WiFiServer telnetServer(23);
+WiFiClient serverClient;
+
 AsyncWebServer server(80);
 DNSServer dns;
 
@@ -48,7 +51,7 @@ String commandLine = "";
 
 String fwM115 = "Unknown"; // Result of M115
 String device_name = "Unknown"; // Will be parsed from M115
-  
+
 Ticker statusTimer;
 int statusInterval(2); // Ask the printer for its status every 2 seconds
 bool shouldAskPrinterForStatus = false;
@@ -108,12 +111,12 @@ String parseTemp(String response, String whichTemp, bool getTarget = false) {
 }
 
 void parseTemperatures(String response) {
-  if(parseTemp(response, "T") != "") temperature_actual = parseTemp(response, "T");
-  if(parseTemp(response, "T", true) != "") temperature_target = parseTemp(response, "T", true);
-  if(parseTemp(response, "T0") != "") temperature_tool0_actual = parseTemp(response, "T0");
-  if(parseTemp(response, "T0", true) != "") temperature_tool0_target = parseTemp(response, "T0", true);
-  if(parseTemp(response, "B") != "") temperature_bed_actual = parseTemp(response, "B");
-  if(parseTemp(response, "B", true) != "") temperature_bed_target = parseTemp(response, "B", true);
+  if (parseTemp(response, "T") != "") temperature_actual = parseTemp(response, "T");
+  if (parseTemp(response, "T", true) != "") temperature_target = parseTemp(response, "T", true);
+  if (parseTemp(response, "T0") != "") temperature_tool0_actual = parseTemp(response, "T0");
+  if (parseTemp(response, "T0", true) != "") temperature_tool0_target = parseTemp(response, "T0", true);
+  if (parseTemp(response, "B") != "") temperature_bed_actual = parseTemp(response, "B");
+  if (parseTemp(response, "B", true) != "") temperature_bed_target = parseTemp(response, "B", true);
 }
 
 String sendToPrinter(String line) {
@@ -139,11 +142,22 @@ String sendToPrinter(String line) {
   }
 
   Serial.println(line); // Send to 3D Printer
+  
+  if (serverClient && serverClient.connected()) {  // send data to telnet client if connected
+    serverClient.println("> " + line);
+  }
 
   lineLastSent = line;
   okFound = false;
   while (okFound == false) {
     response = Serial.readStringUntil('\n');
+  if (serverClient && serverClient.connected()) {  // send data to telnet client if connected
+    serverClient.println("< " + response);
+    serverClient.print(millis());
+    serverClient.print(", free heap RAM: ");
+    serverClient.println(ESP.getFreeHeap());
+    serverClient.println();
+  }
     parseTemperatures(response);
     lineSecondLastReceived = lineLastReceived;
     lineLastReceived = response;
@@ -271,15 +285,15 @@ void setup() {
   // Parse the name of the machine from M115
   fwM115 = lineSecondLastReceived;
   String fwMACHINE_TYPE = "Unknown";
-  if((lineSecondLastReceived.indexOf("MACHINE_TYPE:") > -1) && (lineSecondLastReceived.indexOf("EXTRUDER_COUNT:") > -1)){
-    fwMACHINE_TYPE = lineSecondLastReceived.substring(lineSecondLastReceived.indexOf("MACHINE_TYPE:")+13, lineSecondLastReceived.indexOf("EXTRUDER_COUNT:")-1);
+  if ((lineSecondLastReceived.indexOf("MACHINE_TYPE:") > -1) && (lineSecondLastReceived.indexOf("EXTRUDER_COUNT:") > -1)) {
+    fwMACHINE_TYPE = lineSecondLastReceived.substring(lineSecondLastReceived.indexOf("MACHINE_TYPE:") + 13, lineSecondLastReceived.indexOf("EXTRUDER_COUNT:") - 1);
   }
 
   char output[9];
   itoa(ESP.getChipId(), output, 16);
   String chip_id = String(output);
   device_name = fwMACHINE_TYPE + " (" + chip_id + ")";
-  
+
   if (MDNS.begin(device_name.c_str())) {
 
     // For Cura WirelessPrint - deprecated in favor of the OctoPrint API
@@ -328,7 +342,7 @@ void setup() {
     message += "</form>";
     message += "";
     message += "<p><a href=\"/download\">Download</a></p>";
-    message +=  String("<pre>") + 
+    message +=  String("<pre>") +
                 String("fwM115: ") + fwM115 + String("\n") +
                 String("lineLastSent: ") + lineLastSent + String("\n") +
                 String("lineSecondLastReceived: ") + lineSecondLastReceived + String("\n") +
@@ -373,28 +387,24 @@ void setup() {
     // request->send(200, "application/json", "{\r\n  \"temperature\": {\r\n    \"tool0\": {\r\n      \"actual\": 0.0,\r\n      \"target\": 0.0,\r\n      \"offset\": 0\r\n    },\r\n    \"bed\": {\r\n      \"actual\": 0.0,\r\n      \"target\": 0.0,\r\n      \"offset\": 0\r\n    }\r\n  },\r\n  \"sd\": {\r\n    \"ready\": true\r\n  },\r\n  \"state\": {\r\n    \"text\": \"Operational\",\r\n    \"flags\": {\r\n      \"operational\": true,\r\n      \"paused\": false,\r\n      \"printing\": " + String(isPrinting) + ",\r\n      \"sdReady\": true,\r\n      \"error\": false,\r\n      \"ready\": true,\r\n      \"closedOrError\": false\r\n    }\r\n  }\r\n}");
   });
 
-/*
+    // Parse POST JSON data, https://github.com/me-no-dev/ESPAsyncWebServer/issues/195
+    server.onRequestBody([](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total) {
+      Serial.println("Running");
+      DynamicJsonBuffer jsonBuffer;
+      if (request->url() == "/api/printer/command") {
 
-  // Parse POST JSON data, https://github.com/me-no-dev/ESPAsyncWebServer/issues/195
-  server.onRequestBody([](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total) {
-    Serial.println("Running");
-    DynamicJsonBuffer jsonBuffer;
-    if (request->url() == "/api/printer/command") {
-      
-      JsonObject& root = jsonBuffer.parseObject((const char*)data);
-      if (root.success()) {
-        if (root.containsKey("command")) {
-          // Cura uses this to Pre-heat the build plate (M140)
-          // http://docs.octoprint.org/en/master/api/printer.html#send-an-arbitrary-command-to-the-printer
-          // sendToPrinter(root["command"]); // Crashes when done here. Takes too long for inside a callback?
-          commandLine = root["command"].asString();
+        JsonObject& root = jsonBuffer.parseObject((const char*)data);
+        if (root.success()) {
+          if (root.containsKey("command")) {
+            // Cura uses this to Pre-heat the build plate (M140)
+            // http://docs.octoprint.org/en/master/api/printer.html#send-an-arbitrary-command-to-the-printer
+            // sendToPrinter(root["command"]); // Crashes when done here. Takes too long for inside a callback?
+            commandLine = root["command"].asString();
+          }
         }
+        request->send(204);
       }
-      request->send(204);
-    }
-  });
-
-*/
+    });
 
   // For legacy PrusaControlWireless - deprecated in favor of the OctoPrint API
   server.on("/print", HTTP_POST, [](AsyncWebServerRequest * request) {
@@ -408,11 +418,19 @@ void setup() {
 
 
   server.onNotFound([](AsyncWebServerRequest * request) {
-    // lcd(request->url()); // For debugging the APIs only ---- does it crash the device???
     request->send(404);
+  if (serverClient && serverClient.connected()) {  // send data to telnet client if connected
+    serverClient.println("404");
+    serverClient.println("request->url()");
+    serverClient.println("");
+  }
+
   });
 
   server.begin();
+
+  telnetServer.begin();
+  telnetServer.setNoDelay(true);
 
   /* Set up the timer to fire every 2 seconds */
   statusTimer.attach(statusInterval, askPrinterForStatus);
@@ -470,14 +488,31 @@ void loop() {
   ArduinoOTA.handle();
   if (shouldPrint == true) handlePrint();
 
-  if(commandLine != ""){
+  if (commandLine != "") {
     sendToPrinter(commandLine);
     commandLine = "";
   }
 
-  if(shouldAskPrinterForStatus){
+  if (shouldAskPrinterForStatus) {
     shouldAskPrinterForStatus = false;
     sendToPrinter("M105"); // Doing this in the ticker callback would take too long and crash it
   }
-  
+
+  // look for Client connect trial
+  if (telnetServer.hasClient()) {
+    if (!serverClient || !serverClient.connected()) {
+      if (serverClient) {
+        serverClient.stop();
+      }
+      serverClient = telnetServer.available();
+      serverClient.flush();  // clear input buffer, else you get strange characters
+    }
+  }
+
+  while (serverClient.available()) { // get data from Client
+    Serial.write(serverClient.read());
+  }
+
+  // delay(10);  // to avoid strange characters left in buffer
+
 }
