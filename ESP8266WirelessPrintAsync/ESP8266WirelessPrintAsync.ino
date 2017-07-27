@@ -389,7 +389,6 @@ void setup() {
 
     // Parse POST JSON data, https://github.com/me-no-dev/ESPAsyncWebServer/issues/195
     server.onRequestBody([](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total) {
-      Serial.println("Running");
       DynamicJsonBuffer jsonBuffer;
       if (request->url() == "/api/printer/command") {
 
