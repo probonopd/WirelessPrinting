@@ -273,6 +273,10 @@ void setup() {
   wifiManager.setDebugOutput(false); // So that it does not send stuff to the printer that the printer does not understand
   wifiManager.autoConnect("AutoConnectAP");
   digitalWrite(LED_BUILTIN, HIGH);  // Turn the LED off (Note that LOW is the voltage level
+  
+  telnetServer.begin();
+  telnetServer.setNoDelay(true);
+   
   text = IpAddress2String(WiFi.localIP());
   if (hasSD) {
     text += " SD";
@@ -427,9 +431,6 @@ void setup() {
   });
 
   server.begin();
-
-  telnetServer.begin();
-  telnetServer.setNoDelay(true);
 
   /* Set up the timer to fire every 2 seconds */
   statusTimer.attach(statusInterval, askPrinterForStatus);
