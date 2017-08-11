@@ -26,8 +26,8 @@ Can be flashed via USB or (subsequently) over the air. You can use the Arduino I
 ```
 # USB
  sudo chmod a+x /dev/ttyUSB0
-`/tmp/.mount_*/usr/bin/hardware/esp8266/esp8266/tools/esptool/esptool -vv -cd nodemcu -cb 921600 -cp /dev/ttyUSB0 -ca 0x00000 -cf ESP8266WirelessPrint_d1_mini_08d8b11.bin
+`/tmp/.mount_*/usr/bin/hardware/esp8266/esp8266/tools/esptool/esptool -vv -cd nodemcu -cb 921600 -cp /dev/ttyUSB0 -ca 0x00000 -cf ESP8266WirelessPrint*.bin
 
 # Wireless
-python /tmp/.mount_*/usr/bin/hardware/esp8266/esp8266/tools/espota.py -i 192.168.0.27 -p 8266 --auth= -f ESP8266WirelessPrint_*.bin
+python /tmp/.mount_*/usr/bin/hardware/esp8266/esp8266/tools/espota.py -i 192.168.0.27 -p 8266 --auth= -f ESP8266WirelessPrint*.bin
 ```
