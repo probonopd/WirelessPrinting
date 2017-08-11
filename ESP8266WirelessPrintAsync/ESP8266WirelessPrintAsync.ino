@@ -412,7 +412,7 @@ void setup() {
   // For Cura 2.7.0 OctoPrintPlugin compatibility
   // https://github.com/probonopd/WirelessPrinting/issues/18#issuecomment-321927016
   server.on("/api/settings", HTTP_GET, [](AsyncWebServerRequest * request) {
-    request->send(200, "text/plain", "");
+    request->send(200, "application/json", "{}");
   });
    
   // For legacy PrusaControlWireless - deprecated in favor of the OctoPrint API
