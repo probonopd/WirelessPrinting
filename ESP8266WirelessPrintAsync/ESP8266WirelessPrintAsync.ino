@@ -370,7 +370,7 @@ void setup() {
     request->send(200, "application/json", "{\r\n  \"files\": {\r\n    \"local\": {\r\n      \"name\": \"cache.gco\",\r\n      \"origin\": \"local\",\r\n      \"refs\": {\r\n        \"resource\": \"\",\r\n        \"download\": \"\"\r\n      }\r\n    }\r\n  },\r\n  \"done\": true\r\n}\r\n");
   }, handleUpload);
 
-  // For Cura 2.6.0 OctoPrint compatibility
+  // For Cura 2.6.0 OctoPrintPlugin compatibility
   // Must be valid JSON
   // http://docs.octoprint.org/en/master/api
   // TODO: Fill with values that actually make sense; currently this is enough for Cura 2.6.0 not to crash
@@ -409,6 +409,12 @@ void setup() {
       }
     });
 
+  // For Cura 2.7.0 OctoPrintPlugin compatibility
+  // https://github.com/probonopd/WirelessPrinting/issues/18#issuecomment-321927016
+  server.on("/api/settings", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send(200, "text/plain", "");
+  });
+   
   // For legacy PrusaControlWireless - deprecated in favor of the OctoPrint API
   server.on("/print", HTTP_POST, [](AsyncWebServerRequest * request) {
     request->send(200, "text/plain", "Received");
