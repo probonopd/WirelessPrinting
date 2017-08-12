@@ -60,10 +60,11 @@ Can be flashed via USB or (subsequently) over the air. You can use the Arduino I
 ```
 # USB
  sudo chmod a+x /dev/ttyUSB0
-`/tmp/.mount_*/usr/bin/hardware/esp8266/esp8266/tools/esptool/esptool -vv -cd nodemcu -cb 921600 -cp /dev/ttyUSB0 -ca 0x00000 -cf ESP8266WirelessPrint*.bin
+/tmp/.mount_*/usr/bin/hardware/esp8266/esp8266/tools/esptool/esptool -vv -cd nodemcu -cb 921600 -cp /dev/ttyUSB0 -ca 0x00000 -cf ESP8266WirelessPrint*.bin
 
 # Wireless
-python /tmp/.mount_*/usr/bin/hardware/esp8266/esp8266/tools/espota.py -i 192.168.0.27 -p 8266 --auth= -f ESP8266WirelessPrint*.bin
+wget -c "https://raw.githubusercontent.com/esp8266/Arduino/master/tools/espota.py"
+python espota.py -i 192.168.0.27 -p 8266 --auth= -f ESP8266WirelessPrint*.bin
 ```
 
 ## Wireless printing with Cura
