@@ -1,9 +1,3 @@
-/*
-   TODO
-   Remove hardcoded cache.gco
-*/
-
-
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <ArduinoOTA.h>
@@ -55,6 +49,9 @@ String device_name = "Unknown"; // Will be parsed from M115
 Ticker statusTimer;
 int statusInterval(2); // Ask the printer for its status every 2 seconds
 bool shouldAskPrinterForStatus = false;
+
+String filename = "cache.gco";
+double filesize = 0;
 
 Ticker blinker;
 
@@ -198,7 +195,7 @@ void handlePrint() {
   String line;
 
   if (!hasSD) {
-    fs::File gcodeFile = SPIFFS.open("/cache.gco", "r");
+    fs::File gcodeFile = SPIFFS.open("/" + filename, "r");
 
     if (gcodeFile) {
       while (gcodeFile.available()) {
@@ -222,7 +219,7 @@ void handlePrint() {
     lcd("Complete");
     gcodeFile.close();
   } else {
-    File gcodeFile = SD.open("cache.gco", FILE_READ);
+    File gcodeFile = SD.open(filename, FILE_READ);
 
     if (gcodeFile) {
       while (gcodeFile.available()) {
@@ -367,7 +364,7 @@ void setup() {
       // Cura needs https://github.com/me-no-dev/ESPAsyncWebServer/pull/192
     }
 
-    request->send(200, "application/json", "{\r\n  \"files\": {\r\n    \"local\": {\r\n      \"name\": \"cache.gco\",\r\n      \"origin\": \"local\",\r\n      \"refs\": {\r\n        \"resource\": \"\",\r\n        \"download\": \"\"\r\n      }\r\n    }\r\n  },\r\n  \"done\": true\r\n}\r\n");
+    request->send(200, "application/json", "{\r\n  \"files\": {\r\n    \"local\": {\r\n      \"name\": \"" + filename + "\",\r\n      \"origin\": \"local\",\r\n      \"refs\": {\r\n        \"resource\": \"\",\r\n        \"download\": \"\"\r\n      }\r\n    }\r\n  },\r\n  \"done\": true\r\n}\r\n");
   }, handleUpload);
 
   // For Cura 2.6.0 OctoPrintPlugin compatibility
@@ -449,7 +446,6 @@ File uploadFile; // SD card
 void handleUpload(AsyncWebServerRequest * request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
   if (!hasSD) { // No SD, hence use SPIFFS
 
-    filename = "/cache.gco";
     if (!filename.startsWith("/")) filename = "/" + filename;
 
     if (!index) {
@@ -469,8 +465,6 @@ void handleUpload(AsyncWebServerRequest * request, String filename, size_t index
     }
 
   } else { // has SD, hence use it
-
-    filename = "cache.gco";
 
     if (!index) {
       if (SD.exists((char *)filename.c_str())) SD.remove((char *)filename.c_str());
