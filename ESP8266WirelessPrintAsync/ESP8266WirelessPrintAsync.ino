@@ -51,7 +51,7 @@ int statusInterval(2); // Ask the printer for its status every 2 seconds
 bool shouldAskPrinterForStatus = false;
 
 String filename = "cache.gco";
-double filesize = 0;
+size_t filesize = 0;
 
 Ticker blinker;
 
@@ -364,7 +364,7 @@ void setup() {
       // Cura needs https://github.com/me-no-dev/ESPAsyncWebServer/pull/192
     }
 
-    request->send(200, "application/json", "{\r\n  \"files\": {\r\n    \"local\": {\r\n      \"name\": \"" + filename + "\",\r\n      \"origin\": \"local\",\r\n      \"refs\": {\r\n        \"resource\": \"\",\r\n        \"download\": \"\"\r\n      }\r\n    }\r\n  },\r\n  \"done\": true\r\n}\r\n");
+    request->send(200, "application/json", "{\r\n  \"files\": {\r\n    \"local\": {\r\n      \"name\": \"" + filename + "\",\r\n      \"size\": \"" + String(filesize) + "\",\r\n      \"origin\": \"local\",\r\n      \"refs\": {\r\n        \"resource\": \"\",\r\n        \"download\": \"\"\r\n      }\r\n    }\r\n  },\r\n  \"done\": true\r\n}\r\n");
   }, handleUpload);
 
   // For Cura 2.6.0 OctoPrintPlugin compatibility
@@ -444,6 +444,7 @@ fs::File f; // SPIFFS
 File uploadFile; // SD card
 
 void handleUpload(AsyncWebServerRequest * request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+  filesize = 0; # Will set the correct one below
   if (!hasSD) { // No SD, hence use SPIFFS
 
     if (!filename.startsWith("/")) filename = "/" + filename;
@@ -461,6 +462,7 @@ void handleUpload(AsyncWebServerRequest * request, String filename, size_t index
 
     if (final) { // upload finished
       f.close();
+      filesize = index+len;
       shouldPrint = true;
     }
 
@@ -479,6 +481,7 @@ void handleUpload(AsyncWebServerRequest * request, String filename, size_t index
 
     if (final) { // upload finished
       uploadFile.close();
+      filesize = index + len;
       shouldPrint = true;
     }
   }
