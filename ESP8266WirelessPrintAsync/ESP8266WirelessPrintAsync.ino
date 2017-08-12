@@ -202,7 +202,7 @@ void handlePrint() {
       while (gcodeFile.available()) {
         lineNumberLastPrinted = lineNumberLastPrinted + 1;
         line = gcodeFile.readStringUntil('\n'); // The G-Code line being worked on
-        filesize_read = filesize_read + line.size()+1;
+        filesize_read = filesize_read + line.length();
         int pos = line.indexOf(';');
         if (pos != -1) {
           line = line.substring(0, pos);
@@ -227,7 +227,7 @@ void handlePrint() {
       while (gcodeFile.available()) {
         lineNumberLastPrinted = lineNumberLastPrinted + 1;
         line = gcodeFile.readStringUntil('\n'); // The G-Code line being worked on
-        filesize_read = filesize_read + line.size()+1;
+        filesize_read = filesize_read + line.length();
         int pos = line.indexOf(';');
         if (pos != -1) {
           line = line.substring(0, pos);
