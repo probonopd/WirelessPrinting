@@ -444,7 +444,7 @@ fs::File f; // SPIFFS
 File uploadFile; // SD card
 
 void handleUpload(AsyncWebServerRequest * request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
-  filesize = 0; # Will set the correct one below
+  filesize = 0; // Will set the correct one below
   if (!hasSD) { // No SD, hence use SPIFFS
 
     if (!filename.startsWith("/")) filename = "/" + filename;
