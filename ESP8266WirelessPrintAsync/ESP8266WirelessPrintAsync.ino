@@ -193,13 +193,13 @@ void handlePrint() {
   statusTimer.detach();
 
   int i = 0;
+  filesize_read = 0;
   String line;
 
   if (!hasSD) {
     fs::File gcodeFile = SPIFFS.open("/" + filename, "r");
 
     if (gcodeFile) {
-      filesize_read = 0;
       while (gcodeFile.available()) {
         lineNumberLastPrinted = lineNumberLastPrinted + 1;
         line = gcodeFile.readStringUntil('\n'); // The G-Code line being worked on
@@ -208,7 +208,7 @@ void handlePrint() {
         if (pos != -1) {
           line = line.substring(0, pos);
         }
-        if ((line.startsWith("(")) || (line.startsWith(";")) || (line.startsWith("\r")) || (line.length() < 3)) {
+        if (((line.startsWith("(")) || (line.startsWith(";")) || (line.startsWith("\r"))) {
           continue;
         }
         sendToPrinter(line);
@@ -223,8 +223,7 @@ void handlePrint() {
     gcodeFile.close();
   } else {
     File gcodeFile = SD.open(filename, FILE_READ);
-
-    filesize_read = 0;
+    
     if (gcodeFile) {
       while (gcodeFile.available()) {
         lineNumberLastPrinted = lineNumberLastPrinted + 1;
