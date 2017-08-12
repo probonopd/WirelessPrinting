@@ -208,7 +208,7 @@ void handlePrint() {
         if (pos != -1) {
           line = line.substring(0, pos);
         }
-        if ((line.startsWith("(")) || (line.startsWith(";")) || (line.length() < 2)) {
+        if ((line.startsWith("(")) || (line.startsWith(";")) || (line.startsWith("\r")) || (line.length() < 2)) {
           continue;
         }
         sendToPrinter(line);
