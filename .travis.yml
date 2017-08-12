@@ -23,8 +23,6 @@ install:
   - git clone https://github.com/alanswx/ESPAsyncWiFiManager.git
   - git clone https://github.com/bblanchon/ArduinoJson.git
   - cd -
-  - # Workaround for https://github.com/esp8266/Arduino/issues/3483
-  - ( mkdir -p $HOME/Arduino/libraries/DateTime/src/ ; cd $HOME/Arduino/libraries/DateTime/src/ ; wget https://raw.githubusercontent.com/jeremymlong/ESP8266-UPnP/master/DateTime.cpp ; wget https://raw.githubusercontent.com/jeremymlong/ESP8266-UPnP/master/DateTime.h )
   
 script:
   - #arduino-1.8.3/arduino --pref build.path=. --verify --verbose-build --board $BD $PWD/ESP8266WirelessPrint/ESP8266WirelessPrint.ino
