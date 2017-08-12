@@ -52,6 +52,7 @@ git clone https://github.com/me-no-dev/ESPAsyncTCP.git
 git clone https://github.com/alanswx/ESPAsyncWiFiManager.git
 git clone https://github.com/bblanchon/ArduinoJson.git
 cd -
+mkdir -p $HOME/Arduino/libraries/DateTime/src/ ; cd $HOME/Arduino/libraries/DateTime/src/ ; wget https://raw.githubusercontent.com/jeremymlong/ESP8266-UPnP/master/DateTime.cpp ; wget https://raw.githubusercontent.com/jeremymlong/ESP8266-UPnP/master/DateTime.h )
 ```
 ### Flashing
 
