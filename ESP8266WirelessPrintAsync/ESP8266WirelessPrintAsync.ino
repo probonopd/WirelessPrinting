@@ -2,6 +2,7 @@
 #include <ESP8266mDNS.h>
 #include <ArduinoOTA.h>
 #include <Ticker.h>
+#include <DateTime.h>
 
 #define FS_NO_GLOBALS //allow spiffs to coexist with SD card, define BEFORE including FS.h
 
@@ -185,6 +186,7 @@ void handlePrint() {
     return;
   }
 
+  DateTime.sync(0); // start the clock
   sendToPrinter("M300 S500 P50"); // M300 - Play beep sound
   lcd("Printing...");
 
@@ -388,7 +390,7 @@ void setup() {
     if( filesize_read > 0 ){
       percentage = filesize_read / filesize; // Not super accurate but what OctoPrint does, too
     }
-    request->send(200, "application/json", "{\r\n  \"job\": {\r\n    \"file\": {\r\n      \"name\": \"Unknown\",\r\n      \"origin\": \"local\",\r\n      \"size\": " + String(filesize) + ",\r\n      \"date\": 1378847754\r\n    },\r\n    \"estimatedPrintTime\": 8811,\r\n    \"filament\": {\r\n      \"length\": 810,\r\n      \"volume\": 5.36\r\n    }\r\n  },\r\n  \"progress\": {\r\n    \"completion\": " + String(percentage) + ",\r\n    \"filepos\": " + String(filesize_read) + ",\r\n    \"printTime\": 0,\r\n    \"printTimeLeft\": 0\r\n  }\r\n}");
+    request->send(200, "application/json", "{\r\n  \"job\": {\r\n    \"file\": {\r\n      \"name\": \"Unknown\",\r\n      \"origin\": \"local\",\r\n      \"size\": " + String(filesize) + ",\r\n      \"date\": 1378847754\r\n    },\r\n    \"estimatedPrintTime\": 8811,\r\n    \"filament\": {\r\n      \"length\": 810,\r\n      \"volume\": 5.36\r\n    }\r\n  },\r\n  \"progress\": {\r\n    \"completion\": " + String(percentage) + ",\r\n    \"filepos\": " + String(filesize_read) + ",\r\n    \"printTime\": " + String(now()) + ",\r\n    \"printTimeLeft\": 0\r\n  }\r\n}");
   });
   // TODO: Implement POST. Cura uses this to pause and abort prints.
 
