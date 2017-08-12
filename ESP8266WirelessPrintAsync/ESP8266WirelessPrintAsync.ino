@@ -199,6 +199,7 @@ void handlePrint() {
     fs::File gcodeFile = SPIFFS.open("/" + filename, "r");
 
     if (gcodeFile) {
+      filesize_read = 0;
       while (gcodeFile.available()) {
         lineNumberLastPrinted = lineNumberLastPrinted + 1;
         line = gcodeFile.readStringUntil('\n'); // The G-Code line being worked on
@@ -223,6 +224,7 @@ void handlePrint() {
   } else {
     File gcodeFile = SD.open(filename, FILE_READ);
 
+    filesize_read = 0;
     if (gcodeFile) {
       while (gcodeFile.available()) {
         lineNumberLastPrinted = lineNumberLastPrinted + 1;
@@ -382,7 +384,10 @@ void setup() {
 
   server.on("/api/job", HTTP_GET, [](AsyncWebServerRequest * request) {
     // http://docs.octoprint.org/en/master/api/datamodel.html#sec-api-datamodel-jobs-job
-    float percentage = filesize_read / filesize; // Not super accurate but what OctoPrint does, too
+    float percentage = 0.0;
+    if( filesize_read > 0 ){
+      percentage = filesize_read / filesize; // Not super accurate but what OctoPrint does, too
+    }
     request->send(200, "application/json", "{\r\n  \"job\": {\r\n    \"file\": {\r\n      \"name\": \"Unknown\",\r\n      \"origin\": \"local\",\r\n      \"size\": " + String(filesize) + ",\r\n      \"date\": 1378847754\r\n    },\r\n    \"estimatedPrintTime\": 8811,\r\n    \"filament\": {\r\n      \"length\": 810,\r\n      \"volume\": 5.36\r\n    }\r\n  },\r\n  \"progress\": {\r\n    \"completion\": " + String(percentage) + ",\r\n    \"filepos\": " + String(filesize_read) + ",\r\n    \"printTime\": 0,\r\n    \"printTimeLeft\": 0\r\n  }\r\n}");
   });
   // TODO: Implement POST. Cura uses this to pause and abort prints.
