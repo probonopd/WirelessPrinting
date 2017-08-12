@@ -34,8 +34,6 @@ The ESP8266 module is connected with your 3D printer via the serial connection a
 
 The [esp8266/Arduino](https://github.com/esp8266/Arduino) sketch `ESP8266WirelessPrintAsync.ino` is uploaded to a ESP8266 module. As or July 2017, this code compiled on Arduino hourly and esp8266/Arduino git master. See `.travis.yml` for how this is compiled on Travis CI.
 
-# ESP8266WirelessPrintAsync
-
 ### Building
 
 Pre-built binaries are available on GitHub Releases.
