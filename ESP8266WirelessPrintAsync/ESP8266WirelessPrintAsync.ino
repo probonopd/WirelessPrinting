@@ -52,6 +52,7 @@ bool shouldAskPrinterForStatus = false;
 
 String filename = "cache.gco";
 size_t filesize = 0;
+size_t filesize_read = 0;
 
 Ticker blinker;
 
@@ -201,6 +202,7 @@ void handlePrint() {
       while (gcodeFile.available()) {
         lineNumberLastPrinted = lineNumberLastPrinted + 1;
         line = gcodeFile.readStringUntil('\n'); // The G-Code line being worked on
+        filesize_read = filesize_read + strlen(line)+1;
         int pos = line.indexOf(';');
         if (pos != -1) {
           line = line.substring(0, pos);
@@ -225,6 +227,7 @@ void handlePrint() {
       while (gcodeFile.available()) {
         lineNumberLastPrinted = lineNumberLastPrinted + 1;
         line = gcodeFile.readStringUntil('\n'); // The G-Code line being worked on
+        filesize_read = filesize_read + strlen(line)+1;
         int pos = line.indexOf(';');
         if (pos != -1) {
           line = line.substring(0, pos);
@@ -345,6 +348,7 @@ void setup() {
     message += "<p><a href=\"/download\">Download</a></p>";
     message +=  String("<pre>") +
                 String("fwM115: ") + fwM115 + String("\n") +
+                String("filesize_read: ") + String(filesize_read) + String("\n") +
                 String("lineLastSent: ") + lineLastSent + String("\n") +
                 String("lineSecondLastReceived: ") + lineSecondLastReceived + String("\n") +
                 String("lineLastReceived: ") + lineLastReceived + String("\n") + String("</pre>");
