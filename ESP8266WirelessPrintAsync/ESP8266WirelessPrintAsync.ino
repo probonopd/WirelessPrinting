@@ -51,8 +51,11 @@ int statusInterval(2); // Ask the printer for its status every 2 seconds
 bool shouldAskPrinterForStatus = false;
 
 String filename = "cache.gco";
+String upload_name = "Unknown";
 size_t filesize = 0;
 size_t filesize_read = 0;
+
+unsigned long millis_start;
 
 Ticker blinker;
 
@@ -140,7 +143,7 @@ String sendToPrinter(String line) {
   }
 
   Serial.println(line); // Send to 3D Printer
-  
+
   if (serverClient && serverClient.connected()) {  // send data to telnet client if connected
     serverClient.println("> " + line);
   }
@@ -149,13 +152,13 @@ String sendToPrinter(String line) {
   okFound = false;
   while (okFound == false) {
     response = Serial.readStringUntil('\n');
-  if (serverClient && serverClient.connected()) {  // send data to telnet client if connected
-    serverClient.println("< " + response);
-    serverClient.print(millis());
-    serverClient.print(", free heap RAM: ");
-    serverClient.println(ESP.getFreeHeap());
-    serverClient.println();
-  }
+    if (serverClient && serverClient.connected()) {  // send data to telnet client if connected
+      serverClient.println("< " + response);
+      serverClient.print(millis());
+      serverClient.print(", free heap RAM: ");
+      serverClient.println(ESP.getFreeHeap());
+      serverClient.println();
+    }
     parseTemperatures(response);
     lineSecondLastReceived = lineLastReceived;
     lineLastReceived = response;
@@ -187,7 +190,7 @@ void handlePrint() {
 
   sendToPrinter("M300 S500 P50"); // M300 - Play beep sound
   lcd("Printing...");
-
+  millis_start = millis();
   shouldPrint = false;
   isPrinting = true;
   statusTimer.detach();
@@ -223,7 +226,7 @@ void handlePrint() {
     gcodeFile.close();
   } else {
     File gcodeFile = SD.open(filename, FILE_READ);
-    
+
     if (gcodeFile) {
       while (gcodeFile.available()) {
         lineNumberLastPrinted = lineNumberLastPrinted + 1;
@@ -274,10 +277,10 @@ void setup() {
   wifiManager.setDebugOutput(false); // So that it does not send stuff to the printer that the printer does not understand
   wifiManager.autoConnect("AutoConnectAP");
   digitalWrite(LED_BUILTIN, HIGH);  // Turn the LED off (Note that LOW is the voltage level
-  
+
   telnetServer.begin();
   telnetServer.setNoDelay(true);
-   
+
   text = IpAddress2String(WiFi.localIP());
   if (hasSD) {
     text += " SD";
@@ -384,10 +387,16 @@ void setup() {
   server.on("/api/job", HTTP_GET, [](AsyncWebServerRequest * request) {
     // http://docs.octoprint.org/en/master/api/datamodel.html#sec-api-datamodel-jobs-job
     float percentage = 0.0;
-    if( filesize_read > 0 ){
-      percentage = (float)filesize_read / (float)filesize; // Not super accurate but what OctoPrint does, too
+    if ( filesize_read > 0 ) {
+      percentage = ((float)filesize_read / (float)filesize) * 100; // Not super accurate but what OctoPrint does, too
     }
-    request->send(200, "application/json", "{\r\n  \"job\": {\r\n    \"file\": {\r\n      \"name\": \"Unknown\",\r\n      \"origin\": \"local\",\r\n      \"size\": " + String(filesize) + ",\r\n      \"date\": 1378847754\r\n    },\r\n    \"estimatedPrintTime\": 8811,\r\n    \"filament\": {\r\n      \"length\": 810,\r\n      \"volume\": 5.36\r\n    }\r\n  },\r\n  \"progress\": {\r\n    \"completion\": " + String(percentage) + ",\r\n    \"filepos\": " + String(filesize_read) + ",\r\n    \"printTime\": 0,\r\n    \"printTimeLeft\": 0\r\n  }\r\n}");
+    int seconds_since_start = 0;
+    int seconds_remaining = 0;
+    if (isPrinting == true) {
+      seconds_since_start = (millis() - millis_start) / 1000;
+      seconds_remaining = seconds_since_start * (100.0-percentage);
+    }
+    request->send(200, "application/json", "{\r\n  \"job\": {\r\n    \"file\": {\r\n      \"name\": \"" + upload_name + "\",\r\n      \"origin\": \"local\",\r\n      \"size\": " + String(filesize) + ",\r\n      \"date\": 1378847754\r\n    },\r\n    \"estimatedPrintTime\": 8811,\r\n    \"filament\": {\r\n      \"length\": 810,\r\n      \"volume\": 5.36\r\n    }\r\n  },\r\n  \"progress\": {\r\n    \"completion\": " + String(percentage) + ",\r\n    \"filepos\": " + String(filesize_read) + ",\r\n    \"printTime\": " + String(seconds_since_start) + ",\r\n    \"printTimeLeft\": " + String(seconds_remaining) + "\r\n  }\r\n}");
   });
   // TODO: Implement POST. Cura uses this to pause and abort prints.
 
@@ -398,30 +407,30 @@ void setup() {
     // request->send(200, "application/json", "{\r\n  \"temperature\": {\r\n    \"tool0\": {\r\n      \"actual\": 0.0,\r\n      \"target\": 0.0,\r\n      \"offset\": 0\r\n    },\r\n    \"bed\": {\r\n      \"actual\": 0.0,\r\n      \"target\": 0.0,\r\n      \"offset\": 0\r\n    }\r\n  },\r\n  \"sd\": {\r\n    \"ready\": true\r\n  },\r\n  \"state\": {\r\n    \"text\": \"Operational\",\r\n    \"flags\": {\r\n      \"operational\": true,\r\n      \"paused\": false,\r\n      \"printing\": " + String(isPrinting) + ",\r\n      \"sdReady\": true,\r\n      \"error\": false,\r\n      \"ready\": true,\r\n      \"closedOrError\": false\r\n    }\r\n  }\r\n}");
   });
 
-    // Parse POST JSON data, https://github.com/me-no-dev/ESPAsyncWebServer/issues/195
-    server.onRequestBody([](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total) {
-      DynamicJsonBuffer jsonBuffer;
-      if (request->url() == "/api/printer/command") {
+  // Parse POST JSON data, https://github.com/me-no-dev/ESPAsyncWebServer/issues/195
+  server.onRequestBody([](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total) {
+    DynamicJsonBuffer jsonBuffer;
+    if (request->url() == "/api/printer/command") {
 
-        JsonObject& root = jsonBuffer.parseObject((const char*)data);
-        if (root.success()) {
-          if (root.containsKey("command")) {
-            // Cura uses this to Pre-heat the build plate (M140)
-            // http://docs.octoprint.org/en/master/api/printer.html#send-an-arbitrary-command-to-the-printer
-            // sendToPrinter(root["command"]); // Crashes when done here. Takes too long for inside a callback?
-            commandLine = root["command"].asString();
-          }
+      JsonObject& root = jsonBuffer.parseObject((const char*)data);
+      if (root.success()) {
+        if (root.containsKey("command")) {
+          // Cura uses this to Pre-heat the build plate (M140)
+          // http://docs.octoprint.org/en/master/api/printer.html#send-an-arbitrary-command-to-the-printer
+          // sendToPrinter(root["command"]); // Crashes when done here. Takes too long for inside a callback?
+          commandLine = root["command"].asString();
         }
-        request->send(204);
       }
-    });
+      request->send(204);
+    }
+  });
 
   // For Cura 2.7.0 OctoPrintPlugin compatibility
   // https://github.com/probonopd/WirelessPrinting/issues/18#issuecomment-321927016
   server.on("/api/settings", HTTP_GET, [](AsyncWebServerRequest * request) {
     request->send(200, "application/json", "{}");
   });
-   
+
   // For legacy PrusaControlWireless - deprecated in favor of the OctoPrint API
   server.on("/print", HTTP_POST, [](AsyncWebServerRequest * request) {
     request->send(200, "text/plain", "Received");
@@ -435,11 +444,11 @@ void setup() {
 
   server.onNotFound([](AsyncWebServerRequest * request) {
     request->send(404);
-  if (serverClient && serverClient.connected()) {  // send data to telnet client if connected
-    serverClient.println("404");
-    serverClient.println("request->url()");
-    serverClient.println("");
-  }
+    if (serverClient && serverClient.connected()) {  // send data to telnet client if connected
+      serverClient.println("404");
+      serverClient.println("request->url()");
+      serverClient.println("");
+    }
 
   });
 
@@ -455,6 +464,7 @@ File uploadFile; // SD card
 
 void handleUpload(AsyncWebServerRequest * request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
   filesize = 0; // Will set the correct one below
+  upload_name = filename;
   if (!hasSD) { // No SD, hence use SPIFFS
 
     if (!filename.startsWith("/")) filename = "/" + filename;
@@ -472,7 +482,7 @@ void handleUpload(AsyncWebServerRequest * request, String filename, size_t index
 
     if (final) { // upload finished
       f.close();
-      filesize = index+len;
+      filesize = index + len;
       shouldPrint = true;
     }
 
