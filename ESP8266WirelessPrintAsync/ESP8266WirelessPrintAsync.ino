@@ -397,7 +397,7 @@ void setup() {
     int seconds_remaining = 0;
     if (isPrinting == true) {
       seconds_since_start = (millis() - millis_start) / 1000;
-      seconds_remaining = seconds_since_start * (100.0-percentage);
+      seconds_remaining = seconds_since_start/percentage * (100.0-percentage);
     }
     request->send(200, "application/json", "{\r\n  \"job\": {\r\n    \"file\": {\r\n      \"name\": \"" + upload_name + "\",\r\n      \"origin\": \"local\",\r\n      \"size\": " + String(filesize) + ",\r\n      \"date\": 1378847754\r\n    },\r\n    \"estimatedPrintTime\": 8811,\r\n    \"filament\": {\r\n      \"length\": 810,\r\n      \"volume\": 5.36\r\n    }\r\n  },\r\n  \"progress\": {\r\n    \"completion\": " + String(percentage) + ",\r\n    \"filepos\": " + String(filesize_read) + ",\r\n    \"printTime\": " + String(seconds_since_start) + ",\r\n    \"printTimeLeft\": " + String(seconds_remaining) + "\r\n  }\r\n}");
   });
