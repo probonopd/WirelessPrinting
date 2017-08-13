@@ -34,6 +34,7 @@ String response; // The last response from 3D printer
 
 bool isPrinting = false;
 bool shouldPrint = false;
+bool shouldCancelPrint = false;
 long lineNumberLastPrinted = 0;
 String lineLastSent = "";
 String lineLastReceived = "";
@@ -134,7 +135,25 @@ String sendToPrinter(String line) {
 
   Serial.setTimeout(240000); // How long we wait for "ok" in milliseconds
 
-  /* If a priority line exists (e.g., a stop command), then send it before anything else.
+  if (shouldCancelPrint == true) {
+    // Apparently we need to decide how to handle this
+    // For now using M112 - Emergency Stop
+    // http://marlinfw.org/docs/gcode/M112.html
+        if (serverClient && serverClient.connected()) {  // send data to telnet client if connected
+      serverClient.println("Should cancel print! This is not working yet");
+    }
+    Serial.println("M112"); // Send to 3D Printer immediately w/o waiting for anything
+    Serial.println("M112"); // Send to 3D Printer immediately w/o waiting for anything
+    Serial.println("M112"); // Send to 3D Printer immediately w/o waiting for anything
+    Serial.println("M300 S500 P50"); // M300 - Play beep sound; Send to 3D Printer immediately w/o waiting for anything
+    // sendToPrinter("M112");
+    // sendToPrinter("M300 S500 P50"); // M300 - Play beep sound
+    lcd("Print cancelled");
+    // ESP.restart(); // Maybe a bit too drastic?
+    return "";
+  }
+
+  /* If a priority line exists, then send it before anything else.
      TODO: Extend this to handle multiple priority lines. */
   if (priorityLine != "") {
     String originalLine = line;
@@ -206,6 +225,11 @@ void handlePrint() {
 
     if (gcodeFile) {
       while (gcodeFile.available()) {
+        if(shouldCancelPrint == true){
+          shouldCancelPrint == false;
+          isPrinting = false;
+          return;
+        }
         lineNumberLastPrinted = lineNumberLastPrinted + 1;
         line = gcodeFile.readStringUntil('\n'); // The G-Code line being worked on
         filesize_read = filesize_read + line.length();
@@ -231,6 +255,11 @@ void handlePrint() {
 
     if (gcodeFile) {
       while (gcodeFile.available()) {
+        if(shouldCancelPrint == true){
+          shouldCancelPrint == false;
+          isPrinting = false;
+          return;
+        }
         lineNumberLastPrinted = lineNumberLastPrinted + 1;
         line = gcodeFile.readStringUntil('\n'); // The G-Code line being worked on
         filesize_read = filesize_read + line.length();
@@ -397,7 +426,7 @@ void setup() {
     int seconds_remaining = 0;
     if (isPrinting == true) {
       seconds_since_start = (millis() - millis_start) / 1000;
-      seconds_remaining = seconds_since_start/percentage * (100.0-percentage);
+      seconds_remaining = seconds_since_start / percentage * (100.0 - percentage);
     }
     request->send(200, "application/json", "{\r\n  \"job\": {\r\n    \"file\": {\r\n      \"name\": \"" + upload_name + "\",\r\n      \"origin\": \"local\",\r\n      \"size\": " + String(filesize) + ",\r\n      \"date\": 1378847754\r\n    },\r\n    \"estimatedPrintTime\": 8811,\r\n    \"filament\": {\r\n      \"length\": 810,\r\n      \"volume\": 5.36\r\n    }\r\n  },\r\n  \"progress\": {\r\n    \"completion\": " + String(percentage) + ",\r\n    \"filepos\": " + String(filesize_read) + ",\r\n    \"printTime\": " + String(seconds_since_start) + ",\r\n    \"printTimeLeft\": " + String(seconds_remaining) + "\r\n  }\r\n}");
   });
@@ -413,15 +442,31 @@ void setup() {
   // Parse POST JSON data, https://github.com/me-no-dev/ESPAsyncWebServer/issues/195
   server.onRequestBody([](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total) {
     DynamicJsonBuffer jsonBuffer;
-    if (request->url() == "/api/printer/command") {
+    if ((request->url() == "/api/printer/command") || (request->url() == "/api/job")) {
 
       JsonObject& root = jsonBuffer.parseObject((const char*)data);
       if (root.success()) {
         if (root.containsKey("command")) {
+
+          String command = root["command"].asString();
+
           // Cura uses this to Pre-heat the build plate (M140)
           // http://docs.octoprint.org/en/master/api/printer.html#send-an-arbitrary-command-to-the-printer
           // sendToPrinter(root["command"]); // Crashes when done here. Takes too long for inside a callback?
-          commandLine = root["command"].asString();
+          if (serverClient && serverClient.connected()) {  // send data to telnet client if connected
+            root.prettyPrintTo(serverClient);
+          }
+
+          // Cura uses this to "Abort print"
+          // http://docs.octoprint.org/en/master/api/job.html
+          if (command == "cancel") {
+            shouldCancelPrint = true;
+          } else {
+            commandLine = command;
+            if (isPrinting == true) {
+              priorityLine = commandLine;
+            }
+          }
         }
       }
       request->send(204);
@@ -449,7 +494,7 @@ void setup() {
     request->send(404);
     if (serverClient && serverClient.connected()) {  // send data to telnet client if connected
       serverClient.println("404");
-      serverClient.println("request->url()");
+      serverClient.println(request->url());
       serverClient.println("");
     }
 
@@ -468,10 +513,10 @@ File uploadFile; // SD card
 void handleUpload(AsyncWebServerRequest * request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
   filesize = 0; // Will set the correct one below
   upload_name = filename;
-  
+
   if (!hasSD) { // No SD, hence use SPIFFS
 
-    
+
 
     if (!index) {
       f = SPIFFS.open(filename_with_slash, "w"); // create or truncate file
@@ -516,8 +561,12 @@ void loop() {
   if (shouldPrint == true) handlePrint();
 
   if (commandLine != "") {
-    sendToPrinter(commandLine);
-    commandLine = "";
+    if (isPrinting == false) {
+      sendToPrinter(commandLine);
+      commandLine = "";
+    } else {
+      priorityLine = commandLine;
+    }
   }
 
   if (shouldAskPrinterForStatus) {
