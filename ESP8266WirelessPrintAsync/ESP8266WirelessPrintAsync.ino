@@ -211,7 +211,7 @@ void handlePrint() {
         if (pos != -1) {
           line = line.substring(0, pos);
         }
-        if ((line.startsWith("(")) || (line.startsWith(";")) || (line.startsWith("\r"))) {
+        if ((line.startsWith("(")) || line.startsWith(";") || line.length() == 0 || line.startsWith("\r")) {
           continue;
         }
         sendToPrinter(line);
@@ -236,7 +236,7 @@ void handlePrint() {
         if (pos != -1) {
           line = line.substring(0, pos);
         }
-        if ((line.startsWith("(")) || (line.startsWith(";")) || (line.length() == 0)) {
+        if ((line.startsWith("(")) || line.startsWith(";") || line.length() == 0 || line.startsWith("\r")) {
           continue;
         }
         sendToPrinter(line);
