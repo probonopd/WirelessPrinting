@@ -51,6 +51,8 @@ int statusInterval(2); // Ask the printer for its status every 2 seconds
 bool shouldAskPrinterForStatus = false;
 
 String filename = "cache.gco";
+String filename_with_slash = filename; // Will be changed in setup()
+
 String upload_name = "Unknown";
 size_t filesize = 0;
 size_t filesize_read = 0;
@@ -256,6 +258,7 @@ void handlePrint() {
 
 void setup() {
 
+  if (!filename.startsWith("/")) filename_with_slash = "/" + filename;
 
   if (SD.begin(SS, 50000000)) { // https://github.com/esp8266/Arduino/issues/1853
     hasSD = true;
@@ -465,16 +468,17 @@ File uploadFile; // SD card
 void handleUpload(AsyncWebServerRequest * request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
   filesize = 0; // Will set the correct one below
   upload_name = filename;
+  
   if (!hasSD) { // No SD, hence use SPIFFS
 
-    if (!filename.startsWith("/")) filename = "/" + filename;
+    
 
     if (!index) {
-      f = SPIFFS.open(filename, "w"); // create or truncate file
+      f = SPIFFS.open(filename_with_slash, "w"); // create or truncate file
     }
 
     if (len) { // uploading
-      f = SPIFFS.open(filename, "a"); // append to file (for chunked upload) //////////// REALLY NEEDED???
+      f = SPIFFS.open(filename_with_slash, "a"); // append to file (for chunked upload) //////////// REALLY NEEDED???
       ESP.wdtDisable();
       f.write(data, len);
       ESP.wdtEnable(10);
@@ -489,8 +493,8 @@ void handleUpload(AsyncWebServerRequest * request, String filename, size_t index
   } else { // has SD, hence use it
 
     if (!index) {
-      if (SD.exists((char *)filename.c_str())) SD.remove((char *)filename.c_str());
-      uploadFile = SD.open(filename.c_str(), FILE_WRITE);
+      if (SD.exists((char *)filename_with_slash.c_str())) SD.remove((char *)filename_with_slash.c_str());
+      uploadFile = SD.open(filename_with_slash.c_str(), FILE_WRITE);
     }
 
     if (len) { // uploading
