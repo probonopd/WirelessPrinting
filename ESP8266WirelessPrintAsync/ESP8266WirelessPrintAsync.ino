@@ -1,7 +1,16 @@
+#if defined(ESP8266)
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
-#include <ArduinoOTA.h>
 #include <Ticker.h>
+#endif
+
+#if defined(ESP32)
+#include <WiFi.h>
+#include <ESPmDNS.h>
+#include <ESP32Ticker.h>
+#endif
+
+#include <ArduinoOTA.h>
 
 #define FS_NO_GLOBALS //allow spiffs to coexist with SD card, define BEFORE including FS.h
 
