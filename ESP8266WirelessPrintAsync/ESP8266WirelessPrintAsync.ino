@@ -1,12 +1,14 @@
 #if defined(ESP8266)
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
+#include <ESPAsyncTCP.h>
 #include <Ticker.h>
 #endif
 
 #if defined(ESP32)
 #include <WiFi.h>
 #include <ESPmDNS.h>
+#include <AsyncTCP.h>
 #include <ESP32Ticker.h>
 #endif
 
@@ -22,7 +24,6 @@
 
 #include <DNSServer.h>
 
-#include <ESPAsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <ESPAsyncWiFiManager.h> // https://github.com/alanswx/ESPAsyncWiFiManager/
 
