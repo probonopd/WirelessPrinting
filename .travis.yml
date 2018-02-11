@@ -17,11 +17,10 @@ install:
   - # For async; unfortunately these libraries are still not the default in arduino/esp8266 yet
   - mkdir -p $HOME/Arduino/libraries/
   - cd $HOME/Arduino/libraries/
-  - git clone -o 56e7450 https://github.com/probonopd/ESPAsyncWebServer.git # Patched version until https://github.com/me-no/dev/ESPAsyncWebServer/pull/192 is merged
-  - ( cd ESPAsyncWebServer ; git checkout 56e745 )
-  - git clone https://github.com/me-no-dev/ESPAsyncTCP.git
-  - git clone https://github.com/alanswx/ESPAsyncWiFiManager.git
-  - git clone https://github.com/bblanchon/ArduinoJson.git
+  - git clone https://github.com/probonopd/ESPAsyncWebServer
+  - git clone https://github.com/me-no-dev/ESPAsyncTCP
+  - git clone https://github.com/alanswx/ESPAsyncWiFiManager
+  - git clone https://github.com/bblanchon/ArduinoJson
   - cd -
   
 script:
