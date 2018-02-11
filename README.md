@@ -49,6 +49,7 @@ git clone https://github.com/probonopd/ESPAsyncWebServer
 git clone https://github.com/me-no-dev/ESPAsyncTCP
 git clone https://github.com/alanswx/ESPAsyncWiFiManager
 git clone https://github.com/bblanchon/ArduinoJson
+git clone https://github.com/bertmelis/Ticker-esp32 # for ESP32
 cd -
 ```
 ### Flashing
