@@ -296,6 +296,7 @@ void handlePrint() {
 }
 
 void setup() {
+  delay(3000);
 
   if (!filename.startsWith("/")) filename_with_slash = "/" + filename;
 
