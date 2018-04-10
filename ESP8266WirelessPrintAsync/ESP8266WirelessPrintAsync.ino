@@ -442,6 +442,11 @@ void setup() {
     request->send(200, "application/json", "{\r\n  \"job\": {\r\n    \"file\": {\r\n      \"name\": \"" + upload_name + "\",\r\n      \"origin\": \"local\",\r\n      \"size\": " + String(filesize) + ",\r\n      \"date\": 1378847754\r\n    },\r\n    \"estimatedPrintTime\": 8811,\r\n    \"filament\": {\r\n      \"length\": 810,\r\n      \"volume\": 5.36\r\n    }\r\n  },\r\n  \"progress\": {\r\n    \"completion\": " + String(percentage) + ",\r\n    \"filepos\": " + String(filesize_read) + ",\r\n    \"printTime\": " + String(seconds_since_start) + ",\r\n    \"printTimeLeft\": " + String(seconds_remaining) + "\r\n  }\r\n}");
   });
   // TODO: Implement POST. Cura uses this to pause and abort prints.
+  
+  server.on("/api/settings", HTTP_GET, [](AsyncWebServerRequest * request) {
+    // https://github.com/probonopd/WirelessPrinting/issues/30
+    request->send(200, "application/json", "{\r\n}");
+  });
 
   server.on("/api/printer", HTTP_GET, [](AsyncWebServerRequest * request) {
     // http://docs.octoprint.org/en/master/api/datamodel.html#printer-state
