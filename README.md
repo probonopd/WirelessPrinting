@@ -10,6 +10,7 @@ __UNDER DEVELOPMENT__. See [Issues](https://github.com/probonopd/WirelessPrintin
 
 | Printer SD card slot | OctoPrint | WirelessPrint |
 | --- | --- | --- |
+| Instant | Booting can take minutes | Booting takes seconds |
 | Need to plug SD card into computer and then into printer for each print | Ethernet and wireless | Wireless |
 | No cost (comes with many printers) | High cost (Raspberry Pi, Power supply, SD card) | Inexpensive | 
 | No clutter on desktop | Clutter on desktop (Raspberry Pi, cable) | No clutter (can be placed inside printer electronics box) |
