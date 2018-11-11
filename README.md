@@ -10,6 +10,7 @@ __UNDER DEVELOPMENT__. See [Issues](https://github.com/probonopd/WirelessPrintin
 
 | Printer SD card slot | OctoPrint | WirelessPrint |
 | --- | --- | --- |
+| Instant | Booting can take minutes | Booting takes seconds |
 | Need to plug SD card into computer and then into printer for each print | Ethernet and wireless | Wireless |
 | No cost (comes with many printers) | High cost (Raspberry Pi, Power supply, SD card) | Inexpensive | 
 | No clutter on desktop | Clutter on desktop (Raspberry Pi, cable) | No clutter (can be placed inside printer electronics box) |
@@ -45,10 +46,11 @@ mkdir -p $HOME/Arduino/libraries/
 cd $HOME
 git clone https://github.com/probonopd/WirelessPrinting
 cd $HOME/Arduino/libraries/
-git clone https://github.com/probonopd/ESPAsyncWebServer
-git clone https://github.com/me-no-dev/ESPAsyncTCP
-git clone https://github.com/alanswx/ESPAsyncWiFiManager
-git clone https://github.com/bblanchon/ArduinoJson
+# wget "https://raw.githubusercontent.com/probonopd/WirelessPrinting/master/.travis.yml" -O - | grep "git clone" | cut -d " " -f 4-99
+git clone -o 2e6dff3 https://github.com/probonopd/ESPAsyncWebServer
+git clone -o 991f855 https://github.com/me-no-dev/ESPAsyncTCP
+git clone -o 6734c16 https://github.com/alanswx/ESPAsyncWiFiManager
+git clone -o ed98ea4 https://github.com/bblanchon/ArduinoJson
 git clone https://github.com/bertmelis/Ticker-esp32 # for ESP32
 git clone https://github.com/me-no-dev/AsyncTCP # for ESP32
 cd -
