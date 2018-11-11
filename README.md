@@ -26,8 +26,8 @@ __UNDER DEVELOPMENT__. See [Issues](https://github.com/probonopd/WirelessPrintin
 _Readymade, pre-assembled, flashed and tested hardware may be available, please contact me for information._
 
 The ESP8266 module is connected with your 3D printer via the serial connection and to a SD card (acting as a cache during printing). You need to connect
-* TX, RX from your 3D printer to the ESP8266 module (__EXT-1__ header on RAMPS boards)
-* Power and GND from your 3D printer to the ESP8266 module (attention, the __EXT-1__ header on RAMPS boards has 5V while the ESP8266 needs 3.3V)
+* TX, RX from your 3D printer to the ESP8266 module (__AUX-1__ header on RAMPS boards)
+* Power and GND from your 3D printer to the ESP8266 module (attention, the __AUX-1__ header on RAMPS boards has 5V while the ESP8266 needs 3.3V)
 * Optional: SD card shield to the ESP8266 module (a capacitor across the power pins of the SD card; SD shields have this). Using a SanDisk 2 GB card formatted with the [SD Card Formatter](https://www.sdcard.org/downloads/formatter_4/) from the SD Association seems to work for me. If no SD card is connected, then the internal SPIFFS memory (3 MB) is used
 * A matching case for a WeMos D1 mini and microSD shield can be found at http://www.thingiverse.com/thing:2287618
 
