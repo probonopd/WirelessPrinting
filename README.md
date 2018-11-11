@@ -26,8 +26,8 @@ __UNDER DEVELOPMENT__. See [Issues](https://github.com/probonopd/WirelessPrintin
 _Readymade, pre-assembled, flashed and tested hardware may be available, please contact me for information._
 
 The ESP8266 module is connected with your 3D printer via the serial connection and to a SD card (acting as a cache during printing). You need to connect
-* TX, RX from your 3D printer to the ESP8266 module (__EXT-1__ header on RAMPS boards)
-* Power and GND from your 3D printer to the ESP8266 module (attention, the __EXT-1__ header on RAMPS boards has 5V while the ESP8266 needs 3.3V)
+* TX, RX from your 3D printer to the ESP8266 module (__AUX-1__ header on RAMPS boards)
+* Power and GND from your 3D printer to the ESP8266 module (attention, the __AUX-1__ header on RAMPS boards has 5V while the ESP8266 needs 3.3V)
 * Optional: SD card shield to the ESP8266 module (a capacitor across the power pins of the SD card; SD shields have this). Using a SanDisk 2 GB card formatted with the [SD Card Formatter](https://www.sdcard.org/downloads/formatter_4/) from the SD Association seems to work for me. If no SD card is connected, then the internal SPIFFS memory (3 MB) is used
 * A matching case for a WeMos D1 mini and microSD shield can be found at http://www.thingiverse.com/thing:2287618
 
@@ -68,6 +68,11 @@ Can be flashed via USB or (subsequently) over the air. You can use the Arduino I
 wget -c "https://raw.githubusercontent.com/esp8266/Arduino/master/tools/espota.py"
 python espota.py -i 192.168.0.27 -p 8266 --auth= -f ESP8266WirelessPrint*.bin
 ```
+
+## Initial WiFi Configuration
+Following the instrucions in https://github.com/alanswx/ESPAsyncWiFiManager/ : 
+
+The first time the sketch is uploaded the ESP will enter in Access Point mode, so you have to open the wifi manager of your system and connect to wifi "AutoConnectAP", then open your browser and type http://192.168.4.1/, there you will see a menu, select "Configure WiFi", press scan and wait until the device scans available networks and select yours, enter the the password and click save. It will try to connect to your network, if it's successfull you will see a message on your 3D printer (or in a serial monitor if conected to your computer) with the new device IP, write down this IP if you wish to connect via browser. 
 
 ## Wireless printing with Cura
 
