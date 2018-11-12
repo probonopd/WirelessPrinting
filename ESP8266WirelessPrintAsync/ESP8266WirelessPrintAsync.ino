@@ -39,7 +39,7 @@ DNSServer dns;
 
 const char* sketch_version = "1.0";
 
-const int DEFAULT_BAUD = 250000; 
+const int DEFAULT_BAUD = 115200; 
 
 bool okFound = true; // Set to true if last response from 3D printer was "ok", otherwise false
 String response; // The last response from 3D printer
