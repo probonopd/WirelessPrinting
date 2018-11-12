@@ -304,7 +304,7 @@ void setup() {
     hasSD = true;
   }
 
-  Serial.begin(115200);
+  Serial.begin(250000);
 
   // Wait until we detect a printer - seemingly not needed? Using this would have the disadvantage that you always need to reset the printer as well as the ESP
   // Serial.flush(); //flush all previous received and transmitted data
