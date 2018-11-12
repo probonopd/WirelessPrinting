@@ -35,6 +35,10 @@ The ESP8266 module is connected with your 3D printer via the serial connection a
 
 The [esp8266/Arduino](https://github.com/esp8266/Arduino) sketch `ESP8266WirelessPrintAsync.ino` is uploaded to a ESP8266 module. As or July 2017, this code compiled on Arduino hourly and esp8266/Arduino git master. See `.travis.yml` for how this is compiled on Travis CI.
 
+### Set Baudrate
+
+Make sure to set the correct baudrate in sketch `ESP8266WirelessPrintAsync.ino` search DEFAULT_BAUD, typical values are 115200 (default for this repo) and 250000 (newest firmwares use this) 
+
 ### Building
 
 Pre-built binaries are available on GitHub Releases.

@@ -39,6 +39,8 @@ DNSServer dns;
 
 const char* sketch_version = "1.0";
 
+const int DEFAULT_BAUD = 115200; 
+
 bool okFound = true; // Set to true if last response from 3D printer was "ok", otherwise false
 String response; // The last response from 3D printer
 
@@ -304,7 +306,7 @@ void setup() {
     hasSD = true;
   }
 
-  Serial.begin(115200);
+  Serial.begin(DEFAULT_BAUD);
 
   // Wait until we detect a printer - seemingly not needed? Using this would have the disadvantage that you always need to reset the printer as well as the ESP
   // Serial.flush(); //flush all previous received and transmitted data
