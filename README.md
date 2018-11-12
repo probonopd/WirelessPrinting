@@ -37,7 +37,7 @@ The [esp8266/Arduino](https://github.com/esp8266/Arduino) sketch `ESP8266Wireles
 
 ### Set Baudrate
 
-Make sure to set the correct baudrate in sketch `ESP8266WirelessPrintAsync.ino` search DEFAULT_BAUD, typical values are 115200 and 250000 (default) 
+Make sure to set the correct baudrate in sketch `ESP8266WirelessPrintAsync.ino` search DEFAULT_BAUD, typical values are 115200 (default for this repo) and 250000 (newest firmwares use this) 
 
 ### Building
 
