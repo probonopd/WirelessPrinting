@@ -39,10 +39,10 @@ DNSServer dns;
 
 const char* sketch_version = "1.0";
 
-const int DEFAULT_BAUD = 115200; 
+const int DEFAULT_BAUD = 115200;  // Set your printer's baud
 
-const int CS = 15; 
-bool useFastSD=false; 
+const int CS = 15; // Chip select pin of your ESP board setup
+bool useFastSD=true; // Use Default fast SD clock in SD.begin(), set to false if your SD is an old or slow one.
 
 bool okFound = true; // Set to true if last response from 3D printer was "ok", otherwise false
 String response; // The last response from 3D printer
