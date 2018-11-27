@@ -41,7 +41,6 @@ const char* sketch_version = "1.0";
 
 const int DEFAULT_BAUD = 115200;  // Set your printer's baud
 
-const int CS = 15; // Chip select pin of your ESP board setup
 bool useFastSD=true; // Use Default fast SD clock in SD.begin(), set to false if your SD is an old or slow one.
 
 bool okFound = true; // Set to true if last response from 3D printer was "ok", otherwise false
@@ -307,11 +306,11 @@ void setup() {
   if (!filename.startsWith("/")) filename_with_slash = "/" + filename;
 
   if(useFastSD){
-    if (SD.begin(CS, 50000000)) { // https://github.com/esp8266/Arduino/issues/1853
+    if (SD.begin(SS, 50000000)) { // https://github.com/esp8266/Arduino/issues/1853
     hasSD = true;
     }
   } else {
-    if (SD.begin(CS)) { 
+    if (SD.begin()) { 
       hasSD = true;
     }
   }
