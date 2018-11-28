@@ -39,7 +39,9 @@ DNSServer dns;
 
 const char* sketch_version = "1.0";
 
-const int DEFAULT_BAUD = 115200; 
+const int DEFAULT_BAUD = 115200;  // Set your printer's baud
+
+bool useFastSD=true; // Use Default fast SD clock in SD.begin(), set to false if your SD is an old or slow one.
 
 bool okFound = true; // Set to true if last response from 3D printer was "ok", otherwise false
 String response; // The last response from 3D printer
@@ -300,10 +302,17 @@ void handlePrint() {
 void setup() {
   delay(3000);
 
+
   if (!filename.startsWith("/")) filename_with_slash = "/" + filename;
 
-  if (SD.begin(SS, 50000000)) { // https://github.com/esp8266/Arduino/issues/1853
+  if(useFastSD){
+    if (SD.begin(SS, 50000000)) { // https://github.com/esp8266/Arduino/issues/1853
     hasSD = true;
+    }
+  } else {
+    if (SD.begin()) { 
+      hasSD = true;
+    }
   }
 
   Serial.begin(DEFAULT_BAUD);
@@ -329,6 +338,8 @@ void setup() {
   text = IpAddress2String(WiFi.localIP());
   if (hasSD) {
     text += " SD";
+  } else {
+    text += " SPIFFS";
   }
   lcd(text);
   sendToPrinter("M300 S500 P50"); // M300 - Play beep sound
