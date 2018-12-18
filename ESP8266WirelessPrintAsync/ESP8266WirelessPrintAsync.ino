@@ -153,7 +153,7 @@ String sendToPrinter(String line) {
     // Apparently we need to decide how to handle this
     // For now using M112 - Emergency Stop
     // http://marlinfw.org/docs/gcode/M112.html
-        if (serverClient && serverClient.connected()) {  // send data to telnet client if connected
+    if (serverClient && serverClient.connected()) {  // send data to telnet client if connected
       serverClient.println("Should cancel print! This is not working yet");
     }
     Serial.println("M112"); // Send to 3D Printer immediately w/o waiting for anything
