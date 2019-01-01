@@ -1,15 +1,13 @@
 #if defined(ESP8266)
-#include <ESP8266WiFi.h>
-#include <ESP8266mDNS.h>
-#include <ESPAsyncTCP.h>
-#include <Ticker.h>
-#endif
-
-#if defined(ESP32)
-#include <WiFi.h>
-#include <ESPmDNS.h>
-#include <AsyncTCP.h>
-#include <ESP32Ticker.h>
+  #include <ESP8266WiFi.h>
+  #include <ESP8266mDNS.h>
+  #include <ESPAsyncTCP.h>
+  #include <Ticker.h>
+#elif defined(ESP32)
+  #include <WiFi.h>
+  #include <ESPmDNS.h>
+  #include <AsyncTCP.h>
+  #include <ESP32Ticker.h>
 #endif
 
 #include <ArduinoOTA.h>
@@ -27,15 +25,15 @@
 #include <ESPAsyncWebServer.h>
 #include <ESPAsyncWiFiManager.h> // https://github.com/alanswx/ESPAsyncWiFiManager/
 
+// For implementing (a subset of) the OctoPrint API
+#include "AsyncJson.h"
+#include "ArduinoJson.h"
+
 WiFiServer telnetServer(23);
 WiFiClient serverClient;
 
 AsyncWebServer server(80);
 DNSServer dns;
-
-// For implementing (a subset of) the OctoPrint API
-#include "AsyncJson.h"
-#include "ArduinoJson.h"
 
 const char* sketch_version = "1.0";
 
@@ -62,7 +60,7 @@ String fwM115 = "Unknown"; // Result of M115
 String device_name = "Unknown"; // Will be parsed from M115
 
 Ticker statusTimer;
-int statusInterval(2); // Ask the printer for its status every 2 seconds
+int statusInterval = 2; // Ask the printer for its status every 2 seconds
 bool shouldAskPrinterForStatus = false;
 
 String filename = "cache.gco";
@@ -113,19 +111,20 @@ void stopBlinking() {
 String parseTemp(String response, String whichTemp, bool getTarget = false) {
   String temperature;
   int Tpos = response.indexOf(whichTemp + ":");
-  if (Tpos > -1) { // This response contains a temperature
+  if (Tpos != -1) { // This response contains a temperature
     int slashpos = response.indexOf(" /", Tpos);
     int spacepos = response.indexOf(" ", slashpos + 1);
     //if match mask T:xxx.xx /xxx.xx
     if (spacepos - Tpos < 17) {
-      if (! getTarget) {
+      if (!getTarget) {
         temperature = response.substring(Tpos + whichTemp.length() + 1, slashpos);
       } else {
         temperature = response.substring(slashpos + 2, spacepos);
       }
     }
   }
-  return (temperature);
+
+  return temperature;
 }
 
 void parseTemperatures(String response) {
@@ -153,7 +152,7 @@ String sendToPrinter(String line) {
     // Apparently we need to decide how to handle this
     // For now using M112 - Emergency Stop
     // http://marlinfw.org/docs/gcode/M112.html
-        if (serverClient && serverClient.connected()) {  // send data to telnet client if connected
+    if (serverClient && serverClient.connected()) {  // send data to telnet client if connected
       serverClient.println("Should cancel print! This is not working yet");
     }
     Serial.println("M112"); // Send to 3D Printer immediately w/o waiting for anything
@@ -199,7 +198,8 @@ String sendToPrinter(String line) {
     lineLastReceived = response;
     if (response.startsWith("ok")) okFound = true;
   }
-  return (response);
+
+  return response;
 }
 
 void lcd(String string) {
@@ -217,7 +217,6 @@ void askPrinterForStatus() {
 }
 
 void handlePrint() {
-
   // Do nothing if we are already printing. TODO: Give clear response
   if (isPrinting) {
     return;
@@ -239,7 +238,7 @@ void handlePrint() {
 
     if (gcodeFile) {
       while (gcodeFile.available()) {
-        if(shouldCancelPrint == true){
+        if (shouldCancelPrint == true) {
           shouldCancelPrint == false;
           isPrinting = false;
           return;
@@ -251,11 +250,10 @@ void handlePrint() {
         if (pos != -1) {
           line = line.substring(0, pos);
         }
-        if ((line.startsWith("(")) || line.startsWith(";") || line.length() == 0 || line.startsWith("\r")) {
+        if (line.startsWith("(") || line.startsWith(";") || line.length() == 0 || line.startsWith("\r")) {
           continue;
         }
         sendToPrinter(line);
-
       }
     } else {
       lcd("Cannot open file");
@@ -269,7 +267,7 @@ void handlePrint() {
 
     if (gcodeFile) {
       while (gcodeFile.available()) {
-        if(shouldCancelPrint == true){
+        if (shouldCancelPrint == true) {
           shouldCancelPrint == false;
           isPrinting = false;
           return;
@@ -278,14 +276,13 @@ void handlePrint() {
         line = gcodeFile.readStringUntil('\n'); // The G-Code line being worked on
         filesize_read = filesize_read + line.length();
         int pos = line.indexOf(';');
-        if (pos != -1) {
+        if (pos != ) {
           line = line.substring(0, pos);
         }
-        if ((line.startsWith("(")) || line.startsWith(";") || line.length() == 0 || line.startsWith("\r")) {
+        if (line.startsWith("(") || line.startsWith(";") || line.length() == 0 || line.startsWith("\r")) {
           continue;
         }
         sendToPrinter(line);
-
       }
     } else {
       lcd("Cannot open file");
@@ -294,20 +291,16 @@ void handlePrint() {
     statusTimer.attach(statusInterval, askPrinterForStatus);
     lcd("Complete");
     gcodeFile.close();
-
   }
-
 }
 
 void setup() {
   delay(3000);
-
-
   if (!filename.startsWith("/")) filename_with_slash = "/" + filename;
 
-  if(useFastSD){
+  if (useFastSD) {
     if (SD.begin(SS, 50000000)) { // https://github.com/esp8266/Arduino/issues/1853
-    hasSD = true;
+      hasSD = true;
     }
   } else {
     if (SD.begin()) { 
@@ -349,7 +342,7 @@ void setup() {
   // Parse the name of the machine from M115
   fwM115 = lineSecondLastReceived;
   String fwMACHINE_TYPE = "Unknown";
-  if ((lineSecondLastReceived.indexOf("MACHINE_TYPE:") > -1) && (lineSecondLastReceived.indexOf("EXTRUDER_COUNT:") > -1)) {
+  if (lineSecondLastReceived.indexOf("MACHINE_TYPE:") != -1 && lineSecondLastReceived.indexOf("EXTRUDER_COUNT:") != -1) {
     fwMACHINE_TYPE = lineSecondLastReceived.substring(lineSecondLastReceived.indexOf("MACHINE_TYPE:") + 13, lineSecondLastReceived.indexOf("EXTRUDER_COUNT:") - 1);
   }
 
@@ -359,7 +352,6 @@ void setup() {
   device_name = fwMACHINE_TYPE + " (" + chip_id + ")";
 
   if (MDNS.begin(device_name.c_str())) {
-
     // For Cura WirelessPrint - deprecated in favor of the OctoPrint API
     MDNS.addService("wirelessprint", "tcp", 80);
     MDNS.addServiceTxt("wirelessprint", "tcp", "version", sketch_version);
@@ -544,9 +536,6 @@ void handleUpload(AsyncWebServerRequest * request, String filename, size_t index
   upload_name = filename;
 
   if (!hasSD) { // No SD, hence use SPIFFS
-
-
-
     if (!index) {
       f = SPIFFS.open(filename_with_slash, "w"); // create or truncate file
     }
@@ -563,9 +552,7 @@ void handleUpload(AsyncWebServerRequest * request, String filename, size_t index
       filesize = index + len;
       shouldPrint = true;
     }
-
   } else { // has SD, hence use it
-
     if (!index) {
       if (SD.exists((char *)filename_with_slash.c_str())) SD.remove((char *)filename_with_slash.c_str());
       uploadFile = SD.open(filename_with_slash.c_str(), FILE_WRITE);
