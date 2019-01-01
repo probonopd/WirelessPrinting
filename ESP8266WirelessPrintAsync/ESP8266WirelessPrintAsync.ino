@@ -276,7 +276,7 @@ void handlePrint() {
         line = gcodeFile.readStringUntil('\n'); // The G-Code line being worked on
         filesize_read = filesize_read + line.length();
         int pos = line.indexOf(';');
-        if (pos != ) {
+        if (pos != -1) {
           line = line.substring(0, pos);
         }
         if (line.startsWith("(") || line.startsWith(";") || line.length() == 0 || line.startsWith("\r")) {
