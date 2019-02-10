@@ -477,15 +477,15 @@ void setup() {
       startPrint = printerConnected && !isPrinting && uploadedFullname != "";
 
     request->send(200, "application/json", "{\r\n"
-                  "  \"files\": {\r\n"
-                  "    \"local\": {\r\n"
-                  "      \"name\": \"" + getUploadedFilename() + "\",\r\n"
-                  "      \"size\": \"" + String(uploadedFileSize) + "\",\r\n"
-                  "      \"origin\": \"local\"\r\n"
-                  "    }\r\n"
-                  "  },\r\n"
-                  "  \"done\": true\r\n"
-                  "}\r\n");
+                                           "  \"files\": {\r\n"
+                                           "    \"local\": {\r\n"
+                                           "      \"name\": \"" + getUploadedFilename() + "\",\r\n"
+                                           "      \"size\": \"" + String(uploadedFileSize) + "\",\r\n"
+                                           "      \"origin\": \"local\"\r\n"
+                                           "    }\r\n"
+                                           "  },\r\n"
+                                           "  \"done\": true\r\n"
+                                           "}\r\n");
   }, handleUpload);
 
   // For Cura 2.6.0 OctoPrintPlugin compatibility
@@ -505,21 +505,21 @@ void setup() {
       printTimeLeft = printTimeLeft / printCompletion * (100 - printCompletion);
     }
     request->send(200, "application/json", "{\r\n"
-                  "  \"job\": {\r\n"
-                  "    \"file\": {\r\n"
-                  "      \"name\": \"" + getUploadedFilename() + "\",\r\n"
-                  "      \"size\": " + String(uploadedFileSize) + ",\r\n"
-                  "      \"date\": 1378847754,\r\n"
-                  "      \"origin\": \"local\"\r\n"
-                  "    }\r\n"
-                  "  },\r\n"
-                  "  \"progress\": {\r\n"
-                  "    \"completion\": " + String(printCompletion) + ",\r\n"
-                  "    \"filepos\": " + String(filePos) + ",\r\n"
-                  "    \"printTime\": " + String(printTime) + ",\r\n"
-                  "    \"printTimeLeft\": " + String(printTimeLeft) + "\r\n"
-                  "  }\r\n"
-                  "}");
+                                           "  \"job\": {\r\n"
+                                           "    \"file\": {\r\n"
+                                           "      \"name\": \"" + getUploadedFilename() + "\",\r\n"
+                                           "      \"size\": " + String(uploadedFileSize) + ",\r\n"
+                                           "      \"date\": 1378847754,\r\n"
+                                           "      \"origin\": \"local\"\r\n"
+                                           "    }\r\n"
+                                           "  },\r\n"
+                                           "  \"progress\": {\r\n"
+                                           "    \"completion\": " + String(printCompletion) + ",\r\n"
+                                           "    \"filepos\": " + String(filePos) + ",\r\n"
+                                           "    \"printTime\": " + String(printTime) + ",\r\n"
+                                           "    \"printTimeLeft\": " + String(printTimeLeft) + "\r\n"
+                                           "  }\r\n"
+                                           "}");
   });
 
   server.on("/api/settings", HTTP_GET, [](AsyncWebServerRequest * request) {
