@@ -8,13 +8,13 @@ class StorageFS {
   private:
     static bool hasSD,
                 hasSPIFFS;
-    static int maxPathLength;
+    static unsigned int maxPathLength;
 
   public:
     static inline void begin(const bool fastSD) {
       hasSD = SD.begin(SS, fastSD ? SD_SCK_MHZ(50) : SPI_HALF_SPEED); // https://github.com/esp8266/Arduino/issues/1853
       if (hasSD)
-        maxPathLength = FileWrapper::MaxPathLength;
+        maxPathLength = 255;
       else {
         hasSPIFFS = SPIFFS.begin();
         if (hasSPIFFS) {

@@ -9,10 +9,10 @@ class FileWrapper {
   friend class StorageFS;
 
   private:
-    static const int MaxPathLength = 255;
     enum FSDirType { Null, DirSource, DirEntry };
 
     File sdFile;
+    String cachedName;
     fs::File fsFile;
     fs::Dir fsDir;
     FSDirType fsDirType;

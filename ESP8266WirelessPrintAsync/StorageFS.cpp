@@ -5,7 +5,7 @@ StorageFS storageFS;
 
 bool StorageFS::hasSD, 
      StorageFS::hasSPIFFS;
-int StorageFS::maxPathLength;
+unsigned int StorageFS::maxPathLength;
 
 
 FileWrapper StorageFS::open(const String path, const char *openMode) {

@@ -1,13 +1,17 @@
 #include "FileWrapper.h"
+#include "StorageFS.h"
 
 String FileWrapper::name() {
   if (sdFile) {
-    char *namePtr = (char *)malloc(MaxPathLength + 1);
-    sdFile.getName(namePtr, MaxPathLength);
-    String nameGot = String(namePtr);
-    free (namePtr);
+    if (cachedName == "") {
+      const int maxPathLength = StorageFS::getMaxPathLength();
+      char *namePtr = (char *)malloc(maxPathLength + 1);
+      sdFile.getName(namePtr, maxPathLength);
+      cachedName = String(namePtr);
+      free (namePtr);
+      }
 
-    return nameGot;
+    return cachedName;
   }
   else if (fsDirType != DirEntry)
     return "";
