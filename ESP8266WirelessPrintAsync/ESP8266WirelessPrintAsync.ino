@@ -1,6 +1,6 @@
 #if defined(ESP8266)
 #include <ESP8266WiFi.h>
-#include <ESP8266mDNS.h>
+#include <ESP8266mDNS.h>       // https://github.com/esp8266/Arduino/tree/master/libraries/ESP8266mDNS
 #include <ESPAsyncTCP.h>
 #include <Ticker.h>
 #endif
@@ -8,7 +8,7 @@
 #if defined(ESP32)
 #include <WiFi.h>
 #include <ESPmDNS.h>
-#include <AsyncTCP.h>
+#include <AsyncTCP.h>   // https://github.com/me-no-dev/ESPAsyncTCP
 #include <ESP32Ticker.h>
 #endif
 
@@ -24,7 +24,7 @@
 
 #include <DNSServer.h>
 
-#include <ESPAsyncWebServer.h>
+#include <ESPAsyncWebServer.h>    // https://github.com/me-no-dev/ESPAsyncWebServer
 #include <ESPAsyncWiFiManager.h> // https://github.com/alanswx/ESPAsyncWiFiManager/
 
 WiFiServer telnetServer(23);
@@ -34,7 +34,7 @@ AsyncWebServer server(80);
 DNSServer dns;
 
 // For implementing (a subset of) the OctoPrint API
-#include "AsyncJson.h"
+#include "AsyncJson.h"          // https://github.com/bblanchon/ArduinoJson
 #include "ArduinoJson.h"
 
 const char* sketch_version = "1.0";
