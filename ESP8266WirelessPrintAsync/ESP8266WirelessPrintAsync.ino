@@ -37,7 +37,6 @@ int fwExtruders = 1;
 bool fwAutoreportTempCap, fwProgressCap, fwBuildPercentCap;
 
 String deviceName = "Unknown";
-//bool hasSD; // will be set true if SD card is detected and usable; otherwise use SPIFFS
 bool printerConnected;
 bool startPrint, isPrinting, printPause, restartPrint, cancelPrint;
 String lastCommandSent, lastReceivedResponse;
@@ -232,6 +231,7 @@ int apiPrinterCommandHandler(const uint8_t* data) {
   return 204;
 }
 
+// Job commands http://docs.octoprint.org/en/master/api/job.html#issue-a-job-command
 int apiJobHandler(const uint8_t* data) {
   DynamicJsonBuffer jsonBuffer;
   JsonObject& root = jsonBuffer.parseObject(data);
@@ -239,7 +239,7 @@ int apiJobHandler(const uint8_t* data) {
     telnetSend(root["command"]);
     String command = root["command"].asString();
     if (command == "cancel") {
-      if (!isPrinting)
+      if (!isPrinting) 
         return 409;
       cancelPrint = true;
     }
@@ -346,6 +346,7 @@ bool detectPrinter() {
       Serial.begin(serialBauds[serialBaudIndex]);
       telnetSend("Connecting at " + String(serialBauds[serialBaudIndex]));
       commandQueue.push("M115"); // M115 - Firmware Info
+      commandQueue.push("M115"); // M115 - Firmware Info
       printerDetectionState = 20;
       break;
 
@@ -442,13 +443,13 @@ void setup() {
 
   server.on("/api/version", HTTP_GET, [](AsyncWebServerRequest * request) {       
     String message = "{\r\n"
-                     "    \"api\": \"" + String("0.0") + "\",\r\n"
-                     "    \"server\": \"" + String("0.0") + "\"\r\n"
+                     "    \"api\": " + String("0.0") +    ",\r\n"
+                     "    \"server\": " + String("0.0") + "\r\n"
                      "}";                
     request->send(200, "application/json", message);
   });
 
-
+// http://docs.octoprint.org/en/master/api/connection.html#get-connection-settings
   server.on("/api/connection", HTTP_GET, [](AsyncWebServerRequest * request) {       
     String message = 
          "{\r\n"
@@ -471,8 +472,23 @@ void setup() {
     request->send(200, "application/json", message);
   });
   
-// To do::f http://docs.octoprint.org/en/master/api/connection.html#post--api-connection
+// To do: http://docs.octoprint.org/en/master/api/connection.html#post--api-connection
 
+
+
+// File Operations
+// Pending: http://docs.octoprint.org/en/master/api/files.html#retrieve-all-files
+  server.on("/api/files", HTTP_GET, [](AsyncWebServerRequest * request) {       
+    String message = 
+         "{\r\n"
+         "  \"files\": {\r\n"          
+         "  }\r\n"
+         "}";
+    request->send(200, "application/json", message);
+  });
+
+
+  // Main page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
     String message = "<h1>" + deviceName + "</h1>"
                      "<form enctype=\"multipart/form-data\" action=\"/api/files/local\" method=\"POST\">\n"
@@ -484,7 +500,8 @@ void setup() {
                      "<p><a href=\"/download\">Download</a></p>";
     request->send(200, "text/html", message);
   });
-
+  
+  // Info page
   server.on("/info", HTTP_GET, [](AsyncWebServerRequest * request) {
     String message = "<pre>"
                      "Free heap: " + String(ESP.getFreeHeap()) + "\n\n"
@@ -535,6 +552,9 @@ void setup() {
   // https://jsonformatter.curiousconcept.com/
   // https://www.freeformatter.com/json-escape.html
 
+
+
+// Job info http://docs.octoprint.org/en/master/api/job.html#retrieve-information-about-the-current-job
   server.on("/api/job", HTTP_GET, [](AsyncWebServerRequest * request) {
     // http://docs.octoprint.org/en/master/api/datamodel.html#sec-api-datamodel-jobs-job
     int printTime = 0, printTimeLeft = 0;
@@ -546,10 +566,15 @@ void setup() {
                                            "  \"job\": {\r\n"
                                            "    \"file\": {\r\n"
                                            "      \"name\": \"" + getUploadedFilename() + "\",\r\n"
+                                           "      \"origin\": \"local\",\r\n"                                           
                                            "      \"size\": " + String(uploadedFileSize) + ",\r\n"
-                                           "      \"date\": 1378847754,\r\n"
-                                           "      \"origin\": \"local\"\r\n"
-                                           "    }\r\n"
+                                           "      \"date\": 1378847754 \r\n"
+                                           "    },\r\n"
+                                           "    \"estimatedPrintTime\": \"" + String("PrintTime") + "\",\r\n"                                                                                      
+                                           "    \"filament\": {\r\n"
+                                           "      \"length\": \"" + String("Length") + "\",\r\n"
+                                           "      \"volume\": \"" + String("Volume") + "\"\r\n"                                           
+                                           "    }\r\n"                                           
                                            "  },\r\n"
                                            "  \"progress\": {\r\n"
                                            "    \"completion\": " + String(printCompletion) + ",\r\n"
@@ -559,6 +584,8 @@ void setup() {
                                            "  }\r\n"
                                            "}");
   });
+
+
 
   server.on("/api/settings", HTTP_GET, [](AsyncWebServerRequest * request) {
     // https://github.com/probonopd/WirelessPrinting/issues/30
