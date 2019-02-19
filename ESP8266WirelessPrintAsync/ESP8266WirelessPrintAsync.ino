@@ -12,6 +12,7 @@
 #include "StorageFS.h"
 #include <ESPAsyncWebServer.h>
 #include <ESPAsyncWiFiManager.h>  // https://github.com/alanswx/ESPAsyncWiFiManager/
+#include <SPIFFSEditor.h>
 
 #include "CommandQueue.h"
 
@@ -441,13 +442,13 @@ void setup() {
   });
 
 
-  server.on("/api/version", HTTP_GET, [](AsyncWebServerRequest * request) {       
-    String message = "{\r\n"
-                     "    \"api\": " + String("0.0") +    ",\r\n"
-                     "    \"server\": " + String("0.0") + "\r\n"
-                     "}";                
-    request->send(200, "application/json", message);
-  });
+//  server.on("/api/version", HTTP_GET, [](AsyncWebServerRequest * request) {       
+//    String message = "{\r\n"
+//                     "    \"api\": " + String("0.0") +    ",\r\n"
+//                     "    \"server\": " + String("0.0") + "\r\n"
+//                     "}";                
+//    request->send(200, "application/json", message);
+//  });
 
 // http://docs.octoprint.org/en/master/api/connection.html#get-connection-settings
   server.on("/api/connection", HTTP_GET, [](AsyncWebServerRequest * request) {       
