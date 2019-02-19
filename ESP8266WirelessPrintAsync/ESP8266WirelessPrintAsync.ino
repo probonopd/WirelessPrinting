@@ -1,3 +1,4 @@
+// Required: https://github.com/greiman/SdFat
 #include <ArduinoOTA.h>
 #if defined(ESP8266)
   #include <ESP8266mDNS.h>        // https://github.com/esp8266/Arduino/tree/master/libraries/ESP8266mDNS
@@ -11,7 +12,6 @@
 #include "StorageFS.h"            // Required: https://github.com/greiman/SdFat
 #include <ESPAsyncWebServer.h>    // https://github.com/me-no-dev/ESPAsyncWebServer
 #include <ESPAsyncWiFiManager.h>  // https://github.com/alanswx/ESPAsyncWiFiManager/
-#include <SPIFFSEditor.h>
 
 #include "CommandQueue.h"
 
@@ -113,6 +113,7 @@ bool parseTemperatures(const String response) {
 
   return tempResponse;
 }
+
 
 inline void lcd(const String text) {
   commandQueue.push("M117 " + text);
@@ -238,7 +239,7 @@ int apiJobHandler(const uint8_t* data) {
     telnetSend(root["command"]);
     String command = root["command"].asString();
     if (command == "cancel") {
-      if (!isPrinting)
+      if (!isPrinting) 
         return 409;
       cancelPrint = true;
     }
@@ -327,6 +328,7 @@ void mDNSInit() {
 
   MDNS.addService("http", "tcp", 80);
 }
+
 
 bool detectPrinter() {
   static int printerDetectionState;
@@ -561,10 +563,15 @@ void setup() {
                                            "  \"job\": {\r\n"
                                            "    \"file\": {\r\n"
                                            "      \"name\": \"" + getUploadedFilename() + "\",\r\n"
+                                           "      \"origin\": \"local\",\r\n"                                           
                                            "      \"size\": " + String(uploadedFileSize) + ",\r\n"
-                                           "      \"date\": 1378847754,\r\n"
-                                           "      \"origin\": \"local\"\r\n"
-                                           "    }\r\n"
+                                           "      \"date\": 1378847754 \r\n"
+                                           "    },\r\n"
+                                           "    \"estimatedPrintTime\": \"" + String("PrintTime") + "\",\r\n"                                                                                      
+                                           "    \"filament\": {\r\n"
+                                           "      \"length\": \"" + String("Length") + "\",\r\n"
+                                           "      \"volume\": \"" + String("Volume") + "\"\r\n"                                           
+                                           "    }\r\n"                                           
                                            "  },\r\n"
                                            "  \"progress\": {\r\n"
                                            "    \"completion\": " + String(printCompletion) + ",\r\n"
@@ -574,6 +581,8 @@ void setup() {
                                            "  }\r\n"
                                            "}");
   });
+
+
 
   server.on("/api/settings", HTTP_GET, [](AsyncWebServerRequest * request) {
     // https://github.com/probonopd/WirelessPrinting/issues/30
