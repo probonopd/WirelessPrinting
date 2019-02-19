@@ -33,6 +33,10 @@ class StorageFS {
       return hasSPIFFS;
     }
 
+    inline static bool isActive() {
+      return activeSD() || activeSPIFFS();
+    }
+
     inline static String getActiveFS() {
       return activeSD() ? "SD" : (activeSPIFFS() ? "SPIFFS" : "NO FS");
     }

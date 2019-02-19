@@ -1,4 +1,3 @@
-// Required: https://github.com/greiman/SdFat
 #include <ArduinoOTA.h>
 #if defined(ESP8266)
   #include <ESP8266mDNS.h>        // https://github.com/esp8266/Arduino/tree/master/libraries/ESP8266mDNS
@@ -12,6 +11,7 @@
 #include "StorageFS.h"            // Required: https://github.com/greiman/SdFat
 #include <ESPAsyncWebServer.h>    // https://github.com/me-no-dev/ESPAsyncWebServer
 #include <ESPAsyncWiFiManager.h>  // https://github.com/alanswx/ESPAsyncWiFiManager/
+#include <SPIFFSEditor.h>
 
 #include "CommandQueue.h"
 
@@ -75,9 +75,8 @@ inline void setLed(const bool status) {
 }
 
 inline void telnetSend(const String line) {
-  if (serverClient && serverClient.connected()) { // send data to telnet client if connected
+  if (serverClient && serverClient.connected())   // send data to telnet client if connected
     serverClient.println(line);
-  }
 }
 
 // Parse temperatures from printer responses like
@@ -113,7 +112,6 @@ bool parseTemperatures(const String response) {
 
   return tempResponse;
 }
-
 
 inline void lcd(const String text) {
   commandQueue.push("M117 " + text);
@@ -239,7 +237,7 @@ int apiJobHandler(const uint8_t* data) {
     telnetSend(root["command"]);
     String command = root["command"].asString();
     if (command == "cancel") {
-      if (!isPrinting) 
+      if (!isPrinting)
         return 409;
       cancelPrint = true;
     }
@@ -328,7 +326,6 @@ void mDNSInit() {
 
   MDNS.addService("http", "tcp", 80);
 }
-
 
 bool detectPrinter() {
   static int printerDetectionState;
@@ -454,25 +451,23 @@ void setup() {
 
   // http://docs.octoprint.org/en/master/api/connection.html#get-connection-settings
   server.on("/api/connection", HTTP_GET, [](AsyncWebServerRequest * request) {
-    String message =
-         "{\r\n"
-         "  \"current\": {\r\n"
-         "    \"state\": \"" + getState() + "\",\r\n"
-         "    \"port\": \"Serial\",\r\n"
-         "    \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"
-         "    \"printerProfile\": \"Default\"\r\n"
-         "  },\r\n"
-         "  \"options\": {\r\n"
-         "  \"ports\": \"Serial\",\r\n"
-         "  \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"
-         "  \"printerProfiles\": \"Default\",\r\n"
-         "  \"portPreference\": \"Serial\",\r\n"
-         "  \"baudratePreference\": " + serialBauds[serialBaudIndex] + ",\r\n"
-         "  \"printerProfilePreference\": \"Default\",\r\n"
-         "  \"autoconnect\": true\r\n"
-         "  }\r\n"
-         "}";
-    request->send(200, "application/json", message);
+    request->send(200, "application/json", "{\r\n"
+                                           "  \"current\": {\r\n"
+                                           "    \"state\": \"" + getState() + "\",\r\n"
+                                           "    \"port\": \"Serial\",\r\n"
+                                           "    \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"
+                                           "    \"printerProfile\": \"Default\"\r\n"
+                                           "  },\r\n"
+                                           "  \"options\": {\r\n"
+                                           "  \"ports\": \"Serial\",\r\n"
+                                           "  \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"
+                                           "  \"printerProfiles\": \"Default\",\r\n"
+                                           "  \"portPreference\": \"Serial\",\r\n"
+                                           "  \"baudratePreference\": " + serialBauds[serialBaudIndex] + ",\r\n"
+                                           "  \"printerProfilePreference\": \"Default\",\r\n"
+                                           "  \"autoconnect\": true\r\n"
+                                           "  }\r\n"
+                                           "}");
   });
 
   //  To do: http://docs.octoprint.org/en/master/api/connection.html#post--api-connection
@@ -504,11 +499,13 @@ void setup() {
   server.on("/info", HTTP_GET, [](AsyncWebServerRequest * request) {
     String message = "<pre>"
                      "Free heap: " + String(ESP.getFreeHeap()) + "\n\n"
-                     "File system: " + storageFS.getActiveFS() + "\n"
-                     "Filename length limit: " + String(storageFS.getMaxPathLength()) + "\n";
-    if (uploadedFullname != "") {
-      message += "Uploaded file: " + getUploadedFilename() + "\n"
-                 "Uploaded file size: " + String(uploadedFileSize) + "\n";
+                     "File system: " + storageFS.getActiveFS() + "\n";
+    if (storageFS.isActive()) {
+      message += "Filename length limit: " + String(storageFS.getMaxPathLength()) + "\n";
+      if (uploadedFullname != "") {
+        message += "Uploaded file: " + getUploadedFilename() + "\n"
+                   "Uploaded file size: " + String(uploadedFileSize) + "\n";
+      }
     }
     message += "\n"
                "Last command sent: " + lastCommandSent + "\n"
@@ -581,8 +578,6 @@ void setup() {
                                            "  }\r\n"
                                            "}");
   });
-
-
 
   server.on("/api/settings", HTTP_GET, [](AsyncWebServerRequest * request) {
     // https://github.com/probonopd/WirelessPrinting/issues/30

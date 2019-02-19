@@ -3,7 +3,6 @@
 #define FS_NO_GLOBALS //allow spiffs to coexist with SD card, define BEFORE including FS.h
 #include <FS.h>
 #include <SdFat.h>
-#include <SPIFFSEditor.h>
 
 class FileWrapper {
   friend class StorageFS;
