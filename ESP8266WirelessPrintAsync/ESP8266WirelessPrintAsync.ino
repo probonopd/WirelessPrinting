@@ -346,7 +346,7 @@ bool detectPrinter() {
       Serial.begin(serialBauds[serialBaudIndex]);
       telnetSend("Connecting at " + String(serialBauds[serialBaudIndex]));
       commandQueue.push("M115"); // M115 - Firmware Info
-      commandQueue.push("M115"); // M115 - Firmware Info
+      commandQueue.push("M115"); // M115 - Send it al least twice 
       printerDetectionState = 20;
       break;
 
