@@ -444,8 +444,8 @@ void setup() {
   // http://docs.octoprint.org/en/master/api/version.html
   server.on("/api/version", HTTP_GET, [](AsyncWebServerRequest * request) {
     request->send(200, "application/json", "{\r\n"
-                                           "  \"api\": 0.0,\r\n"
-                                           "  \"server\": 0.0.0\r\n"
+                                           "  \"api\": \"0.0\",\r\n"
+                                           "  \"server\": \"0.0.0\"\r\n"
                                            "}");
   });
 
