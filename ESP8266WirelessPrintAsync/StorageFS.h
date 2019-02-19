@@ -11,7 +11,7 @@ class StorageFS {
     static unsigned int maxPathLength;
 
   public:
-    static inline void begin(const bool fastSD) {
+    inline static void begin(const bool fastSD) {
       hasSD = SD.begin(SS, fastSD ? SD_SCK_MHZ(50) : SPI_HALF_SPEED); // https://github.com/esp8266/Arduino/issues/1853
       if (hasSD)
         maxPathLength = 255;
@@ -25,8 +25,16 @@ class StorageFS {
       }
     }
 
+    inline static bool activeSD() {
+      return hasSD;
+    }
+
+    inline static bool activeSPIFFS() {
+      return hasSPIFFS;
+    }
+
     inline static String getActiveFS() {
-      return hasSD ? "SD" : (hasSPIFFS ? "SPIFFS" : "NO FS");
+      return activeSD() ? "SD" : (activeSPIFFS() ? "SPIFFS" : "NO FS");
     }
 
     inline static unsigned int getMaxPathLength() {
