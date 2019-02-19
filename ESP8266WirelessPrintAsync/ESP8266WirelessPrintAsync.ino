@@ -28,7 +28,7 @@ DNSServer dns;
 #define MAX_SUPPORTED_EXTRUDERS 6       // Number of supported extruder
 #define USE_FAST_SD                     // Use Default fast SD clock, comment if your SD is an old or slow one.
 //#define OTA_UPDATES                   // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load every code on device)
-const int serialBauds[] = { 1000000, 500000, 250000, 125000, 57600 };   // Marlin valid bauds (removed very low bauds)
+const int serialBauds[] = { 1000000, 500000, 250000, 115200, 57600 };   // Marlin valid bauds (removed very low bauds)
 
 // Information from M115
 String fwMachineType = "Unknown";
