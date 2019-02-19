@@ -26,7 +26,15 @@ class StorageFS {
     }
 
     inline static String getActiveFS() {
-      return hasSD ? "SD" : (hasSPIFFS ? "SPIFFS" : "NO FS");
+      return activeSD() ? "SD" : (activeSPIFFS() ? "SPIFFS" : "NO FS");
+    }
+
+    inline static boolean activeSD() {
+      return hasSD;
+    }
+
+    inline static boolean activeSPIFFS() {
+      return hasSPIFFS;
     }
 
     inline static unsigned int getMaxPathLength() {

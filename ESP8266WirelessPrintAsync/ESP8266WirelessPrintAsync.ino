@@ -12,7 +12,6 @@
 #include "StorageFS.h"
 #include <ESPAsyncWebServer.h>
 #include <ESPAsyncWiFiManager.h>  // https://github.com/alanswx/ESPAsyncWiFiManager/
-#include <SPIFFSEditor.h>
 
 #include "CommandQueue.h"
 
@@ -29,7 +28,8 @@ DNSServer dns;
 #define MAX_SUPPORTED_EXTRUDERS 6       // Number of supported extruder
 #define USE_FAST_SD                     // Use Default fast SD clock, comment if your SD is an old or slow one.
 //#define OTA_UPDATES                   // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load every code on device)
-const int serialBauds[] = {  250000};   // Marlin valid bauds (removed very low bauds)
+const int serialBauds[] = { 1000000, 500000, 250000, 115200, 57600 };   // Marlin valid bauds (removed very low bauds)
+unsigned int serialBaudIndex; 
 
 // Information from M115
 String fwMachineType = "Unknown";
@@ -37,7 +37,7 @@ int fwExtruders = 1;
 bool fwAutoreportTempCap, fwProgressCap, fwBuildPercentCap;
 
 String deviceName = "Unknown";
-bool hasSD; // will be set true if SD card is detected and usable; otherwise use SPIFFS
+//bool hasSD; // will be set true if SD card is detected and usable; otherwise use SPIFFS
 bool printerConnected;
 bool startPrint, isPrinting, printPause, restartPrint, cancelPrint;
 String lastCommandSent, lastReceivedResponse;
@@ -329,8 +329,9 @@ void mDNSInit() {
   MDNS.addService("http", "tcp", 80);
 }
 
+
 bool detectPrinter() {
-  static int printerDetectionState, serialBaudIndex;
+  static int printerDetectionState;
 
   switch (printerDetectionState) {
     case 0:
@@ -428,7 +429,7 @@ void setup() {
   telnetServer.begin();
   telnetServer.setNoDelay(true);
 
-  if (!hasSD)
+  if (storageFS.activeSPIFFS()==true)
     server.addHandler(new SPIFFSEditor());
 
   initUploadedFilename();
@@ -437,6 +438,40 @@ void setup() {
     telnetSend("404 | Page '" + request->url() + "' not found\r\n");
     request->send(404, "text/html", "<h1>Page not found!</h1>");
   });
+
+
+  server.on("/api/version", HTTP_GET, [](AsyncWebServerRequest * request) {       
+    String message = "{\r\n"
+                     "    \"api\": \"" + String("0.0") + "\",\r\n"
+                     "    \"server\": \"" + String("0.0") + "\"\r\n"
+                     "}";                
+    request->send(200, "application/json", message);
+  });
+
+
+  server.on("/api/connection", HTTP_GET, [](AsyncWebServerRequest * request) {       
+    String message = 
+         "{\r\n"
+         "  \"current\": {\r\n"
+         "      \"state\": \"" + String(!printerConnected ? "Discovering printer" : isPrinting ? "Printing" : "Operational") + "\",\r\n"
+         "      \"port\": \"" + String("Serial") + "\",\r\n"
+         "      \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"       
+         "      \"printerProfile\": \"" + String("Default") + "\"\r\n"
+         "  },\r\n"
+         "    \"options\": {\r\n"     
+         "      \"ports\": \"" + String("Serial") + "\",\r\n"
+         "      \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"
+         "      \"printerProfiles\": \"" + String("Default") + "\",\r\n"
+         "      \"portPreference\": \"" + String("Serial") + "\",\r\n"       
+         "      \"baudratePreference\": " + serialBauds[serialBaudIndex] + ",\r\n"
+         "      \"printerProfilePreference\": \"" + String("Default") + "\",\r\n"
+         "      \"autoconnect\": " + String("true") + "\r\n"             
+         "    }\r\n"
+         "}";
+    request->send(200, "application/json", message);
+  });
+  
+// To do::f http://docs.octoprint.org/en/master/api/connection.html#post--api-connection
 
   server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
     String message = "<h1>" + deviceName + "</h1>"
@@ -533,7 +568,7 @@ void setup() {
 
   server.on("/api/printer", HTTP_GET, [](AsyncWebServerRequest * request) {
     // http://docs.octoprint.org/en/master/api/datamodel.html#printer-state
-    String sdReadyState = String(hasSD ? "true" : "false");
+    String sdReadyState = String(storageFS.activeSD() ? "true" : "false");
     String readyState = String(printerConnected ? "true" : "false");
     String message = "{\r\n"
                      "  \"state\": {\r\n"
