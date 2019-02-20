@@ -11,7 +11,7 @@
 #endif
 #include <ArduinoJson.h>          // https://github.com/bblanchon/ArduinoJson (for implementing a subset of the OctoPrint API)
 #include <DNSServer.h>
-#include "StorageFS.h"            // Required: https://github.com/greiman/SdFat
+#include "StorageFS.h"
 #include <ESPAsyncWebServer.h>    // https://github.com/me-no-dev/ESPAsyncWebServer
 #include <ESPAsyncWiFiManager.h>  // https://github.com/alanswx/ESPAsyncWiFiManager/
 #include <SPIFFSEditor.h>
@@ -116,7 +116,6 @@ bool parseTemperatures(const String response) {
 
   return tempResponse;
 }
-
 
 inline void lcd(const String text) {
   commandQueue.push("M117 " + text);
@@ -331,7 +330,6 @@ void mDNSInit() {
   MDNS.addService("http", "tcp", 80);
 }
 
-
 bool detectPrinter() {
   static int printerDetectionState;
 
@@ -379,8 +377,7 @@ bool detectPrinter() {
           String text = IpAddress2String(WiFi.localIP()) + " " + storageFS.getActiveFS();
           lcd(text);
           playSound();
-          
-          
+
           if (fwAutoreportTempCap)
             commandQueue.push("M155 S" + String(TEMPERATURE_REPORT_INTERVAL));   // Start auto report temperatures
           else
@@ -444,7 +441,7 @@ void setup() {
     server.addHandler(new SPIFFSEditor());
 
   //mDNSInit();   // works if called here and OTA enabled
-   
+
   initUploadedFilename();
   server.onNotFound([](AsyncWebServerRequest * request) {
     telnetSend("404 | Page '" + request->url() + "' not found\r\n");
@@ -574,10 +571,10 @@ void setup() {
                                            "      \"size\": " + String(uploadedFileSize) + ",\r\n"
                                            "      \"date\": 1378847754 \r\n"
                                            "    },\r\n"
-                                           "    \"estimatedPrintTime\": \"" + String("PrintTime") + "\",\r\n"
+                                           "    \"estimatedPrintTime\": \"PrintTime\",\r\n"
                                            "    \"filament\": {\r\n"
-                                           "      \"length\": \"" + String("Length") + "\",\r\n"
-                                           "      \"volume\": \"" + String("Volume") + "\"\r\n"
+                                           "      \"length\": \"Length\",\r\n"
+                                           "      \"volume\": \"Volume\"\r\n"
                                            "    }\r\n"
                                            "  },\r\n"
                                            "  \"progress\": {\r\n"
@@ -674,8 +671,6 @@ void loop() {
   #ifdef OTA_UPDATES
     ArduinoOTA.handle();
   #endif
-  MDNS.update();
-//  mDNSInit();
 
   // look for Client connect trial
   if (telnetServer.hasClient() && (!serverClient || !serverClient.connected())) {
@@ -686,8 +681,11 @@ void loop() {
     serverClient.flush();  // clear input buffer, else you get strange characters
   }
 
-  if (!printerConnected)    printerConnected = detectPrinter();
+  if (!printerConnected)
+    printerConnected = detectPrinter();
   else {
+    MDNS.update();
+
     handlePrint();
 
     if (cancelPrint && !isPrinting) { // Only when cancelPrint has been processed by 'handlePrint'
