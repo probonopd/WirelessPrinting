@@ -1,6 +1,8 @@
 #include <ArduinoOTA.h>
 #if defined(ESP8266)
+  #include <ESP8266WiFi.h>
   #include <ESP8266mDNS.h>        // https://github.com/esp8266/Arduino/tree/master/libraries/ESP8266mDNS
+  #include <ESPAsyncTCP.h>
 #elif defined(ESP32)
   #include <WiFi.h>
   #include <ESPmDNS.h>
@@ -8,7 +10,7 @@
 #endif
 #include <ArduinoJson.h>          // https://github.com/bblanchon/ArduinoJson (for implementing a subset of the OctoPrint API)
 #include <DNSServer.h>
-#include "StorageFS.h"            // Required: https://github.com/greiman/SdFat
+#include "StorageFS.h"
 #include <ESPAsyncWebServer.h>    // https://github.com/me-no-dev/ESPAsyncWebServer
 #include <ESPAsyncWiFiManager.h>  // https://github.com/alanswx/ESPAsyncWiFiManager/
 #include <SPIFFSEditor.h>
@@ -323,8 +325,6 @@ void mDNSInit() {
     MDNS.addServiceTxt("http", "tcp", "api", "0.1");
     MDNS.addServiceTxt("http", "tcp", "version", "1.2.10");
   }
-
-  MDNS.addService("http", "tcp", 80);
 }
 
 bool detectPrinter() {
@@ -343,7 +343,7 @@ bool detectPrinter() {
       Serial.begin(serialBauds[serialBaudIndex]);
       telnetSend("Connecting at " + String(serialBauds[serialBaudIndex]));
       commandQueue.push("M115"); // M115 - Firmware Info
-      commandQueue.push("M115");
+      commandQueue.push("M115"); // M115 - Send it al least twice
       printerDetectionState = 20;
       break;
 
@@ -368,10 +368,13 @@ bool detectPrinter() {
           fwAutoreportTempCap = M115ExtractBool(lastReceivedResponse, "Cap:AUTOREPORT_TEMP");
           fwProgressCap = M115ExtractBool(lastReceivedResponse, "Cap:PROGRESS");
           fwBuildPercentCap = M115ExtractBool(lastReceivedResponse, "Cap:BUILD_PERCENT");
-          mDNSInit();
+
+          mDNSInit(); // Works only if line 680 to 687 are commented
+          
           String text = IpAddress2String(WiFi.localIP()) + " " + storageFS.getActiveFS();
           lcd(text);
           playSound();
+
           if (fwAutoreportTempCap)
             commandQueue.push("M155 S" + String(TEMPERATURE_REPORT_INTERVAL));   // Start auto report temperatures
           else
@@ -434,8 +437,9 @@ void setup() {
   if (storageFS.activeSPIFFS())
     server.addHandler(new SPIFFSEditor());
 
-  initUploadedFilename();
+  //mDNSInit();   // works if called here and OTA enabled
 
+  initUploadedFilename();
   server.onNotFound([](AsyncWebServerRequest * request) {
     telnetSend("404 | Page '" + request->url() + "' not found\r\n");
     request->send(404, "text/html", "<h1>Page not found!</h1>");
@@ -560,15 +564,15 @@ void setup() {
                                            "  \"job\": {\r\n"
                                            "    \"file\": {\r\n"
                                            "      \"name\": \"" + getUploadedFilename() + "\",\r\n"
-                                           "      \"origin\": \"local\",\r\n"                                           
+                                           "      \"origin\": \"local\",\r\n"
                                            "      \"size\": " + String(uploadedFileSize) + ",\r\n"
                                            "      \"date\": 1378847754 \r\n"
                                            "    },\r\n"
-                                           "    \"estimatedPrintTime\": \"" + String("PrintTime") + "\",\r\n"                                                                                      
+                                           "    \"estimatedPrintTime\": \"PrintTime\",\r\n"
                                            "    \"filament\": {\r\n"
-                                           "      \"length\": \"" + String("Length") + "\",\r\n"
-                                           "      \"volume\": \"" + String("Volume") + "\"\r\n"                                           
-                                           "    }\r\n"                                           
+                                           "      \"length\": \"Length\",\r\n"
+                                           "      \"volume\": \"Volume\"\r\n"
+                                           "    }\r\n"
                                            "  },\r\n"
                                            "  \"progress\": {\r\n"
                                            "    \"completion\": " + String(printCompletion) + ",\r\n"
@@ -587,7 +591,7 @@ void setup() {
 
   server.on("/api/printer", HTTP_GET, [](AsyncWebServerRequest * request) {
     // http://docs.octoprint.org/en/master/api/datamodel.html#printer-state
-    String sdReadyState = String(storageFS.activeSD() ? "true" : "false");
+    String sdReadyState = String(storageFS.activeSD() ? "true" : "false");  //  This should request SD status to the printer
     String readyState = String(printerConnected ? "true" : "false");
     String message = "{\r\n"
                      "  \"state\": {\r\n"
@@ -667,7 +671,7 @@ void loop() {
   if (telnetServer.hasClient() && (!serverClient || !serverClient.connected())) {
     if (serverClient)
       serverClient.stop();
-
+      
     serverClient = telnetServer.available();
     serverClient.flush();  // clear input buffer, else you get strange characters
   }
@@ -675,6 +679,8 @@ void loop() {
   if (!printerConnected)
     printerConnected = detectPrinter();
   else {
+    MDNS.update();
+
     handlePrint();
 
     if (cancelPrint && !isPrinting) { // Only when cancelPrint has been processed by 'handlePrint'
