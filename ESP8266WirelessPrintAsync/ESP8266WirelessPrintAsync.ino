@@ -1,16 +1,16 @@
 // Required: https://github.com/greiman/SdFat
 #include <ArduinoOTA.h>
 #if defined(ESP8266)
-  #include <ESP8266mDNS.h>
+  #include <ESP8266mDNS.h>        // https://github.com/esp8266/Arduino/tree/master/libraries/ESP8266mDNS
 #elif defined(ESP32)
   #include <WiFi.h>
   #include <ESPmDNS.h>
-  #include <AsyncTCP.h>
+  #include <AsyncTCP.h>           // https://github.com/me-no-dev/ESPAsyncTCP
 #endif
-#include <ArduinoJson.h>    // For implementing (a subset of) the OctoPrint API
+#include <ArduinoJson.h>          // https://github.com/bblanchon/ArduinoJson (for implementing a subset of the OctoPrint API)
 #include <DNSServer.h>
-#include "StorageFS.h"
-#include <ESPAsyncWebServer.h>
+#include "StorageFS.h"            // Required: https://github.com/greiman/SdFat
+#include <ESPAsyncWebServer.h>    // https://github.com/me-no-dev/ESPAsyncWebServer
 #include <ESPAsyncWiFiManager.h>  // https://github.com/alanswx/ESPAsyncWiFiManager/
 #include <SPIFFSEditor.h>
 
@@ -30,7 +30,6 @@ DNSServer dns;
 #define USE_FAST_SD                     // Use Default fast SD clock, comment if your SD is an old or slow one.
 //#define OTA_UPDATES                   // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load every code on device)
 const int serialBauds[] = { 1000000, 500000, 250000, 115200, 57600 };   // Marlin valid bauds (removed very low bauds)
-unsigned int serialBaudIndex; 
 
 // Information from M115
 String fwMachineType = "Unknown";
@@ -43,6 +42,7 @@ bool startPrint, isPrinting, printPause, restartPrint, cancelPrint;
 String lastCommandSent, lastReceivedResponse;
 long lastPrintedLine;
 
+unsigned int serialBaudIndex;
 unsigned int printerUsedBuffer;
 unsigned int serialReceiveTimeoutValue;
 unsigned long serialReceiveTimeoutTimer;
@@ -240,7 +240,7 @@ int apiJobHandler(const uint8_t* data) {
     telnetSend(root["command"]);
     String command = root["command"].asString();
     if (command == "cancel") {
-      if (!isPrinting) 
+      if (!isPrinting)
         return 409;
       cancelPrint = true;
     }
@@ -347,7 +347,7 @@ bool detectPrinter() {
       Serial.begin(serialBauds[serialBaudIndex]);
       telnetSend("Connecting at " + String(serialBauds[serialBaudIndex]));
       commandQueue.push("M115"); // M115 - Firmware Info
-      commandQueue.push("M115"); // M115 - Send it al least twice 
+      commandQueue.push("M115"); // M115 - Send it al least twice
       printerDetectionState = 20;
       break;
 
@@ -407,6 +407,10 @@ void initUploadedFilename() {
   }
 }
 
+inline String getState() {
+ return !printerConnected ? "Discovering printer" : (isPrinting ? "Printing" : "Operational");
+}
+
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);     // Initialize the LED_BUILTIN pin as an output
 
@@ -431,7 +435,7 @@ void setup() {
   telnetServer.begin();
   telnetServer.setNoDelay(true);
 
-  if (storageFS.activeSPIFFS()==true)
+  if (storageFS.activeSPIFFS())
     server.addHandler(new SPIFFSEditor());
 
   initUploadedFilename();
@@ -441,51 +445,46 @@ void setup() {
     request->send(404, "text/html", "<h1>Page not found!</h1>");
   });
 
+  // http://docs.octoprint.org/en/master/api/version.html
+  server.on("/api/version", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send(200, "application/json", "{\r\n"
+                                           "  \"api\": 0.0,\r\n"
+                                           "  \"server\": 0.0.0\r\n"
+                                           "}");
+  });
 
-//  server.on("/api/version", HTTP_GET, [](AsyncWebServerRequest * request) {       
-//    String message = "{\r\n"
-//                     "    \"api\": " + String("0.0") +    ",\r\n"
-//                     "    \"server\": " + String("0.0") + "\r\n"
-//                     "}";                
-//    request->send(200, "application/json", message);
-//  });
-
-// http://docs.octoprint.org/en/master/api/connection.html#get-connection-settings
-  server.on("/api/connection", HTTP_GET, [](AsyncWebServerRequest * request) {       
-    String message = 
+  // http://docs.octoprint.org/en/master/api/connection.html#get-connection-settings
+  server.on("/api/connection", HTTP_GET, [](AsyncWebServerRequest * request) {
+    String message =
          "{\r\n"
          "  \"current\": {\r\n"
-         "      \"state\": \"" + String(!printerConnected ? "Discovering printer" : isPrinting ? "Printing" : "Operational") + "\",\r\n"
-         "      \"port\": \"" + String("Serial") + "\",\r\n"
-         "      \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"       
-         "      \"printerProfile\": \"" + String("Default") + "\"\r\n"
+         "    \"state\": \"" + getState() + "\",\r\n"
+         "    \"port\": \"Serial\",\r\n"
+         "    \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"
+         "    \"printerProfile\": \"Default\"\r\n"
          "  },\r\n"
-         "    \"options\": {\r\n"     
-         "      \"ports\": \"" + String("Serial") + "\",\r\n"
-         "      \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"
-         "      \"printerProfiles\": \"" + String("Default") + "\",\r\n"
-         "      \"portPreference\": \"" + String("Serial") + "\",\r\n"       
-         "      \"baudratePreference\": " + serialBauds[serialBaudIndex] + ",\r\n"
-         "      \"printerProfilePreference\": \"" + String("Default") + "\",\r\n"
-         "      \"autoconnect\": " + String("true") + "\r\n"             
-         "    }\r\n"
-         "}";
-    request->send(200, "application/json", message);
-  });
-  
-// To do: http://docs.octoprint.org/en/master/api/connection.html#post--api-connection
-
-
-
-// File Operations
-// Pending: http://docs.octoprint.org/en/master/api/files.html#retrieve-all-files
-  server.on("/api/files", HTTP_GET, [](AsyncWebServerRequest * request) {       
-    String message = 
-         "{\r\n"
-         "  \"files\": {\r\n"          
+         "  \"options\": {\r\n"
+         "  \"ports\": \"Serial\",\r\n"
+         "  \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"
+         "  \"printerProfiles\": \"Default\",\r\n"
+         "  \"portPreference\": \"Serial\",\r\n"
+         "  \"baudratePreference\": " + serialBauds[serialBaudIndex] + ",\r\n"
+         "  \"printerProfilePreference\": \"Default\",\r\n"
+         "  \"autoconnect\": true\r\n"
          "  }\r\n"
          "}";
     request->send(200, "application/json", message);
+  });
+
+  //  To do: http://docs.octoprint.org/en/master/api/connection.html#post--api-connection
+
+  // File Operations
+  // Pending: http://docs.octoprint.org/en/master/api/files.html#retrieve-all-files
+  server.on("/api/files", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send(200, "application/json", "{\r\n"
+                                           "  \"files\": {\r\n"
+                                           "  }\r\n"
+                                           "}");
   });
 
 
@@ -501,7 +500,7 @@ void setup() {
                      "<p><a href=\"/download\">Download</a></p>";
     request->send(200, "text/html", message);
   });
-  
+
   // Info page
   server.on("/info", HTTP_GET, [](AsyncWebServerRequest * request) {
     String message = "<pre>"
@@ -553,9 +552,7 @@ void setup() {
   // https://jsonformatter.curiousconcept.com/
   // https://www.freeformatter.com/json-escape.html
 
-
-
-// Job info http://docs.octoprint.org/en/master/api/job.html#retrieve-information-about-the-current-job
+  // Job info http://docs.octoprint.org/en/master/api/job.html#retrieve-information-about-the-current-job
   server.on("/api/job", HTTP_GET, [](AsyncWebServerRequest * request) {
     // http://docs.octoprint.org/en/master/api/datamodel.html#sec-api-datamodel-jobs-job
     int printTime = 0, printTimeLeft = 0;
@@ -567,15 +564,15 @@ void setup() {
                                            "  \"job\": {\r\n"
                                            "    \"file\": {\r\n"
                                            "      \"name\": \"" + getUploadedFilename() + "\",\r\n"
-                                           "      \"origin\": \"local\",\r\n"                                           
+                                           "      \"origin\": \"local\",\r\n"
                                            "      \"size\": " + String(uploadedFileSize) + ",\r\n"
                                            "      \"date\": 1378847754 \r\n"
                                            "    },\r\n"
-                                           "    \"estimatedPrintTime\": \"" + String("PrintTime") + "\",\r\n"                                                                                      
+                                           "    \"estimatedPrintTime\": \"" + String("PrintTime") + "\",\r\n"
                                            "    \"filament\": {\r\n"
                                            "      \"length\": \"" + String("Length") + "\",\r\n"
-                                           "      \"volume\": \"" + String("Volume") + "\"\r\n"                                           
-                                           "    }\r\n"                                           
+                                           "      \"volume\": \"" + String("Volume") + "\"\r\n"
+                                           "    }\r\n"
                                            "  },\r\n"
                                            "  \"progress\": {\r\n"
                                            "    \"completion\": " + String(printCompletion) + ",\r\n"
@@ -600,7 +597,7 @@ void setup() {
     String readyState = String(printerConnected ? "true" : "false");
     String message = "{\r\n"
                      "  \"state\": {\r\n"
-                     "    \"text\": \"" + String(!printerConnected ? "Discovering printer" : isPrinting ? "Printing" : "Operational") + "\",\r\n"
+                     "    \"text\": \"" + getState() + "\",\r\n"
                      "    \"flags\": {\r\n"
                      "      \"operational\": " + readyState + ",\r\n"
                      "      \"paused\": " + String(printPause ? "true" : "false") + ",\r\n"
