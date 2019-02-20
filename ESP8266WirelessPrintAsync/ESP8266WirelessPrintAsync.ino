@@ -1,8 +1,8 @@
+// Required: https://github.com/greiman/SdFat
+
 #include <ArduinoOTA.h>
 #if defined(ESP8266)
-  #include <ESP8266WiFi.h>
   #include <ESP8266mDNS.h>        // https://github.com/esp8266/Arduino/tree/master/libraries/ESP8266mDNS
-  #include <ESPAsyncTCP.h>
 #elif defined(ESP32)
   #include <WiFi.h>
   #include <ESPmDNS.h>
@@ -29,8 +29,11 @@ DNSServer dns;
 #define TEMPERATURE_REPORT_INTERVAL 2   // Ask the printer for its temperatures status every 2 seconds
 #define MAX_SUPPORTED_EXTRUDERS 6       // Number of supported extruder
 #define USE_FAST_SD                     // Use Default fast SD clock, comment if your SD is an old or slow one.
-//#define OTA_UPDATES                   // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load every code on device)
+//#define OTA_UPDATES                   // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load any code on device)
 const int serialBauds[] = { 1000000, 500000, 250000, 115200, 57600 };   // Marlin valid bauds (removed very low bauds)
+
+#define API_VERSION     "0.1"
+#define VERSION         "1.2.10"
 
 // Information from M115
 String fwMachineType = "Unknown";
@@ -301,10 +304,7 @@ bool M115ExtractBool(const String response, const String field, const bool onErr
 }
 
 void mDNSInit() {
-  char output[9];
-  itoa(ESP.getChipId(), output, 16);
-  String chipID = String(output);
-  deviceName = fwMachineType + " (" + chipID + ")";
+  deviceName = fwMachineType + " (" + String(ESP.getChipId(), HEX) + ")";
 
   if (MDNS.begin(deviceName.c_str())) {
     // For Cura WirelessPrint - deprecated in favor of the OctoPrint API
@@ -315,15 +315,15 @@ void mDNSInit() {
     // Unfortunately, Slic3r doesn't seem to recognize it
     MDNS.addService("octoprint", "tcp", 80);
     MDNS.addServiceTxt("octoprint", "tcp", "path", "/");
-    MDNS.addServiceTxt("octoprint", "tcp", "api", "0.1");
-    MDNS.addServiceTxt("octoprint", "tcp", "version", "1.2.10");
+    MDNS.addServiceTxt("octoprint", "tcp", "api", API_VERSION);
+    MDNS.addServiceTxt("octoprint", "tcp", "version", VERSION);
 
     // For compatibility with Slic3r
     // Unfortunately, Slic3r doesn't seem to recognize it either. Library bug?
     MDNS.addService("http", "tcp", 80);
     MDNS.addServiceTxt("http", "tcp", "path", "/");
-    MDNS.addServiceTxt("http", "tcp", "api", "0.1");
-    MDNS.addServiceTxt("http", "tcp", "version", "1.2.10");
+    MDNS.addServiceTxt("http", "tcp", "api", API_VERSION);
+    MDNS.addServiceTxt("http", "tcp", "version", VERSION);
   }
 }
 
@@ -369,7 +369,7 @@ bool detectPrinter() {
           fwProgressCap = M115ExtractBool(lastReceivedResponse, "Cap:PROGRESS");
           fwBuildPercentCap = M115ExtractBool(lastReceivedResponse, "Cap:BUILD_PERCENT");
 
-          mDNSInit(); // Works only if line 680 to 687 are commented
+          mDNSInit();
           
           String text = IpAddress2String(WiFi.localIP()) + " " + storageFS.getActiveFS();
           lcd(text);
@@ -437,9 +437,8 @@ void setup() {
   if (storageFS.activeSPIFFS())
     server.addHandler(new SPIFFSEditor());
 
-  //mDNSInit();   // works if called here and OTA enabled
-
   initUploadedFilename();
+
   server.onNotFound([](AsyncWebServerRequest * request) {
     telnetSend("404 | Page '" + request->url() + "' not found\r\n");
     request->send(404, "text/html", "<h1>Page not found!</h1>");
@@ -448,8 +447,8 @@ void setup() {
   // http://docs.octoprint.org/en/master/api/version.html
   server.on("/api/version", HTTP_GET, [](AsyncWebServerRequest * request) {
     request->send(200, "application/json", "{\r\n"
-                                           "  \"api\": \"0.0\",\r\n"
-                                           "  \"server\": \"0.0.0\"\r\n"
+                                           "  \"api\": \"" API_VERSION "\",\r\n"
+                                           "  \"server\": \"" VERSION "\"\r\n"
                                            "}");
   });
 
@@ -671,7 +670,7 @@ void loop() {
   if (telnetServer.hasClient() && (!serverClient || !serverClient.connected())) {
     if (serverClient)
       serverClient.stop();
-      
+
     serverClient = telnetServer.available();
     serverClient.flush();  // clear input buffer, else you get strange characters
   }
