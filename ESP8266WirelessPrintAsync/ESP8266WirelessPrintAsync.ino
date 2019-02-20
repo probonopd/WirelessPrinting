@@ -1,7 +1,9 @@
 // Required: https://github.com/greiman/SdFat
 #include <ArduinoOTA.h>
 #if defined(ESP8266)
+  #include <ESP8266WiFi.h>
   #include <ESP8266mDNS.h>        // https://github.com/esp8266/Arduino/tree/master/libraries/ESP8266mDNS
+  #include <ESPAsyncTCP.h>
 #elif defined(ESP32)
   #include <WiFi.h>
   #include <ESPmDNS.h>
@@ -326,7 +328,6 @@ void mDNSInit() {
     MDNS.addServiceTxt("http", "tcp", "api", "0.1");
     MDNS.addServiceTxt("http", "tcp", "version", "1.2.10");
   }
-
   MDNS.addService("http", "tcp", 80);
 }
 
@@ -372,10 +373,14 @@ bool detectPrinter() {
           fwAutoreportTempCap = M115ExtractBool(lastReceivedResponse, "Cap:AUTOREPORT_TEMP");
           fwProgressCap = M115ExtractBool(lastReceivedResponse, "Cap:PROGRESS");
           fwBuildPercentCap = M115ExtractBool(lastReceivedResponse, "Cap:BUILD_PERCENT");
-          mDNSInit();
+
+          mDNSInit(); // Doesn't work when called here
+          
           String text = IpAddress2String(WiFi.localIP()) + " " + storageFS.getActiveFS();
           lcd(text);
           playSound();
+          
+          
           if (fwAutoreportTempCap)
             commandQueue.push("M155 S" + String(TEMPERATURE_REPORT_INTERVAL));   // Start auto report temperatures
           else
@@ -438,20 +443,21 @@ void setup() {
   if (storageFS.activeSPIFFS())
     server.addHandler(new SPIFFSEditor());
 
+  //mDNSInit();   // works if called here and OTA enabled
+   
   initUploadedFilename();
-
   server.onNotFound([](AsyncWebServerRequest * request) {
     telnetSend("404 | Page '" + request->url() + "' not found\r\n");
     request->send(404, "text/html", "<h1>Page not found!</h1>");
   });
 
   // http://docs.octoprint.org/en/master/api/version.html
-  server.on("/api/version", HTTP_GET, [](AsyncWebServerRequest * request) {
-    request->send(200, "application/json", "{\r\n"
-                                           "  \"api\": 0.0,\r\n"
-                                           "  \"server\": 0.0.0\r\n"
-                                           "}");
-  });
+//  server.on("/api/version", HTTP_GET, [](AsyncWebServerRequest * request) {
+//    request->send(200, "application/json", "{\r\n"
+//                                           "  \"api\": 0.0,\r\n"
+//                                           "  \"server\": 0.0.0\r\n"
+//                                           "}");
+//  });
 
   // http://docs.octoprint.org/en/master/api/connection.html#get-connection-settings
   server.on("/api/connection", HTTP_GET, [](AsyncWebServerRequest * request) {
@@ -668,6 +674,8 @@ void loop() {
   #ifdef OTA_UPDATES
     ArduinoOTA.handle();
   #endif
+  MDNS.update();
+//  mDNSInit();
 
   // look for Client connect trial
   if (telnetServer.hasClient() && (!serverClient || !serverClient.connected())) {
@@ -678,8 +686,7 @@ void loop() {
     serverClient.flush();  // clear input buffer, else you get strange characters
   }
 
-  if (!printerConnected)
-    printerConnected = detectPrinter();
+  if (!printerConnected)    printerConnected = detectPrinter();
   else {
     handlePrint();
 
