@@ -29,7 +29,6 @@ class StorageFS {
       return hasSD;
     }
 
-    inline static boolean activeSPIFFS() {
     inline static bool activeSPIFFS() {
       return hasSPIFFS;
     }
