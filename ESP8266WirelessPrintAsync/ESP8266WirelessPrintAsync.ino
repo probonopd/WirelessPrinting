@@ -596,7 +596,7 @@ void setup() {
 
   server.on("/api/printer", HTTP_GET, [](AsyncWebServerRequest * request) {
     // http://docs.octoprint.org/en/master/api/datamodel.html#printer-state
-    String sdReadyState = String(storageFS.activeSD() ? "true" : "false");
+    String sdReadyState = String(storageFS.activeSD() ? "true" : "false");  //  This should request SD status to the printer
     String readyState = String(printerConnected ? "true" : "false");
     String message = "{\r\n"
                      "  \"state\": {\r\n"
