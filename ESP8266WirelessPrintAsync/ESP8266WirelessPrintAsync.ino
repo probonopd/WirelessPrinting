@@ -374,7 +374,7 @@ bool detectPrinter() {
           fwProgressCap = M115ExtractBool(lastReceivedResponse, "Cap:PROGRESS");
           fwBuildPercentCap = M115ExtractBool(lastReceivedResponse, "Cap:BUILD_PERCENT");
 
-          mDNSInit(); // Doesn't work when called here
+          mDNSInit(); // Works only if line 680 to 687 are commented
           
           String text = IpAddress2String(WiFi.localIP()) + " " + storageFS.getActiveFS();
           lcd(text);
@@ -681,7 +681,7 @@ void loop() {
   if (telnetServer.hasClient() && (!serverClient || !serverClient.connected())) {
     if (serverClient)
       serverClient.stop();
-
+      
     serverClient = telnetServer.available();
     serverClient.flush();  // clear input buffer, else you get strange characters
   }
