@@ -4,7 +4,6 @@
 #include <FS.h>
 #include <SdFat.h>
 
-
 class FileWrapper {
   friend class StorageFS;
 
