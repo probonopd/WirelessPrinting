@@ -327,7 +327,6 @@ void mDNSInit() {
     MDNS.addServiceTxt("http", "tcp", "api", "0.1");
     MDNS.addServiceTxt("http", "tcp", "version", "1.2.10");
   }
-  MDNS.addService("http", "tcp", 80);
 }
 
 bool detectPrinter() {
