@@ -444,16 +444,16 @@ void setup() {
     request->send(404, "text/html", "<h1>Page not found!</h1>");
   });
 
-  // http://docs.octoprint.org/en/master/api/version.html
   server.on("/api/version", HTTP_GET, [](AsyncWebServerRequest * request) {
+    // http://docs.octoprint.org/en/master/api/version.html
     request->send(200, "application/json", "{\r\n"
                                            "  \"api\": \"" API_VERSION "\",\r\n"
                                            "  \"server\": \"" VERSION "\"\r\n"
                                            "}");
   });
 
-  // http://docs.octoprint.org/en/master/api/connection.html#get-connection-settings
   server.on("/api/connection", HTTP_GET, [](AsyncWebServerRequest * request) {
+    // http://docs.octoprint.org/en/master/api/connection.html#get-connection-settings
     request->send(200, "application/json", "{\r\n"
                                            "  \"current\": {\r\n"
                                            "    \"state\": \"" + getState() + "\",\r\n"
@@ -473,17 +473,7 @@ void setup() {
                                            "}");
   });
 
-  //  To do: http://docs.octoprint.org/en/master/api/connection.html#post--api-connection
-
-  // File Operations
-  // Pending: http://docs.octoprint.org/en/master/api/files.html#retrieve-all-files
-  server.on("/api/files", HTTP_GET, [](AsyncWebServerRequest * request) {
-    request->send(200, "application/json", "{\r\n"
-                                           "  \"files\": {\r\n"
-                                           "  }\r\n"
-                                           "}");
-  });
-
+  // Todo: http://docs.octoprint.org/en/master/api/connection.html#post--api-connection
 
   // Main page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
@@ -518,9 +508,18 @@ void setup() {
     request->send(200, "text/html", message);
   });
 
+  // File Operations
+  //server.on("/api/files", HTTP_GET, [](AsyncWebServerRequest * request) {
+  //  Pending: http://docs.octoprint.org/en/master/api/files.html#retrieve-all-files
+  //  request->send(200, "application/json", "{\r\n"
+  //                                         "  \"files\": {\r\n"
+  //                                         "  }\r\n"
+  //                                         "}");
+  //});
+
   // For Slic3r OctoPrint compatibility
   server.on("/api/files/local", HTTP_POST, [](AsyncWebServerRequest * request) {
-    // http://docs.octoprint.org/en/master/api/files.html#upload-response
+    // https://docs.octoprint.org/en/master/api/files.html?highlight=api%2Ffiles%2Flocal#upload-file-or-create-folder
     playSound();
     lcd("Receiving...");
 
@@ -539,21 +538,11 @@ void setup() {
                                            "    }\r\n"
                                            "  },\r\n"
                                            "  \"done\": true\r\n"
-                                           "}\r\n");
+                                           "}");
   }, handleUpload);
 
-  // For Cura 2.6.0 OctoPrintPlugin compatibility
-  // Must be valid JSON
-  // http://docs.octoprint.org/en/master/api
-  // TODO: Fill with values that actually make sense; currently this is enough for Cura 2.6.0 not to crash
-
-  // Poor Man's JSON:
-  // https://jsonformatter.curiousconcept.com/
-  // https://www.freeformatter.com/json-escape.html
-
-  // Job info http://docs.octoprint.org/en/master/api/job.html#retrieve-information-about-the-current-job
   server.on("/api/job", HTTP_GET, [](AsyncWebServerRequest * request) {
-    // http://docs.octoprint.org/en/master/api/datamodel.html#sec-api-datamodel-jobs-job
+    // http://docs.octoprint.org/en/master/api/job.html#retrieve-information-about-the-current-job
     int printTime = 0, printTimeLeft = 0;
     if (isPrinting) {
       printTime = (millis() - printStartTime) / 1000;
@@ -567,10 +556,10 @@ void setup() {
                                            "      \"size\": " + String(uploadedFileSize) + ",\r\n"
                                            "      \"date\": 1378847754 \r\n"
                                            "    },\r\n"
-                                           "    \"estimatedPrintTime\": \"PrintTime\",\r\n"
+                                           //"    \"estimatedPrintTime\": \"" + PrintTime + "\",\r\n"
                                            "    \"filament\": {\r\n"
-                                           "      \"length\": \"Length\",\r\n"
-                                           "      \"volume\": \"Volume\"\r\n"
+                                           //"      \"length\": \"" + Length + "\",\r\n"
+                                           //"      \"volume\": \"" + Volume + "\"\r\n"
                                            "    }\r\n"
                                            "  },\r\n"
                                            "  \"progress\": {\r\n"
@@ -589,7 +578,7 @@ void setup() {
   });
 
   server.on("/api/printer", HTTP_GET, [](AsyncWebServerRequest * request) {
-    // http://docs.octoprint.org/en/master/api/datamodel.html#printer-state
+    // https://docs.octoprint.org/en/master/api/printer.html#retrieve-the-current-printer-state
     String sdReadyState = String(storageFS.activeSD() ? "true" : "false");  //  This should request SD status to the printer
     String readyState = String(printerConnected ? "true" : "false");
     String message = "{\r\n"
@@ -599,6 +588,8 @@ void setup() {
                      "      \"operational\": " + readyState + ",\r\n"
                      "      \"paused\": " + String(printPause ? "true" : "false") + ",\r\n"
                      "      \"printing\": " + String(isPrinting ? "true" : "false") + ",\r\n"
+                     "      \"pausing\": false,\r\n"
+                     "      \"cancelling\": " + String(cancelPrint ? "true" : "false") + ",\r\n"
                      "      \"sdReady\": " + sdReadyState + ",\r\n"
                      "      \"error\": false,\r\n"
                      "      \"ready\": " + readyState + ",\r\n"
