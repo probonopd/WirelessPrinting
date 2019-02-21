@@ -4,9 +4,7 @@
 #if defined(ESP8266)
   #include <ESP8266mDNS.h>        // https://github.com/esp8266/Arduino/tree/master/libraries/ESP8266mDNS
 #elif defined(ESP32)
-  #include <WiFi.h>
   #include <ESPmDNS.h>
-  #include <AsyncTCP.h>           // https://github.com/me-no-dev/ESPAsyncTCP
 #endif
 #include <ArduinoJson.h>          // https://github.com/bblanchon/ArduinoJson (for implementing a subset of the OctoPrint API)
 #include <DNSServer.h>
