@@ -1,9 +1,8 @@
 // Required: https://github.com/greiman/SdFat
+
 #include <ArduinoOTA.h>
 #if defined(ESP8266)
-  #include <ESP8266WiFi.h>
   #include <ESP8266mDNS.h>        // https://github.com/esp8266/Arduino/tree/master/libraries/ESP8266mDNS
-  #include <ESPAsyncTCP.h>
 #elif defined(ESP32)
   #include <WiFi.h>
   #include <ESPmDNS.h>
@@ -30,8 +29,11 @@ DNSServer dns;
 #define TEMPERATURE_REPORT_INTERVAL 2   // Ask the printer for its temperatures status every 2 seconds
 #define MAX_SUPPORTED_EXTRUDERS 6       // Number of supported extruder
 #define USE_FAST_SD                     // Use Default fast SD clock, comment if your SD is an old or slow one.
-//#define OTA_UPDATES                   // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load every code on device)
+//#define OTA_UPDATES                   // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load any code on device)
 const int serialBauds[] = { 1000000, 500000, 250000, 115200, 57600 };   // Marlin valid bauds (removed very low bauds)
+
+#define API_VERSION     "0.1"
+#define VERSION         "1.2.10"
 
 // Information from M115
 String fwMachineType = "Unknown";
@@ -78,9 +80,8 @@ inline void setLed(const bool status) {
 }
 
 inline void telnetSend(const String line) {
-  if (serverClient && serverClient.connected()) { // send data to telnet client if connected
+  if (serverClient && serverClient.connected())   // send data to telnet client if connected
     serverClient.println(line);
-  }
 }
 
 // Parse temperatures from printer responses like
@@ -303,10 +304,7 @@ bool M115ExtractBool(const String response, const String field, const bool onErr
 }
 
 void mDNSInit() {
-  char output[9];
-  itoa(ESP.getChipId(), output, 16);
-  String chipID = String(output);
-  deviceName = fwMachineType + " (" + chipID + ")";
+  deviceName = fwMachineType + " (" + String(ESP.getChipId(), HEX) + ")";
 
   if (MDNS.begin(deviceName.c_str())) {
     // For Cura WirelessPrint - deprecated in favor of the OctoPrint API
@@ -317,15 +315,15 @@ void mDNSInit() {
     // Unfortunately, Slic3r doesn't seem to recognize it
     MDNS.addService("octoprint", "tcp", 80);
     MDNS.addServiceTxt("octoprint", "tcp", "path", "/");
-    MDNS.addServiceTxt("octoprint", "tcp", "api", "0.1");
-    MDNS.addServiceTxt("octoprint", "tcp", "version", "1.2.10");
+    MDNS.addServiceTxt("octoprint", "tcp", "api", API_VERSION);
+    MDNS.addServiceTxt("octoprint", "tcp", "version", VERSION);
 
     // For compatibility with Slic3r
     // Unfortunately, Slic3r doesn't seem to recognize it either. Library bug?
     MDNS.addService("http", "tcp", 80);
     MDNS.addServiceTxt("http", "tcp", "path", "/");
-    MDNS.addServiceTxt("http", "tcp", "api", "0.1");
-    MDNS.addServiceTxt("http", "tcp", "version", "1.2.10");
+    MDNS.addServiceTxt("http", "tcp", "api", API_VERSION);
+    MDNS.addServiceTxt("http", "tcp", "version", VERSION);
   }
 }
 
@@ -371,7 +369,7 @@ bool detectPrinter() {
           fwProgressCap = M115ExtractBool(lastReceivedResponse, "Cap:PROGRESS");
           fwBuildPercentCap = M115ExtractBool(lastReceivedResponse, "Cap:BUILD_PERCENT");
 
-          mDNSInit(); // Works only if line 680 to 687 are commented
+          mDNSInit();
           
           String text = IpAddress2String(WiFi.localIP()) + " " + storageFS.getActiveFS();
           lcd(text);
@@ -439,56 +437,43 @@ void setup() {
   if (storageFS.activeSPIFFS())
     server.addHandler(new SPIFFSEditor());
 
-  //mDNSInit();   // works if called here and OTA enabled
-
   initUploadedFilename();
+
   server.onNotFound([](AsyncWebServerRequest * request) {
     telnetSend("404 | Page '" + request->url() + "' not found\r\n");
     request->send(404, "text/html", "<h1>Page not found!</h1>");
   });
 
-  // http://docs.octoprint.org/en/master/api/version.html
   server.on("/api/version", HTTP_GET, [](AsyncWebServerRequest * request) {
+    // http://docs.octoprint.org/en/master/api/version.html
     request->send(200, "application/json", "{\r\n"
-                                           "  \"api\": 0.0,\r\n"
-                                           "  \"server\": 0.0.0\r\n"
+                                           "  \"api\": \"" API_VERSION "\",\r\n"
+                                           "  \"server\": \"" VERSION "\"\r\n"
                                            "}");
   });
 
-  // http://docs.octoprint.org/en/master/api/connection.html#get-connection-settings
   server.on("/api/connection", HTTP_GET, [](AsyncWebServerRequest * request) {
-    String message =
-         "{\r\n"
-         "  \"current\": {\r\n"
-         "    \"state\": \"" + getState() + "\",\r\n"
-         "    \"port\": \"Serial\",\r\n"
-         "    \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"
-         "    \"printerProfile\": \"Default\"\r\n"
-         "  },\r\n"
-         "  \"options\": {\r\n"
-         "  \"ports\": \"Serial\",\r\n"
-         "  \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"
-         "  \"printerProfiles\": \"Default\",\r\n"
-         "  \"portPreference\": \"Serial\",\r\n"
-         "  \"baudratePreference\": " + serialBauds[serialBaudIndex] + ",\r\n"
-         "  \"printerProfilePreference\": \"Default\",\r\n"
-         "  \"autoconnect\": true\r\n"
-         "  }\r\n"
-         "}";
-    request->send(200, "application/json", message);
-  });
-
-  //  To do: http://docs.octoprint.org/en/master/api/connection.html#post--api-connection
-
-  // File Operations
-  // Pending: http://docs.octoprint.org/en/master/api/files.html#retrieve-all-files
-  server.on("/api/files", HTTP_GET, [](AsyncWebServerRequest * request) {
+    // http://docs.octoprint.org/en/master/api/connection.html#get-connection-settings
     request->send(200, "application/json", "{\r\n"
-                                           "  \"files\": {\r\n"
+                                           "  \"current\": {\r\n"
+                                           "    \"state\": \"" + getState() + "\",\r\n"
+                                           "    \"port\": \"Serial\",\r\n"
+                                           "    \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"
+                                           "    \"printerProfile\": \"Default\"\r\n"
+                                           "  },\r\n"
+                                           "  \"options\": {\r\n"
+                                           "    \"ports\": \"Serial\",\r\n"
+                                           "    \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"
+                                           "    \"printerProfiles\": \"Default\",\r\n"
+                                           "    \"portPreference\": \"Serial\",\r\n"
+                                           "    \"baudratePreference\": " + serialBauds[serialBaudIndex] + ",\r\n"
+                                           "    \"printerProfilePreference\": \"Default\",\r\n"
+                                           "    \"autoconnect\": true\r\n"
                                            "  }\r\n"
                                            "}");
   });
 
+  // Todo: http://docs.octoprint.org/en/master/api/connection.html#post--api-connection
 
   // Main page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
@@ -507,11 +492,13 @@ void setup() {
   server.on("/info", HTTP_GET, [](AsyncWebServerRequest * request) {
     String message = "<pre>"
                      "Free heap: " + String(ESP.getFreeHeap()) + "\n\n"
-                     "File system: " + storageFS.getActiveFS() + "\n"
-                     "Filename length limit: " + String(storageFS.getMaxPathLength()) + "\n";
-    if (uploadedFullname != "") {
-      message += "Uploaded file: " + getUploadedFilename() + "\n"
-                 "Uploaded file size: " + String(uploadedFileSize) + "\n";
+                     "File system: " + storageFS.getActiveFS() + "\n";
+    if (storageFS.isActive()) {
+      message += "Filename length limit: " + String(storageFS.getMaxPathLength()) + "\n";
+      if (uploadedFullname != "") {
+        message += "Uploaded file: " + getUploadedFilename() + "\n"
+                   "Uploaded file size: " + String(uploadedFileSize) + "\n";
+      }
     }
     message += "\n"
                "Last command sent: " + lastCommandSent + "\n"
@@ -521,9 +508,18 @@ void setup() {
     request->send(200, "text/html", message);
   });
 
+  // File Operations
+  //server.on("/api/files", HTTP_GET, [](AsyncWebServerRequest * request) {
+  //  Pending: http://docs.octoprint.org/en/master/api/files.html#retrieve-all-files
+  //  request->send(200, "application/json", "{\r\n"
+  //                                         "  \"files\": {\r\n"
+  //                                         "  }\r\n"
+  //                                         "}");
+  //});
+
   // For Slic3r OctoPrint compatibility
   server.on("/api/files/local", HTTP_POST, [](AsyncWebServerRequest * request) {
-    // http://docs.octoprint.org/en/master/api/files.html#upload-response
+    // https://docs.octoprint.org/en/master/api/files.html?highlight=api%2Ffiles%2Flocal#upload-file-or-create-folder
     playSound();
     lcd("Receiving...");
 
@@ -542,21 +538,11 @@ void setup() {
                                            "    }\r\n"
                                            "  },\r\n"
                                            "  \"done\": true\r\n"
-                                           "}\r\n");
+                                           "}");
   }, handleUpload);
 
-  // For Cura 2.6.0 OctoPrintPlugin compatibility
-  // Must be valid JSON
-  // http://docs.octoprint.org/en/master/api
-  // TODO: Fill with values that actually make sense; currently this is enough for Cura 2.6.0 not to crash
-
-  // Poor Man's JSON:
-  // https://jsonformatter.curiousconcept.com/
-  // https://www.freeformatter.com/json-escape.html
-
-  // Job info http://docs.octoprint.org/en/master/api/job.html#retrieve-information-about-the-current-job
   server.on("/api/job", HTTP_GET, [](AsyncWebServerRequest * request) {
-    // http://docs.octoprint.org/en/master/api/datamodel.html#sec-api-datamodel-jobs-job
+    // http://docs.octoprint.org/en/master/api/job.html#retrieve-information-about-the-current-job
     int printTime = 0, printTimeLeft = 0;
     if (isPrinting) {
       printTime = (millis() - printStartTime) / 1000;
@@ -570,10 +556,10 @@ void setup() {
                                            "      \"size\": " + String(uploadedFileSize) + ",\r\n"
                                            "      \"date\": 1378847754 \r\n"
                                            "    },\r\n"
-                                           "    \"estimatedPrintTime\": \"PrintTime\",\r\n"
+                                           //"    \"estimatedPrintTime\": \"" + PrintTime + "\",\r\n"
                                            "    \"filament\": {\r\n"
-                                           "      \"length\": \"Length\",\r\n"
-                                           "      \"volume\": \"Volume\"\r\n"
+                                           //"      \"length\": \"" + Length + "\",\r\n"
+                                           //"      \"volume\": \"" + Volume + "\"\r\n"
                                            "    }\r\n"
                                            "  },\r\n"
                                            "  \"progress\": {\r\n"
@@ -585,8 +571,6 @@ void setup() {
                                            "}");
   });
 
-
-
   server.on("/api/settings", HTTP_GET, [](AsyncWebServerRequest * request) {
     // https://github.com/probonopd/WirelessPrinting/issues/30
     // https://github.com/probonopd/WirelessPrinting/issues/18#issuecomment-321927016
@@ -594,7 +578,7 @@ void setup() {
   });
 
   server.on("/api/printer", HTTP_GET, [](AsyncWebServerRequest * request) {
-    // http://docs.octoprint.org/en/master/api/datamodel.html#printer-state
+    // https://docs.octoprint.org/en/master/api/printer.html#retrieve-the-current-printer-state
     String sdReadyState = String(storageFS.activeSD() ? "true" : "false");  //  This should request SD status to the printer
     String readyState = String(printerConnected ? "true" : "false");
 	String cancellingState = String("false");							// To do Add functionality
@@ -607,8 +591,13 @@ void setup() {
                      "      \"operational\": " + readyState + ",\r\n"
                      "      \"paused\": " + String(printPause ? "true" : "false") + ",\r\n"
                      "      \"printing\": " + String(isPrinting ? "true" : "false") + ",\r\n"
+<<<<<<< HEAD
 					 "      \"cancelling\": " + cancellingState + ",\r\n"			// To do Add functionality
 					 "      \"pausing\": " + pausingState + ",\r\n"				// To do Add functionality
+=======
+                     "      \"pausing\": false,\r\n"
+                     "      \"cancelling\": " + String(cancelPrint ? "true" : "false") + ",\r\n"
+>>>>>>> pr/3
                      "      \"sdReady\": " + sdReadyState + ",\r\n"
                      "      \"error\": false,\r\n"
                      "      \"ready\": " + readyState + ",\r\n"
@@ -680,7 +669,7 @@ void loop() {
   if (telnetServer.hasClient() && (!serverClient || !serverClient.connected())) {
     if (serverClient)
       serverClient.stop();
-      
+
     serverClient = telnetServer.available();
     serverClient.flush();  // clear input buffer, else you get strange characters
   }
