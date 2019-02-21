@@ -597,7 +597,7 @@ void setup() {
     // http://docs.octoprint.org/en/master/api/datamodel.html#printer-state
     String sdReadyState = String(storageFS.activeSD() ? "true" : "false");  //  This should request SD status to the printer
     String readyState = String(printerConnected ? "true" : "false");
-	String cancelingState = String("false");							// To do Add functionality
+	String cancellingState = String("false");							// To do Add functionality
 	String pausingState = String("false");								// To do Add functionality
 	
     String message = "{\r\n"
@@ -607,8 +607,8 @@ void setup() {
                      "      \"operational\": " + readyState + ",\r\n"
                      "      \"paused\": " + String(printPause ? "true" : "false") + ",\r\n"
                      "      \"printing\": " + String(isPrinting ? "true" : "false") + ",\r\n"
-					           "      \"cancelling\": " + cancelingState + ",\r\n"			// To do Add functionality
-					           "      \"pausing\": " + pausingState + ",\r\n"				// To do Add functionality
+					 "      \"cancelling\": " + cancellingState + ",\r\n"			// To do Add functionality
+					 "      \"pausing\": " + pausingState + ",\r\n"				// To do Add functionality
                      "      \"sdReady\": " + sdReadyState + ",\r\n"
                      "      \"error\": false,\r\n"
                      "      \"ready\": " + readyState + ",\r\n"
