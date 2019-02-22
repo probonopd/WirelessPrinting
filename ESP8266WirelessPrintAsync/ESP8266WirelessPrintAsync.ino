@@ -37,6 +37,7 @@ const int serialBauds[] = { 1000000, 500000, 250000, 115200, 57600 };   // Marli
 String fwMachineType = "Unknown";
 int fwExtruders = 1;
 bool fwAutoreportTempCap, fwProgressCap, fwBuildPercentCap;
+bool fwAutoreportTempCapEn;
 
 String deviceName = "Unknown";
 bool printerConnected;
@@ -375,8 +376,8 @@ bool detectPrinter() {
           String text = IpAddress2String(WiFi.localIP()) + " " + storageFS.getActiveFS();
           lcd(text);
           playSound();
-
-          if (fwAutoreportTempCap)
+          fwAutoreportTempEn= 0 ; // fwAutoreportTempCap;  //disable for now
+          if (fwAutoreportTempCapEn)
             commandQueue.push("M155 S" + String(TEMPERATURE_REPORT_INTERVAL));   // Start auto report temperatures
           else
             temperatureTimer = millis();
@@ -687,7 +688,7 @@ void loop() {
       //lcd("Print cancelled");
     }
 
-    if (!fwAutoreportTempCap) {
+    if (!fwAutoreportTempCapEn) {
       unsigned long curMillis = millis();
       if (curMillis - temperatureTimer >= TEMPERATURE_REPORT_INTERVAL * 1000) {
         commandQueue.push("M105");
