@@ -277,9 +277,11 @@ int apiJobHandler(const uint8_t* data) {
 }
 
 String M115ExtractString(const String response, const String field) {
-  int spos = response.indexOf(field + ":");
+  int spos = response.indexOf(field);
   if (spos != -1) {
-    spos += field.length() + 1;
+    spos += field.length();
+    if (response[spos] == ':')    // pre Marlin 1.1.8 compatibility (don't have ":" after field)
+      ++spos;
 
     int epos = response.indexOf(':', spos);
     if (epos == -1)
@@ -371,7 +373,7 @@ bool detectPrinter() {
           fwMachineType = value;
           value = M115ExtractString(lastReceivedResponse, "EXTRUDER_COUNT");
           fwExtruders = value == "" ? 1 : min(value.toInt(), (long)MAX_SUPPORTED_EXTRUDERS);
-          fwAutoreportTempCap = M115ExtractBool(lastReceivedResponse, "Cap:AUTOREPORT_TEMP");
+          //fwAutoreportTempCap = M115ExtractBool(lastReceivedResponse, "Cap:AUTOREPORT_TEMP");   // Queue hangs if this is enabled! let it disabled until solved
           fwProgressCap = M115ExtractBool(lastReceivedResponse, "Cap:PROGRESS");
           fwBuildPercentCap = M115ExtractBool(lastReceivedResponse, "Cap:BUILD_PERCENT");
 
@@ -414,6 +416,10 @@ void initUploadedFilename() {
 
 inline String getState() {
  return !printerConnected ? "Discovering printer" : (isPrinting ? "Printing" : "Operational");
+}
+
+inline String stringify(bool value) {
+  return value ? "true" : "false";
 }
 
 void setup() {
@@ -508,8 +514,15 @@ void setup() {
     }
     message += "\n"
                "Last command sent: " + lastCommandSent + "\n"
-               "Last received response: " + lastReceivedResponse + "\n"
-               "</pre>";
+               "Last received response: " + lastReceivedResponse + "\n";
+    //if (printerConnected) {
+      message += "\n"
+                 "EXTRUDER_COUNT: " + String(fwExtruders) + "\n"
+                 "AUTOREPORT_TEMP: " + stringify(fwAutoreportTempCap) + "\n"
+                 "PROGRESS: " + stringify(fwProgressCap) + "\n"
+                 "BUILD_PERCENT: " + stringify(fwBuildPercentCap) + "\n";
+    //}
+    message += "</pre>";
 
     request->send(200, "text/html", message);
   });
@@ -581,17 +594,17 @@ void setup() {
 
   server.on("/api/printer", HTTP_GET, [](AsyncWebServerRequest * request) {
     // https://docs.octoprint.org/en/master/api/printer.html#retrieve-the-current-printer-state
-    String sdReadyState = String(storageFS.activeSD() ? "true" : "false");  //  This should request SD status to the printer
-    String readyState = String(printerConnected ? "true" : "false");
+    String sdReadyState = stringify(storageFS.activeSD());   //  This should request SD status to the printer
+    String readyState = stringify(printerConnected);
     String message = "{\r\n"
                      "  \"state\": {\r\n"
                      "    \"text\": \"" + getState() + "\",\r\n"
                      "    \"flags\": {\r\n"
                      "      \"operational\": " + readyState + ",\r\n"
-                     "      \"paused\": " + String(printPause ? "true" : "false") + ",\r\n"
-                     "      \"printing\": " + String(isPrinting ? "true" : "false") + ",\r\n"
+                     "      \"paused\": " + stringify(printPause) + ",\r\n"
+                     "      \"printing\": " + stringify(isPrinting) + ",\r\n"
                      "      \"pausing\": false,\r\n"
-                     "      \"cancelling\": " + String(cancelPrint ? "true" : "false") + ",\r\n"
+                     "      \"cancelling\": " + stringify(cancelPrint) + ",\r\n"
                      "      \"sdReady\": " + sdReadyState + ",\r\n"
                      "      \"error\": false,\r\n"
                      "      \"ready\": " + readyState + ",\r\n"
