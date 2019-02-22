@@ -278,10 +278,11 @@ int apiJobHandler(const uint8_t* data) {
 }
 
 String M115ExtractString(const String response, const String field) {
-  int spos = response.indexOf(field + ":");
-  if (spos != -1) {
-    spos += field.length() + 1;
-
+  int spos = response.indexOf(field);
+  if (spos != -1) {    
+    spos += field.length();
+    if (response[spos] == ':')            //pre Marlin 1.1.8 comnpatibility (don't have ":" after field)
+      spos++;
     int epos = response.indexOf(':', spos);
     if (epos == -1)
       epos = response.indexOf('\n', spos);
@@ -365,7 +366,7 @@ bool detectPrinter() {
           fwMachineType = value;
           value = M115ExtractString(lastReceivedResponse, "EXTRUDER_COUNT");
           fwExtruders = value == "" ? 1 : min(value.toInt(), (long)MAX_SUPPORTED_EXTRUDERS);
-          fwAutoreportTempCap = M115ExtractBool(lastReceivedResponse, "Cap:AUTOREPORT_TEMP");
+          fwAutoreportTempCap = M115ExtractBool(lastReceivedResponse, "Cap:AUTOREPORT_TEMP"); // Queue hangs if this is enabled!  
           fwProgressCap = M115ExtractBool(lastReceivedResponse, "Cap:PROGRESS");
           fwBuildPercentCap = M115ExtractBool(lastReceivedResponse, "Cap:BUILD_PERCENT");
 
@@ -503,8 +504,12 @@ void setup() {
     message += "\n"
                "Last command sent: " + lastCommandSent + "\n"
                "Last received response: " + lastReceivedResponse + "\n"
+               "\n"
+               "EXTRUDER_COUNT: " + fwExtruders + "\n"
+               "AUTOREPORT_TEMP: " + fwAutoreportTempCap + "\n"
+               "PROGRESS: " + fwProgressCap + "\n"
+               "BUILD_PERCENT: " + fwBuildPercentCap + "\n"               
                "</pre>";
-
     request->send(200, "text/html", message);
   });
 
