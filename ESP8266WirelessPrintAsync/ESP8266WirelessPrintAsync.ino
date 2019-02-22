@@ -281,7 +281,7 @@ String M115ExtractString(const String response, const String field) {
   int spos = response.indexOf(field);
   if (spos != -1) {    
     spos += field.length();
-    if (response[spos] == ':')            //pre Marlin 1.1.8 comnpatibility (don't have ":" after field)
+    if (response[spos] == ':')            //pre Marlin 1.1.8 compatibility (don't have ":" after field)
       spos++;
     int epos = response.indexOf(':', spos);
     if (epos == -1)
