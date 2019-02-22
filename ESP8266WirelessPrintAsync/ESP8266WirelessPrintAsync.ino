@@ -4,9 +4,7 @@
 #if defined(ESP8266)
   #include <ESP8266mDNS.h>        // https://github.com/esp8266/Arduino/tree/master/libraries/ESP8266mDNS
 #elif defined(ESP32)
-  #include <WiFi.h>
   #include <ESPmDNS.h>
-  #include <AsyncTCP.h>           // https://github.com/me-no-dev/ESPAsyncTCP
 #endif
 #include <ArduinoJson.h>          // https://github.com/bblanchon/ArduinoJson (for implementing a subset of the OctoPrint API)
 #include <DNSServer.h>
@@ -196,6 +194,8 @@ void handleUpload(AsyncWebServerRequest *request, String filename, size_t index,
   static FileWrapper file;
 
   if (!index) {
+    lcd("Receiving...");
+
     if (uploadedFullname != "")
       storageFS.remove(uploadedFullname);     // Remove previous file
     int pos = filename.lastIndexOf("/");
@@ -520,11 +520,8 @@ void setup() {
   // For Slic3r OctoPrint compatibility
   server.on("/api/files/local", HTTP_POST, [](AsyncWebServerRequest * request) {
     // https://docs.octoprint.org/en/master/api/files.html?highlight=api%2Ffiles%2Flocal#upload-file-or-create-folder
+    lcd("Received");
     playSound();
-    lcd("Receiving...");
-
-    if (!request->hasParam("file", true, true))
-      lcd("Needs PR #192");   // Cura needs https://github.com/me-no-dev/ESPAsyncWebServer/pull/192
 
     if (request->hasParam("print", true))
       startPrint = printerConnected && !isPrinting && uploadedFullname != "";
@@ -533,7 +530,6 @@ void setup() {
                                            "  \"files\": {\r\n"
                                            "    \"local\": {\r\n"
                                            "      \"name\": \"" + getUploadedFilename() + "\",\r\n"
-                                           "      \"size\": \"" + String(uploadedFileSize) + "\",\r\n"
                                            "      \"origin\": \"local\"\r\n"
                                            "    }\r\n"
                                            "  },\r\n"
@@ -556,10 +552,10 @@ void setup() {
                                            "      \"size\": " + String(uploadedFileSize) + ",\r\n"
                                            "      \"date\": 1378847754 \r\n"
                                            "    },\r\n"
-                                           //"    \"estimatedPrintTime\": \"" + PrintTime + "\",\r\n"
+                                           //"    \"estimatedPrintTime\": \"" + estimatedPrintTime + "\",\r\n"
                                            "    \"filament\": {\r\n"
-                                           //"      \"length\": \"" + Length + "\",\r\n"
-                                           //"      \"volume\": \"" + Volume + "\"\r\n"
+                                           //"      \"length\": \"" + filementLength + "\",\r\n"
+                                           //"      \"volume\": \"" + filementVolume + "\"\r\n"
                                            "    }\r\n"
                                            "  },\r\n"
                                            "  \"progress\": {\r\n"
@@ -730,7 +726,8 @@ void ReceiveResponses() {
     lineStartPos = 0;
     serialResponse = "";
 
-    printerUsedBuffer -= commandQueue.popAcknowledge().length();  // Command has been processed by printer, buffer has been freed
+    unsigned int cmdLen = commandQueue.popAcknowledge().length();  // Command has been lost by printer, buffer has been freed
+    printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
 
     telnetSend("< #TIMEOUT#");
   }
@@ -745,7 +742,8 @@ void ReceiveResponses() {
             lineStartPos = 0;
             serialResponse = "";
 
-            printerUsedBuffer -= commandQueue.popAcknowledge().length();  // Command has been processed by printer, buffer has been freed
+            unsigned int cmdLen = commandQueue.popAcknowledge().length();  // Command has been processed by printer, buffer has been freed
+            printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
 
             telnetSend("< " + lastReceivedResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
 

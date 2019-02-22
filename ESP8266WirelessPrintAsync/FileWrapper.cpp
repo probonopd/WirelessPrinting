@@ -57,10 +57,8 @@ String FileWrapper::readStringUntil(char eol) {
 }
 
 void FileWrapper::write(const uint8_t *buf, size_t len) {
-  if (sdFile) {
-    for (size_t i = 0; i < len; i++)
-      sdFile.write(buf[i]);
-  }
+  if (sdFile)
+    sdFile.write(buf, len);
   else if (fsFile) {
     ESP.wdtDisable();
     fsFile.write(buf, len);
