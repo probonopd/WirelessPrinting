@@ -28,32 +28,33 @@ DNSServer dns;
 #define MAX_SUPPORTED_EXTRUDERS 6       // Number of supported extruder
 #define USE_FAST_SD                     // Use Default fast SD clock, comment if your SD is an old or slow one.
 //#define OTA_UPDATES                   // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load any code on device)
-const int serialBauds[] = { 1000000, 500000, 250000, 115200, 57600 };   // Marlin valid bauds (removed very low bauds)
+const uint16_t serialBauds[] = { 1000000, 500000, 250000, 115200, 57600 };   // Marlin valid bauds (removed very low bauds)
 
 #define API_VERSION     "0.1"
 #define VERSION         "1.2.10"
 
 // Information from M115
 String fwMachineType = "Unknown";
-int fwExtruders = 1;
+uint8_t fwExtruders = 1;
 bool fwAutoreportTempCap, fwProgressCap, fwBuildPercentCap;
 
 bool printerConnected;
 bool startPrint, isPrinting, printPause, restartPrint, cancelPrint;
 String lastCommandSent, lastReceivedResponse;
-long lastPrintedLine;
+uint32_t lastPrintedLine;
 
-unsigned int serialBaudIndex;
-unsigned int printerUsedBuffer;
-unsigned int serialReceiveTimeoutValue;
-unsigned long serialReceiveTimeoutTimer;
+uint8_t serialBaudIndex;
+uint16_t printerUsedBuffer;
+uint16_t serialReceiveTimeoutValue;
+uint32_t serialReceiveTimeoutTimer;
 
-unsigned long temperatureTimer;
+uint32_t temperatureTimer;
 
 String uploadedFullname;
 size_t uploadedFileSize, filePos;
+uint32_t uploadedFileDate = 1378847754;
 
-unsigned long printStartTime;
+uint32_t printStartTime;
 float printCompletion;
 
 struct Temperature {
@@ -310,7 +311,7 @@ inline String getDeviceName() {
 
 void mDNSInit() {
   #ifdef OTA_UPDATES
-    MDNS.setInstanceName(getDeviceName().c_str());    // Can't call MDNS.init this has been already done by 'ArduinoOTA.begin', just change name
+    MDNS.setInstanceName(getDeviceName().c_str());    // Can't call MDNS.init because it has been already done by 'ArduinoOTA.begin', here I just change instance name
   #else
     if (!MDNS.begin(getDeviceName().c_str()))
       return;
@@ -373,7 +374,7 @@ bool detectPrinter() {
           fwMachineType = value;
           value = M115ExtractString(lastReceivedResponse, "EXTRUDER_COUNT");
           fwExtruders = value == "" ? 1 : min(value.toInt(), (long)MAX_SUPPORTED_EXTRUDERS);
-          //fwAutoreportTempCap = M115ExtractBool(lastReceivedResponse, "Cap:AUTOREPORT_TEMP");   // Queue hangs if this is enabled! let it disabled until solved
+          fwAutoreportTempCap = M115ExtractBool(lastReceivedResponse, "Cap:AUTOREPORT_TEMP");
           fwProgressCap = M115ExtractBool(lastReceivedResponse, "Cap:PROGRESS");
           fwBuildPercentCap = M115ExtractBool(lastReceivedResponse, "Cap:BUILD_PERCENT");
 
@@ -569,7 +570,7 @@ void setup() {
                                            "      \"name\": \"" + getUploadedFilename() + "\",\r\n"
                                            "      \"origin\": \"local\",\r\n"
                                            "      \"size\": " + String(uploadedFileSize) + ",\r\n"
-                                           "      \"date\": 1378847754 \r\n"
+                                           "      \"date\": " + String(uploadedFileDate) + "\r\n"
                                            "    },\r\n"
                                            //"    \"estimatedPrintTime\": \"" + estimatedPrintTime + "\",\r\n"
                                            "    \"filament\": {\r\n"
@@ -714,7 +715,8 @@ void loop() {
   }
 
   SendCommands();
-  ReceiveResponses();
+  if (!commandQueue.isAckEmpty())
+    ReceiveResponses();
 
   while (serverClient && serverClient.available())  // get data from Client
     Serial.write(serverClient.read());
@@ -752,6 +754,8 @@ void ReceiveResponses() {
     printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
 
     telnetSend("< #TIMEOUT#");
+
+    resetSerialReceiveTimeout();
   }
   else {
     while (Serial.available()) {
