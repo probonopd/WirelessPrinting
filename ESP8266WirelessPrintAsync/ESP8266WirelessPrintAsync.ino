@@ -515,13 +515,13 @@ void setup() {
     message += "\n"
                "Last command sent: " + lastCommandSent + "\n"
                "Last received response: " + lastReceivedResponse + "\n";
-    //if (printerConnected) {
+    if (printerConnected) {
       message += "\n"
                  "EXTRUDER_COUNT: " + String(fwExtruders) + "\n"
                  "AUTOREPORT_TEMP: " + stringify(fwAutoreportTempCap) + "\n"
                  "PROGRESS: " + stringify(fwProgressCap) + "\n"
                  "BUILD_PERCENT: " + stringify(fwBuildPercentCap) + "\n";
-    //}
+    }
     message += "</pre>";
 
     request->send(200, "text/html", message);
