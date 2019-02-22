@@ -38,7 +38,6 @@ String fwMachineType = "Unknown";
 int fwExtruders = 1;
 bool fwAutoreportTempCap, fwProgressCap, fwBuildPercentCap;
 
-String deviceName = "Unknown";
 bool printerConnected;
 bool startPrint, isPrinting, printPause, restartPrint, cancelPrint;
 String lastCommandSent, lastReceivedResponse;
@@ -303,28 +302,35 @@ bool M115ExtractBool(const String response, const String field, const bool onErr
   return result == "" ? onErrorValue : (result == "1" ? true : false);
 }
 
+inline String getDeviceName() {
+  return fwMachineType + " (" + String(ESP.getChipId(), HEX) + ")";
+}
+
 void mDNSInit() {
-  deviceName = fwMachineType + " (" + String(ESP.getChipId(), HEX) + ")";
+  #ifdef OTA_UPDATES
+    MDNS.setInstanceName(getDeviceName().c_str());    // Can't call MDNS.init this has been already done by 'ArduinoOTA.begin', just change name
+  #else
+    if (!MDNS.begin(getDeviceName().c_str()))
+      return;
+  #endif
 
-  if (MDNS.begin(deviceName.c_str())) {
-    // For Cura WirelessPrint - deprecated in favor of the OctoPrint API
-    MDNS.addService("wirelessprint", "tcp", 80);
-    MDNS.addServiceTxt("wirelessprint", "tcp", "version", SKETCH_VERSION);
+  // For Cura WirelessPrint - deprecated in favor of the OctoPrint API
+  MDNS.addService("wirelessprint", "tcp", 80);
+  MDNS.addServiceTxt("wirelessprint", "tcp", "version", SKETCH_VERSION);
 
-    // OctoPrint API
-    // Unfortunately, Slic3r doesn't seem to recognize it
-    MDNS.addService("octoprint", "tcp", 80);
-    MDNS.addServiceTxt("octoprint", "tcp", "path", "/");
-    MDNS.addServiceTxt("octoprint", "tcp", "api", API_VERSION);
-    MDNS.addServiceTxt("octoprint", "tcp", "version", VERSION);
+  // OctoPrint API
+  // Unfortunately, Slic3r doesn't seem to recognize it
+  MDNS.addService("octoprint", "tcp", 80);
+  MDNS.addServiceTxt("octoprint", "tcp", "path", "/");
+  MDNS.addServiceTxt("octoprint", "tcp", "api", API_VERSION);
+  MDNS.addServiceTxt("octoprint", "tcp", "version", VERSION);
 
-    // For compatibility with Slic3r
-    // Unfortunately, Slic3r doesn't seem to recognize it either. Library bug?
-    MDNS.addService("http", "tcp", 80);
-    MDNS.addServiceTxt("http", "tcp", "path", "/");
-    MDNS.addServiceTxt("http", "tcp", "api", API_VERSION);
-    MDNS.addServiceTxt("http", "tcp", "version", VERSION);
-  }
+  // For compatibility with Slic3r
+  // Unfortunately, Slic3r doesn't seem to recognize it either. Library bug?
+  MDNS.addService("http", "tcp", 80);
+  MDNS.addServiceTxt("http", "tcp", "path", "/");
+  MDNS.addServiceTxt("http", "tcp", "api", API_VERSION);
+  MDNS.addServiceTxt("http", "tcp", "version", VERSION);
 }
 
 bool detectPrinter() {
@@ -477,7 +483,7 @@ void setup() {
 
   // Main page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
-    String message = "<h1>" + deviceName + "</h1>"
+    String message = "<h1>" + getDeviceName() + "</h1>"
                      "<form enctype=\"multipart/form-data\" action=\"/api/files/local\" method=\"POST\">\n"
                      "<p>You can also print from the command line using curl:</p>\n"
                      "<pre>curl -F \"file=@/path/to/some.gcode\" " + IpAddress2String(WiFi.localIP()) + "/api/files/local</pre>\n"
@@ -644,6 +650,7 @@ void setup() {
   server.begin();
 
   #ifdef OTA_UPDATES
+    ArduinoOTA.setHostname(getDeviceName().c_str());
     ArduinoOTA.begin();
   #endif
 }
@@ -665,7 +672,9 @@ void loop() {
   if (!printerConnected)
     printerConnected = detectPrinter();
   else {
-    MDNS.update();
+    #ifndef OTA_UPDATES
+      MDNS.update();    // When OTA is active it's called by 'handle' method
+    #endif
 
     handlePrint();
 
