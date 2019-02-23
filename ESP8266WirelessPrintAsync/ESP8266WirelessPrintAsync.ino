@@ -380,7 +380,7 @@ bool detectPrinter() {
           fwBuildPercentCap = M115ExtractBool(lastReceivedResponse, "Cap:BUILD_PERCENT");
 
           mDNSInit();
-          
+
           String text = IpAddress2String(WiFi.localIP()) + " " + storageFS.getActiveFS();
           lcd(text);
           playSound();
@@ -715,12 +715,7 @@ void loop() {
   }
 
   SendCommands();
-<<<<<<< HEAD
- // if (!commandQueue.isAckEmpty())
-    ReceiveResponses();
-=======
   ReceiveResponses();
->>>>>>> 5874ed2e84061759aa392f12f73b7827906a0b48
 
 
   //*******************
