@@ -1,4 +1,4 @@
-// Required: https://github.com/greiman/SdFat
+ // Required: https://github.com/greiman/SdFat
 
 #include <ArduinoOTA.h>
 #if defined(ESP8266)
@@ -106,13 +106,13 @@ bool parseTemperatures(const String response) {
   bool tempResponse;
 
   if (fwExtruders == 1)
-    tempResponse = parseTemp(response, "T", &toolTemperature[0]);
+    tempResponse = parseTemp(response, " T", &toolTemperature[0]);
   else {
     tempResponse = false;
     for (int t = 0; t < fwExtruders; t++)
-      tempResponse |= parseTemp(response, "T" + String(t), &toolTemperature[t]);
+      tempResponse |= parseTemp(response, " T" + String(t), &toolTemperature[t]);
   }
-  tempResponse |= parseTemp(response, "B", &bedTemperature);
+  tempResponse |= parseTemp(response, " B", &bedTemperature);
 
   return tempResponse;
 }
