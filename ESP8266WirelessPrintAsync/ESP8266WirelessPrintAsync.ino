@@ -376,7 +376,7 @@ bool detectPrinter() {
           String text = IpAddress2String(WiFi.localIP()) + " " + storageFS.getActiveFS();
           lcd(text);
           playSound();
-          fwAutoreportTempCapEn= fwAutoreportTempCap ; // fwAutoreportTempCap;  0; //disable for now
+          fwAutoreportTempCapEn= 0; // fwAutoreportTempCap ; // fwAutoreportTempCap;  0; //disable for now
           if (fwAutoreportTempCapEn)
             commandQueue.push("M155 S" + String(TEMPERATURE_REPORT_INTERVAL));   // Start auto report temperatures
           else
