@@ -38,8 +38,14 @@ String fwMachineType = "Unknown";
 uint8_t fwExtruders = 1;
 bool fwAutoreportTempCap, fwProgressCap, fwBuildPercentCap;
 
+// Printer status
 bool printerConnected;
 bool startPrint, isPrinting, printPause, restartPrint, cancelPrint;
+
+uint32_t printStartTime;
+float printCompletion;
+
+// Serial communication
 String lastCommandSent, lastReceivedResponse;
 uint32_t lastPrintedLine;
 
@@ -48,22 +54,20 @@ uint16_t printerUsedBuffer;
 uint16_t serialReceiveTimeoutValue;
 uint32_t serialReceiveTimeoutTimer;
 
-uint32_t temperatureTimer;
-
+// Uploaded file information
 String uploadedFullname;
 size_t uploadedFileSize, filePos;
 uint32_t uploadedFileDate = 1378847754;
 
-uint32_t printStartTime;
-float printCompletion;
-
+// Temperature for printer status reporting
 struct Temperature {
   String actual, target;
 };
+uint32_t temperatureTimer;
 
-// Variables for printer status reporting
 Temperature toolTemperature[MAX_SUPPORTED_EXTRUDERS];
 Temperature bedTemperature;
+
 
 // https://forum.arduino.cc/index.php?topic=228884.msg2670971#msg2670971
 inline String IpAddress2String(const IPAddress& ipAddress) {
@@ -664,6 +668,7 @@ void setup() {
   server.begin();
 
   #ifdef OTA_UPDATES
+    // OTA setup
     ArduinoOTA.setHostname(getDeviceName().c_str());
     ArduinoOTA.begin();
   #endif
@@ -671,18 +676,16 @@ void setup() {
 
 void loop() {
   #ifdef OTA_UPDATES
+    //****************
+    //* OTA handling *
+    //****************
     ArduinoOTA.handle();
   #endif
 
-  // look for Client connect trial
-  if (telnetServer.hasClient() && (!serverClient || !serverClient.connected())) {
-    if (serverClient)
-      serverClient.stop();
 
-    serverClient = telnetServer.available();
-    serverClient.flush();  // clear input buffer, else you get strange characters
-  }
-
+  //********************
+  //* Printer handling *
+  //********************
   if (!printerConnected)
     printerConnected = detectPrinter();
   else {
@@ -717,6 +720,19 @@ void loop() {
   SendCommands();
   if (!commandQueue.isAckEmpty())
     ReceiveResponses();
+
+
+  //*******************
+  //* Telnet handling *
+  //*******************
+  // look for Client connect trial
+  if (telnetServer.hasClient() && (!serverClient || !serverClient.connected())) {
+    if (serverClient)
+      serverClient.stop();
+
+    serverClient = telnetServer.available();
+    serverClient.flush();  // clear input buffer, else you get strange characters
+  }
 
   while (serverClient && serverClient.available())  // get data from Client
     Serial.write(serverClient.read());
