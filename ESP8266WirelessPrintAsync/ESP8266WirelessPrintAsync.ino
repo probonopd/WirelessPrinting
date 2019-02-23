@@ -51,7 +51,6 @@ uint32_t lastPrintedLine;
 
 uint8_t serialBaudIndex;
 uint16_t printerUsedBuffer;
-uint16_t serialReceiveTimeoutValue;
 uint32_t serialReceiveTimeoutTimer;
 
 // Uploaded file information
@@ -94,7 +93,7 @@ bool parseTemp(const String response, const String whichTemp, Temperature *tempe
     int slashpos = response.indexOf(" /", tpos);
     int spacepos = response.indexOf(" ", slashpos + 1);
     // if match mask T:xxx.xx /xxx.xx
-    if (spacepos - tpos < 17) {
+    if (slashpos != -1 && spacepos - tpos < 17) {
       temperature->actual = response.substring(tpos + whichTemp.length() + 1, slashpos);
       temperature->target = response.substring(slashpos + 2, spacepos);
 
@@ -347,7 +346,6 @@ bool detectPrinter() {
     case 0:
       // Start printer detection
       serialBaudIndex = 0;
-      serialReceiveTimeoutValue = 1000;
       printerDetectionState = 10;
       break;
 
@@ -373,7 +371,6 @@ bool detectPrinter() {
         }
         else {
           telnetSend("Connected");
-          serialReceiveTimeoutValue = 10000; // Set serial timeout to a safer value (TODO check if it's really needed)
 
           fwMachineType = value;
           value = M115ExtractString(lastReceivedResponse, "EXTRUDER_COUNT");
@@ -718,8 +715,12 @@ void loop() {
   }
 
   SendCommands();
+<<<<<<< HEAD
  // if (!commandQueue.isAckEmpty())
     ReceiveResponses();
+=======
+  ReceiveResponses();
+>>>>>>> 5874ed2e84061759aa392f12f73b7827906a0b48
 
 
   //*******************
@@ -738,6 +739,10 @@ void loop() {
     Serial.write(serverClient.read());
 }
 
+inline void resetSerialReceiveTimeout() {
+  serialReceiveTimeoutTimer = millis() + 1000;
+}
+
 void SendCommands() {
   String command = commandQueue.peekSend();
   if (command != "") {
@@ -754,47 +759,41 @@ void SendCommands() {
   }
 }
 
-inline void resetSerialReceiveTimeout() {
-  serialReceiveTimeoutTimer = millis() + serialReceiveTimeoutValue;
-}
-
 void ReceiveResponses() {
   static int lineStartPos;
   static String serialResponse;
 
-  if (serialReceiveTimeoutTimer - millis() <= 0) {
+  while (Serial.available()) {
+    char ch = (char)Serial.read();
+    serialResponse += ch;
+    serialReceiveTimeoutTimer = millis() + 100;   // Once a char is received timeout may be shorter
+    if (ch == '\n') {
+      if (serialResponse.startsWith("ok", lineStartPos)) {
+        if (!parseTemperatures(lastReceivedResponse) || lastCommandSent == "M105") {
+          lastReceivedResponse = serialResponse;
+          lineStartPos = 0;
+          serialResponse = "";
+
+          unsigned int cmdLen = commandQueue.popAcknowledge().length();  // Command has been processed by printer, buffer has been freed
+          printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
+          resetSerialReceiveTimeout();
+
+          telnetSend("< " + lastReceivedResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
+        }
+      }
+      else
+        lineStartPos = serialResponse.length();
+    }
+  }
+
+  if (!commandQueue.isAckEmpty() && serialReceiveTimeoutTimer - millis() <= 0) {
     lineStartPos = 0;
     serialResponse = "";
 
     unsigned int cmdLen = commandQueue.popAcknowledge().length();  // Command has been lost by printer, buffer has been freed
     printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
+    resetSerialReceiveTimeout();
 
     telnetSend("< #TIMEOUT#");
-
-    resetSerialReceiveTimeout();
-  }
-  else {
-    while (Serial.available()) {
-      char ch = (char)Serial.read();
-      serialResponse += ch;
-      if (ch == '\n') {
-        if (serialResponse.startsWith("ok", lineStartPos)) {
-          if (!parseTemperatures(lastReceivedResponse) || lastCommandSent == "M105") {
-            lastReceivedResponse = serialResponse;
-            lineStartPos = 0;
-            serialResponse = "";
-
-            unsigned int cmdLen = commandQueue.popAcknowledge().length();  // Command has been processed by printer, buffer has been freed
-            printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
-
-            telnetSend("< " + lastReceivedResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
-
-            resetSerialReceiveTimeout();
-          }
-        }
-        else
-          lineStartPos = serialResponse.length();
-      }
-    }
   }
 }
