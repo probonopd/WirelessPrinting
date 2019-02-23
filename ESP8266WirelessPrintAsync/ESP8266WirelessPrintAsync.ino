@@ -28,7 +28,7 @@ DNSServer dns;
 #define MAX_SUPPORTED_EXTRUDERS 6       // Number of supported extruder
 #define USE_FAST_SD                     // Use Default fast SD clock, comment if your SD is an old or slow one.
 //#define OTA_UPDATES                   // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load any code on device)
-const uint16_t serialBauds[] = { 1000000, 500000, 250000, 115200, 57600 };   // Marlin valid bauds (removed very low bauds)
+const uint32_t serialBauds[] = { 1000000, 500000, 250000, 115200, 57600 };   // Marlin valid bauds (removed very low bauds)
 
 #define API_VERSION     "0.1"
 #define VERSION         "1.2.10"
@@ -718,7 +718,7 @@ void loop() {
   }
 
   SendCommands();
-  if (!commandQueue.isAckEmpty())
+ // if (!commandQueue.isAckEmpty())
     ReceiveResponses();
 
 
