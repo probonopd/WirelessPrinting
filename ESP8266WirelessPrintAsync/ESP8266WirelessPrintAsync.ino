@@ -162,7 +162,7 @@ String sendToPrinter(String line) {
     Serial.println("M300 S500 P50"); // M300 - Play beep sound; Send to 3D Printer immediately w/o waiting for anything
     // sendToPrinter("M112");
     // sendToPrinter("M300 S500 P50"); // M300 - Play beep sound
-    lcd("Print cancelled");
+
     // ESP.restart(); // Maybe a bit too drastic?
     return "";
   }
@@ -297,6 +297,55 @@ void handlePrint() {
 
   }
 
+}
+
+fs::File f; // SPIFFS
+File uploadFile; // SD card
+
+void handleUpload(AsyncWebServerRequest * request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+  filesize = 0; // Will set the correct one below
+  upload_name = filename;
+
+  if (!hasSD) { // No SD, hence use SPIFFS
+
+
+
+    if (!index) {
+      f = SPIFFS.open(filename_with_slash, "w"); // create or truncate file
+    }
+
+    if (len) { // uploading
+      f = SPIFFS.open(filename_with_slash, "a"); // append to file (for chunked upload) //////////// REALLY NEEDED???
+      ESP.wdtDisable();
+      f.write(data, len);
+      ESP.wdtEnable(10);
+    }
+
+    if (final) { // upload finished
+      f.close();
+      filesize = index + len;
+      shouldPrint = true;
+    }
+
+  } else { // has SD, hence use it
+
+    if (!index) {
+      if (SD.exists((char *)filename_with_slash.c_str())) SD.remove((char *)filename_with_slash.c_str());
+      uploadFile = SD.open(filename_with_slash.c_str(), FILE_WRITE);
+    }
+
+    if (len) { // uploading
+      for (size_t i = 0; i < len; i++) {
+        uploadFile.write(data[i]);
+      }
+    }
+
+    if (final) { // upload finished
+      uploadFile.close();
+      filesize = index + len;
+      shouldPrint = true;
+    }
+  }
 }
 
 void setup() {
@@ -518,7 +567,6 @@ void setup() {
     request->send(200, "text/plain", "Received");
   }, handleUpload);
 
-
   server.onNotFound([](AsyncWebServerRequest * request) {
     request->send(404);
     if (serverClient && serverClient.connected()) {  // send data to telnet client if connected
@@ -534,55 +582,6 @@ void setup() {
   /* Set up the timer to fire every 2 seconds */
   statusTimer.attach(statusInterval, askPrinterForStatus);
 
-}
-
-fs::File f; // SPIFFS
-File uploadFile; // SD card
-
-void handleUpload(AsyncWebServerRequest * request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
-  filesize = 0; // Will set the correct one below
-  upload_name = filename;
-
-  if (!hasSD) { // No SD, hence use SPIFFS
-
-
-
-    if (!index) {
-      f = SPIFFS.open(filename_with_slash, "w"); // create or truncate file
-    }
-
-    if (len) { // uploading
-      f = SPIFFS.open(filename_with_slash, "a"); // append to file (for chunked upload) //////////// REALLY NEEDED???
-      ESP.wdtDisable();
-      f.write(data, len);
-      ESP.wdtEnable(10);
-    }
-
-    if (final) { // upload finished
-      f.close();
-      filesize = index + len;
-      shouldPrint = true;
-    }
-
-  } else { // has SD, hence use it
-
-    if (!index) {
-      if (SD.exists((char *)filename_with_slash.c_str())) SD.remove((char *)filename_with_slash.c_str());
-      uploadFile = SD.open(filename_with_slash.c_str(), FILE_WRITE);
-    }
-
-    if (len) { // uploading
-      for (size_t i = 0; i < len; i++) {
-        uploadFile.write(data[i]);
-      }
-    }
-
-    if (final) { // upload finished
-      uploadFile.close();
-      filesize = index + len;
-      shouldPrint = true;
-    }
-  }
 }
 
 void loop() {
