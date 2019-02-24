@@ -34,7 +34,7 @@ DNSServer dns;
 const uint32_t serialBauds[] = { 1000000, 500000, 250000, 115200, 57600 };   // Marlin valid bauds (removed very low bauds)
 
 #define API_VERSION     "0.1"
-#define VERSION         "1.2.10"
+#define VERSION         "1.3.10"
 
 // Information from M115
 String fwMachineType = "Unknown";
@@ -480,30 +480,29 @@ void setup() {
   server.on("/api/version", HTTP_GET, [](AsyncWebServerRequest * request) {
     // http://docs.octoprint.org/en/master/api/version.html
     request->send(200, "application/json", "{\r\n"
-                  "  \"api\": \"" API_VERSION "\",\r\n"
-                  "  \"server\": \"" VERSION "\"\r\n"
-                  "}");
-  });
+                                           "  \"api\": \"" API_VERSION "\",\r\n"
+                                           "  \"server\": \"" VERSION "\"\r\n"
+                                           "}");  });
 
   server.on("/api/connection", HTTP_GET, [](AsyncWebServerRequest * request) {
     // http://docs.octoprint.org/en/master/api/connection.html#get-connection-settings
     request->send(200, "application/json", "{\r\n"
-                  "  \"current\": {\r\n"
-                  "    \"state\": \"" + getState() + "\",\r\n"
-                  "    \"port\": \"Serial\",\r\n"
-                  "    \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"
-                  "    \"printerProfile\": \"Default\"\r\n"
-                  "  },\r\n"
-                  "  \"options\": {\r\n"
-                  "    \"ports\": \"Serial\",\r\n"
-                  "    \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"
-                  "    \"printerProfiles\": \"Default\",\r\n"
-                  "    \"portPreference\": \"Serial\",\r\n"
-                  "    \"baudratePreference\": " + serialBauds[serialBaudIndex] + ",\r\n"
-                  "    \"printerProfilePreference\": \"Default\",\r\n"
-                  "    \"autoconnect\": true\r\n"
-                  "  }\r\n"
-                  "}");
+                                           "  \"current\": {\r\n"
+                                           "    \"state\": \"" + getState() + "\",\r\n"
+                                           "    \"port\": \"Serial\",\r\n"
+                                           "    \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"
+                                           "    \"printerProfile\": \"Default\"\r\n"
+                                           "  },\r\n"
+                                           "  \"options\": {\r\n"
+                                           "    \"ports\": \"Serial\",\r\n"
+                                           "    \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"
+                                           "    \"printerProfiles\": \"Default\",\r\n"
+                                           "    \"portPreference\": \"Serial\",\r\n"
+                                           "    \"baudratePreference\": " + serialBauds[serialBaudIndex] + ",\r\n"
+                                           "    \"printerProfilePreference\": \"Default\",\r\n"
+                                           "    \"autoconnect\": true\r\n"
+                                           "  }\r\n"
+                                           "}");
   });
 
   // Todo: http://docs.octoprint.org/en/master/api/connection.html#post--api-connection
@@ -567,14 +566,14 @@ void setup() {
       startPrint = printerConnected && !isPrinting && uploadedFullname != "";
 
     request->send(200, "application/json", "{\r\n"
-                  "  \"files\": {\r\n"
-                  "    \"local\": {\r\n"
-                  "      \"name\": \"" + getUploadedFilename() + "\",\r\n"
-                  "      \"origin\": \"local\"\r\n"
-                  "    }\r\n"
-                  "  },\r\n"
-                  "  \"done\": true\r\n"
-                  "}");
+                                           "  \"files\": {\r\n"
+                                           "    \"local\": {\r\n"
+                                           "      \"name\": \"" + getUploadedFilename() + "\",\r\n"
+                                           "      \"origin\": \"local\"\r\n"
+                                           "    }\r\n"
+                                           "  },\r\n"
+                                           "  \"done\": true\r\n"
+                                           "}");
   }, handleUpload);
 
   server.on("/api/job", HTTP_GET, [](AsyncWebServerRequest * request) {
@@ -585,26 +584,26 @@ void setup() {
       printTimeLeft = printTimeLeft / printCompletion * (100 - printCompletion);
     }
     request->send(200, "application/json", "{\r\n"
-                  "  \"job\": {\r\n"
-                  "    \"file\": {\r\n"
-                  "      \"name\": \"" + getUploadedFilename() + "\",\r\n"
-                  "      \"origin\": \"local\",\r\n"
-                  "      \"size\": " + String(uploadedFileSize) + ",\r\n"
-                  "      \"date\": " + String(uploadedFileDate) + "\r\n"
-                  "    },\r\n"
-                  //"    \"estimatedPrintTime\": \"" + estimatedPrintTime + "\",\r\n"
-                  "    \"filament\": {\r\n"
-                  //"      \"length\": \"" + filementLength + "\",\r\n"
-                  //"      \"volume\": \"" + filementVolume + "\"\r\n"
-                  "    }\r\n"
-                  "  },\r\n"
-                  "  \"progress\": {\r\n"
-                  "    \"completion\": " + String(printCompletion) + ",\r\n"
-                  "    \"filepos\": " + String(filePos) + ",\r\n"
-                  "    \"printTime\": " + String(printTime) + ",\r\n"
-                  "    \"printTimeLeft\": " + String(printTimeLeft) + "\r\n"
-                  "  }\r\n"
-                  "}");
+                                           "  \"job\": {\r\n"
+                                           "    \"file\": {\r\n"
+                                           "      \"name\": \"" + getUploadedFilename() + "\",\r\n"
+                                           "      \"origin\": \"local\",\r\n"
+                                           "      \"size\": " + String(uploadedFileSize) + ",\r\n"
+                                           "      \"date\": " + String(uploadedFileDate) + "\r\n"
+                                           "    },\r\n"
+                                           //"    \"estimatedPrintTime\": \"" + estimatedPrintTime + "\",\r\n"
+                                           "    \"filament\": {\r\n"
+                                           //"      \"length\": \"" + filementLength + "\",\r\n"
+                                           //"      \"volume\": \"" + filementVolume + "\"\r\n"
+                                           "    }\r\n"
+                                           "  },\r\n"
+                                           "  \"progress\": {\r\n"
+                                           "    \"completion\": " + String(printCompletion) + ",\r\n"
+                                           "    \"filepos\": " + String(filePos) + ",\r\n"
+                                           "    \"printTime\": " + String(printTime) + ",\r\n"
+                                           "    \"printTimeLeft\": " + String(printTimeLeft) + "\r\n"
+                                           "  }\r\n"
+                                           "}");
   });
 
   server.on("/api/settings", HTTP_GET, [](AsyncWebServerRequest * request) {
