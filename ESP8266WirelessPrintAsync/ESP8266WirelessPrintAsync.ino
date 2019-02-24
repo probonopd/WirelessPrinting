@@ -1,4 +1,4 @@
- // Required: https://github.com/greiman/SdFat
+// Required: https://github.com/greiman/SdFat
 
 #include <ArduinoOTA.h>
 #if defined(ESP8266)
@@ -24,7 +24,7 @@ DNSServer dns;
 // Configurable parameters
 #define SKETCH_VERSION "2.0"
 #define PRINTER_RX_BUFFER_SIZE 0        // This is printer firmware 'RX_BUFFER_SIZE'. If such parameter is unknown please use 0
-#define TEMPERATURE_REPORT_INTERVAL 10   // Ask the printer for its temperatures status every 2 seconds
+#define TEMPERATURE_REPORT_INTERVAL 10  // Ask the printer for its temperatures status every 10 seconds
 #define MAX_SUPPORTED_EXTRUDERS 6       // Number of supported extruder
 #define USE_FAST_SD                     // Use Default fast SD clock, comment if your SD is an old or slow one.
 //#define OTA_UPDATES                   // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load any code on device)
@@ -82,7 +82,7 @@ inline void setLed(const bool status) {
 }
 
 inline void telnetSend(const String line) {
-  if (serverClient && serverClient.connected())   // send data to telnet client if connected
+  if (serverClient && serverClient.connected())     // send data to telnet client if connected
     serverClient.println(line);
 }
 
@@ -740,6 +740,12 @@ inline void resetSerialReceiveTimeout() {
   serialReceiveTimeoutTimer = millis() + 1000;
 }
 
+inline void GotValidResponse() {
+  lastReceivedResponse = serialResponse;
+  lineStartPos = 0;
+  serialResponse = "";
+}
+
 void SendCommands() {
   String command = commandQueue.peekSend();  //gets the next command to be sent
   if (command != "") {
@@ -747,12 +753,12 @@ void SendCommands() {
     if (noResponsePending || printerUsedBuffer < PRINTER_RX_BUFFER_SIZE * 3 / 4) {  // Let's use no more than 75% of printer RX buffer
       if (noResponsePending)
         resetSerialReceiveTimeout();    // Receive timeout has to be reset only when sending a command and no pending response is expected
-      Serial.println(command);   // Send to 3D Printer
+      Serial.println(command);          // Send to 3D Printer
       printerUsedBuffer += command.length();
       lastCommandSent = command;
       commandQueue.popSend();
-      if (command.startsWith("M109"))           // known commands that make the printer busy add time for timeout. This should be implemented with an array for all the commands like this.
-        serialReceiveTimeoutTimer+=10000; 
+      if (command.startsWith("M109"))   // known commands that make the printer busy add time for timeout. This should be implemented with an array for all the commands like this.
+        serialReceiveTimeoutTimer += 10000; 
       telnetSend("> " + command);
     }
   }
@@ -765,50 +771,39 @@ void ReceiveResponses() {
   while (Serial.available()) {
     char ch = (char)Serial.read();
     serialResponse += ch;
-    serialReceiveTimeoutTimer += 500;   // Once a char is received timeout may be shorter
+    serialReceiveTimeoutTimer = millis() + 500;   // Once a char is received timeout may be shorter
     if (ch == '\n') {
       if (serialResponse.startsWith("ok", lineStartPos)) {
         if (!parseTemperatures(serialResponse) || lastCommandSent == "M105") {
-          lastReceivedResponse = serialResponse;
-          lineStartPos = 0;
-          serialResponse = "";
-
+          GOT_VALID_RESPONSE();
           unsigned int cmdLen = commandQueue.popAcknowledge().length();  // Command has been processed by printer, buffer has been freed
           printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
           resetSerialReceiveTimeout();
-          if (lastCommandSent.startsWith("M155 S") && !lastCommandSent.startsWith("M155 S0")) {
-            fwAutoreportTempCapEn= true ;
-          }
+          if (lastCommandSent.startsWith("M155 S1"))
+            fwAutoreportTempCapEn = true;
+
           telnetSend("< " + lastReceivedResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
-        }        
-      } 
+        }
+      }
       else if (fwAutoreportTempCapEn && parseTemperatures(serialResponse)) {
-          lastReceivedResponse = serialResponse;
-          lineStartPos = 0;
-          serialResponse = "";
-          telnetSend("< AutoReportTemps parsed");         
+        GotValidResponse();
+        telnetSend("< AutoReportTemps parsed");         
       }
       else if (serialResponse.startsWith("echo:busy")) {
-        lastReceivedResponse = serialResponse;
-        lineStartPos = 0;
-        serialResponse = "";
+        GotValidResponse();
         serialReceiveTimeoutTimer += 5000;       
         telnetSend("< Printer is busy, giving it more time");  
       }
       else if (serialResponse.startsWith("echo: cold extrusion prevented")) {
-        lastReceivedResponse = serialResponse;
-        lineStartPos = 0;
-        serialResponse = "";
+        GotValidResponse();
         // To do: Pause sending gcode, or do something similar 
         telnetSend("< Printer is cold, can't move");  
       }      
       else if (serialResponse.startsWith("error")) {
-        lastReceivedResponse = serialResponse;
-        lineStartPos = 0;
-        serialResponse = "";
+        GotValidResponse();
         telnetSend("< Error Received");  
       }
-      else{
+      else {
         lineStartPos = serialResponse.length();
         telnetSend("< New line but nothing to do with it");
       }
