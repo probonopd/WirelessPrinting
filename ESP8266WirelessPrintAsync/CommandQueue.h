@@ -9,18 +9,21 @@ class CommandQueue {
     static int head, sendTail, tail;
     static String buffer[COMMAND_BUFFER_SIZE];
 
-    static inline int nextBufferSlot(int index) {  // Returns the next buffer slot (after index slot) if it's in between the size of the buffer
+    // Returns the next buffer slot (after index slot) if it's in between the size of the buffer
+    static inline int nextBufferSlot(int index) {
       int next = index + 1;
   
       return next >= COMMAND_BUFFER_SIZE ? 0 : next;
     }
 
   public:
-    static inline bool isEmpty() { //check if buffer is empty
+    // Check if buffer is empty
+    static inline bool isEmpty() {
       return head == tail;
     }
 
-    static inline bool isAckEmpty() { // Returns true if the command to be sent was the last sent (so there is no pending response)
+    // Returns true if the command to be sent was the last sent (so there is no pending response)
+    static inline bool isAckEmpty() {
       return tail == sendTail;
     }
 
@@ -32,7 +35,8 @@ class CommandQueue {
 
     static bool push(const String command);
 
-    inline static String peekSend() { // If there is a command pending to be sent returns it
+    // If there is a command pending to be sent returns it
+    inline static String peekSend() {
       return (sendTail == head) ? "" : buffer[sendTail];
     }
 
