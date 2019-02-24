@@ -378,7 +378,7 @@ bool detectPrinter() {
           fwMachineType = value;
           value = M115ExtractString(lastReceivedResponse, "EXTRUDER_COUNT");
           fwExtruders = value == "" ? 1 : min(value.toInt(), (long)MAX_SUPPORTED_EXTRUDERS);
-          fwAutoreportTempCap = M115ExtractBool(lastReceivedResponse, "Cap:AUTOREPORT_TEMP"); // Queue hangs if this is enabled! , force to 0 
+          fwAutoreportTempCap = M115ExtractBool(lastReceivedResponse, "Cap:AUTOREPORT_TEMP");
           fwProgressCap = M115ExtractBool(lastReceivedResponse, "Cap:PROGRESS");
           fwBuildPercentCap = M115ExtractBool(lastReceivedResponse, "Cap:BUILD_PERCENT");
 
@@ -387,7 +387,6 @@ bool detectPrinter() {
           String text = IpAddress2String(WiFi.localIP()) + " " + storageFS.getActiveFS();
           lcd(text);
           playSound();
-
           
           if (fwAutoreportTempCap)
             commandQueue.push("M155 S" + String(TEMPERATURE_REPORT_INTERVAL));   // Start auto report temperatures
@@ -752,6 +751,8 @@ void SendCommands() {
       printerUsedBuffer += command.length();
       lastCommandSent = command;
       commandQueue.popSend();
+      if (command.startsWith("M109"))           // known commands that make the printer busy add time for timeout. This should be implemented with an array for all the commands like this.
+        serialReceiveTimeoutTimer+=10000; 
       telnetSend("> " + command);
     }
   }
@@ -764,7 +765,7 @@ void ReceiveResponses() {
   while (Serial.available()) {
     char ch = (char)Serial.read();
     serialResponse += ch;
-    serialReceiveTimeoutTimer = millis() + 100;   // Once a char is received timeout may be shorter
+    serialReceiveTimeoutTimer += 500;   // Once a char is received timeout may be shorter
     if (ch == '\n') {
       if (serialResponse.startsWith("ok", lineStartPos)) {
         if (!parseTemperatures(serialResponse) || lastCommandSent == "M105") {
@@ -781,26 +782,26 @@ void ReceiveResponses() {
           telnetSend("< " + lastReceivedResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
         }        
       } 
-      else if (fwAutoreportTempCapEn) {
-        if (parseTemperatures(serialResponse)){
+      else if (fwAutoreportTempCapEn && parseTemperatures(serialResponse)) {
           lastReceivedResponse = serialResponse;
           lineStartPos = 0;
           serialResponse = "";
-          telnetSend("< AutoReportTemps parsed");  
-        } else {
-          lastReceivedResponse = serialResponse;
-          lineStartPos = 0;
-          serialResponse = "";
-          telnetSend("< Could not parse AutoReportTemps");  
-        }
-        
+          telnetSend("< AutoReportTemps parsed");         
       }
       else if (serialResponse.startsWith("echo:busy")) {
         lastReceivedResponse = serialResponse;
         lineStartPos = 0;
-        serialResponse = "";      
-        telnetSend("< Printer is busy");  
+        serialResponse = "";
+        serialReceiveTimeoutTimer += 5000;       
+        telnetSend("< Printer is busy, giving it more time");  
       }
+      else if (serialResponse.startsWith("echo: cold extrusion prevented")) {
+        lastReceivedResponse = serialResponse;
+        lineStartPos = 0;
+        serialResponse = "";
+        // To do: Pause sending gcode, or do something similar 
+        telnetSend("< Printer is cold, can't move");  
+      }      
       else if (serialResponse.startsWith("error")) {
         lastReceivedResponse = serialResponse;
         lineStartPos = 0;
