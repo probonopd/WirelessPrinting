@@ -508,8 +508,8 @@ void setup() {
                      "Choose a file to upload: <input name=\"file\" type=\"file\"/><br/>\n"
                      "<input type=\"submit\" value=\"Upload\" />\n"
                      "</form>"
-                     "<p><a href=\"/download\">Download</a></p>";
-    "<p><a href=\"/info\">Info</a></p>";
+                     "<p><a href=\"/download\">Download</a></p>"
+                     "<p><a href=\"/info\">Info</a></p>";
     request->send(200, "text/html", message);
   });
 
