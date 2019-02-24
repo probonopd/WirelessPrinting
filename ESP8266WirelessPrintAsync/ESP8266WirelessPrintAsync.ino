@@ -25,7 +25,7 @@ DNSServer dns;
 #define SKETCH_VERSION "2.0"
 #define USE_FAST_SD                     // Use Default fast SD clock, comment if your SD is an old or slow one.
 #define OTA_UPDATES                     // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load any code on device)
-//#define OTA_PASSWORD ""               // Remove '//' to protect OTA updates
+//#define OTA_PASSWORD ""               // Uncomment to protect OTA updates and assign a password (inside "")
 #define MAX_SUPPORTED_EXTRUDERS 6       // Number of supported extruder
 
 #define PRINTER_RX_BUFFER_SIZE 0        // This is printer firmware 'RX_BUFFER_SIZE'. If such parameter is unknown please use 0
