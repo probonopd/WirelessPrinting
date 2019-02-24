@@ -23,13 +23,15 @@ DNSServer dns;
 
 // Configurable parameters
 #define SKETCH_VERSION "2.0"
-#define PRINTER_RX_BUFFER_SIZE 0        // This is printer firmware 'RX_BUFFER_SIZE'. If such parameter is unknown please use 0
-#define TEMPERATURE_REPORT_INTERVAL 10  // Ask the printer for its temperatures status every 10 seconds
-#define MAX_SUPPORTED_EXTRUDERS 6       // Number of supported extruder
 #define USE_FAST_SD                     // Use Default fast SD clock, comment if your SD is an old or slow one.
 #define OTA_UPDATES                     // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load any code on device)
-const uint32_t serialBauds[] = { 1000000, 500000, 250000, 115200, 57600 };   // Marlin valid bauds (removed very low bauds)
+//#define OTA_PASSWORD ""               // Undefine to protect OTA updates. Must be specified a valid string
+#define MAX_SUPPORTED_EXTRUDERS 6       // Number of supported extruder
+
+#define PRINTER_RX_BUFFER_SIZE 0        // This is printer firmware 'RX_BUFFER_SIZE'. If such parameter is unknown please use 0
+#define TEMPERATURE_REPORT_INTERVAL 10  // Ask the printer for its temperatures status every 10 seconds
 #define KEEPALIVE_INTERVAL 2500         // Marlin defaults to 2 seconds, get a little of margin
+const uint32_t serialBauds[] = { 1000000, 500000, 250000, 115200, 57600 };   // Marlin valid bauds (removed very low bauds)
 
 #define API_VERSION     "0.1"
 #define VERSION         "1.2.10"
@@ -504,7 +506,7 @@ void setup() {
     String message = "<h1>" + getDeviceName() + "</h1>"
                      "<form enctype=\"multipart/form-data\" action=\"/api/files/local\" method=\"POST\">\n"
                      "<p>You can also print from the command line using curl:</p>\n"
-                     "<pre>curl -F \"file=@/path/to/some.gcode\" " + IpAddress2String(WiFi.localIP()) + "/api/files/local</pre>\n"
+                     "<pre>curl -F \"file=@\\\"/path/to/some.gcode\\\";print=true\" " + IpAddress2String(WiFi.localIP()) + "/api/files/local</pre>\n"
                      "Choose a file to upload: <input name=\"file\" type=\"file\"/><br/>\n"
                      "<input type=\"submit\" value=\"Upload\" />\n"
                      "</form>"
@@ -674,20 +676,23 @@ void setup() {
 
   server.begin();
 
-#ifdef OTA_UPDATES
-  // OTA setup
-  ArduinoOTA.setHostname(getDeviceName().c_str());
-  ArduinoOTA.begin();
-#endif
+  #ifdef OTA_UPDATES
+    // OTA setup
+    ArduinoOTA.setHostname(getDeviceName().c_str());
+    #ifdef OTA_PASSWORD
+      ArduinoOTA.setPassword(OTA_PASSWORD);
+    #endif
+    ArduinoOTA.begin();
+  #endif
 }
 
 void loop() {
-#ifdef OTA_UPDATES
-  //****************
-  //* OTA handling *
-  //****************
-  ArduinoOTA.handle();
-#endif
+  #ifdef OTA_UPDATES
+    //****************
+    //* OTA handling *
+    //****************
+    ArduinoOTA.handle();
+  #endif
 
 
   //********************
@@ -696,9 +701,9 @@ void loop() {
   if (!printerConnected)
     printerConnected = detectPrinter();
   else {
-#ifndef OTA_UPDATES
-    MDNS.update();    // When OTA is active it's called by 'handle' method
-#endif
+    #ifndef OTA_UPDATES
+      MDNS.update();    // When OTA is active it's called by 'handle' method
+    #endif
 
     handlePrint();
 
