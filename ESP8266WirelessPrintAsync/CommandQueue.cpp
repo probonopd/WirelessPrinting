@@ -1,6 +1,6 @@
 #include "CommandQueue.h"
 
-CommandQueue commandQueue;
+CommandQueue commandQueue;    //FIFO Queue
 
 int CommandQueue::head = 0;
 int CommandQueue::sendTail = 0;
@@ -19,6 +19,7 @@ int CommandQueue::getFreeSlots() {
   return freeSlots;
 }
 
+// Tries to Add a command to the queue, returns true if possible
 bool CommandQueue::push(const String command) {
   int next = nextBufferSlot(head);
   if (next == tail || command == "")
@@ -30,6 +31,7 @@ bool CommandQueue::push(const String command) {
   return true;
 }
 
+// Returns the next command to be sent, and advances to the next
 String CommandQueue::popSend() {
   if (sendTail == head)
     return "";
@@ -40,6 +42,7 @@ String CommandQueue::popSend() {
   return command;
 }
 
+// Returns the last command sent if it was received by the printer, otherwise returns empty
 String CommandQueue::popAcknowledge() {
   if (isAckEmpty())
     return "";
