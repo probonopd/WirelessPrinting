@@ -25,7 +25,7 @@ DNSServer dns;
 #define SKETCH_VERSION "2.0"
 #define USE_FAST_SD                     // Use Default fast SD clock, comment if your SD is an old or slow one.
 #define OTA_UPDATES                     // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load any code on device)
-//#define OTA_PASSWORD ""               // Remove '//' to protect OTA updates
+//#define OTA_PASSWORD ""               // Uncomment to protect OTA updates and assign a password (inside "")
 #define MAX_SUPPORTED_EXTRUDERS 6       // Number of supported extruder
 
 #define PRINTER_RX_BUFFER_SIZE 0        // This is printer firmware 'RX_BUFFER_SIZE'. If such parameter is unknown please use 0
@@ -328,7 +328,8 @@ bool M115ExtractBool(const String response, const String field, const bool onErr
 }
 
 inline String getDeviceName() {
-  return fwMachineType + " (" + String(ESP.getChipId(), HEX) + ")";
+  // return fwMachineType + " (" + String(ESP.getChipId(), HEX) + ")";
+  return "OctoPrint instance on " + String(ESP.getChipId(), HEX); // https://github.com/probonopd/WirelessPrinting/pull/52#issuecomment-466820965
 }
 
 void mDNSInit() {
@@ -548,13 +549,13 @@ void setup() {
   });
 
   // File Operations
-  //server.on("/api/files", HTTP_GET, [](AsyncWebServerRequest * request) {
-  //  Pending: http://docs.octoprint.org/en/master/api/files.html#retrieve-all-files
-  //  request->send(200, "application/json", "{\r\n"
-  //                                         "  \"files\": {\r\n"
-  //                                         "  }\r\n"
-  //                                         "}");
-  //});
+  // Pending: http://docs.octoprint.org/en/master/api/files.html#retrieve-all-files
+  server.on("/api/files", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send(200, "application/json", "{\r\n"
+                                           "  \"files\": {\r\n"
+                                           "  }\r\n"
+                                           "}");
+  });
 
   // For Slic3r OctoPrint compatibility
   server.on("/api/files/local", HTTP_POST, [](AsyncWebServerRequest * request) {
