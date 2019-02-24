@@ -40,11 +40,15 @@ const uint32_t serialBauds[] = { 1000000, 500000, 250000, 115200, 57600 };   // 
 String fwMachineType = "Unknown";
 uint8_t fwExtruders = 1;
 bool fwAutoreportTempCap, fwProgressCap, fwBuildPercentCap;
-bool fwAutoreportTempCapEn;
 
 // Printer status
-bool printerConnected;
-bool startPrint, isPrinting, printPause, restartPrint, cancelPrint;
+bool printerConnected,
+     startPrint,
+     isPrinting,
+     printPause,
+     restartPrint,
+     cancelPrint,
+     autoreportTempEnabled;
 
 uint32_t printStartTime;
 float printCompletion;
@@ -69,9 +73,12 @@ size_t uploadedFileSize, filePos;
 uint32_t uploadedFileDate = 1378847754;
 
 // Temperature for printer status reporting
+#define AUTOTEMP_COMMAND "M155 S"
+
 struct Temperature {
   String actual, target;
 };
+
 uint32_t temperatureTimer;
 
 Temperature toolTemperature[MAX_SUPPORTED_EXTRUDERS];
@@ -398,7 +405,7 @@ bool detectPrinter() {
           playSound();
 
           if (fwAutoreportTempCap)
-            commandQueue.push("M155 S" + String(TEMPERATURE_REPORT_INTERVAL));   // Start auto report temperatures
+            commandQueue.push(AUTOTEMP_COMMAND + String(TEMPERATURE_REPORT_INTERVAL));   // Start auto report temperatures
           else
             temperatureTimer = millis();
 
@@ -720,7 +727,7 @@ void loop() {
       //lcd("Print cancelled");
     }
 
-    if (!fwAutoreportTempCapEn) {
+    if (!autoreportTempEnabled) {
       unsigned long curMillis = millis();
       if (curMillis - temperatureTimer >= TEMPERATURE_REPORT_INTERVAL * 1000) {
         commandQueue.push("M105");
@@ -782,10 +789,11 @@ void ReceiveResponses() {
       if (serialResponse.startsWith("ok", lineStartPos)) {
         GotValidResponse();
         commandAcknowledged();
-        fwAutoreportTempCapEn |= lastCommandSent.startsWith("M155 S1");
         telnetSend("< " + lastReceivedResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
+
+        autoreportTempEnabled |= (fwAutoreportTempCap && lastCommandSent.startsWith(AUTOTEMP_COMMAND) && lastCommandSent[6] != '0');
       }
-      else if (fwAutoreportTempCapEn && parseTemperatures(serialResponse)) {
+      else if (autoreportTempEnabled && parseTemperatures(serialResponse)) {
         GotValidResponse();
         telnetSend("< AutoReportTemps parsed");
       }
