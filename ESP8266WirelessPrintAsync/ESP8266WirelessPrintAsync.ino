@@ -549,13 +549,13 @@ void setup() {
   });
 
   // File Operations
-  //server.on("/api/files", HTTP_GET, [](AsyncWebServerRequest * request) {
-  //  Pending: http://docs.octoprint.org/en/master/api/files.html#retrieve-all-files
-  //  request->send(200, "application/json", "{\r\n"
-  //                                         "  \"files\": {\r\n"
-  //                                         "  }\r\n"
-  //                                         "}");
-  //});
+  // Pending: http://docs.octoprint.org/en/master/api/files.html#retrieve-all-files
+  server.on("/api/files", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send(200, "application/json", "{\r\n"
+                                           "  \"files\": {\r\n"
+                                           "  }\r\n"
+                                           "}");
+  });
 
   // For Slic3r OctoPrint compatibility
   server.on("/api/files/local", HTTP_POST, [](AsyncWebServerRequest * request) {
