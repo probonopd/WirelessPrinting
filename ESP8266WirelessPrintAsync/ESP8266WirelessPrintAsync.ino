@@ -283,18 +283,13 @@ int apiJobHandler(const uint8_t* data) {
 
 String M115ExtractString(const String response, const String field) {
   int spos = response.indexOf(field);
-<<<<<<< HEAD
-  if (spos != -1) {    
-    spos += field.length();
-    if (response[spos] == ':')            //pre Marlin 1.1.8 compatibility (don't have ":" after field)
-      spos++;
-=======
+
   if (spos != -1) {
     spos += field.length();
     if (response[spos] == ':')    // pre Marlin 1.1.8 compatibility (don't have ":" after field)
       ++spos;
 
->>>>>>> pr/5
+
     int epos = response.indexOf(':', spos);
     if (epos == -1)
       epos = response.indexOf('\n', spos);
@@ -392,13 +387,9 @@ bool detectPrinter() {
           String text = IpAddress2String(WiFi.localIP()) + " " + storageFS.getActiveFS();
           lcd(text);
           playSound();
-<<<<<<< HEAD
-          fwAutoreportTempCapEn= 0; // fwAutoreportTempCap ; // fwAutoreportTempCap;  0; //disable for now
-          if (fwAutoreportTempCapEn)
-=======
+
           
           if (fwAutoreportTempCap)
->>>>>>> pr/5
             commandQueue.push("M155 S" + String(TEMPERATURE_REPORT_INTERVAL));   // Start auto report temperatures
           else
             temperatureTimer = millis();
@@ -529,15 +520,6 @@ void setup() {
     }
     message += "\n"
                "Last command sent: " + lastCommandSent + "\n"
-<<<<<<< HEAD
-               "Last received response: " + lastReceivedResponse + "\n"
-               "\n"
-               "EXTRUDER_COUNT: " + fwExtruders + "\n"
-               "AUTOREPORT_TEMP: " + fwAutoreportTempCap + "\n"
-               "PROGRESS: " + fwProgressCap + "\n"
-               "BUILD_PERCENT: " + fwBuildPercentCap + "\n"               
-               "</pre>";
-=======
                "Last received response: " + lastReceivedResponse + "\n";
     if (printerConnected) {
       message += "\n"
@@ -547,8 +529,6 @@ void setup() {
                  "BUILD_PERCENT: " + stringify(fwBuildPercentCap) + "\n";
     }
     message += "</pre>";
-
->>>>>>> pr/5
     request->send(200, "text/html", message);
   });
 
@@ -817,9 +797,21 @@ void ReceiveResponses() {
         }
         
       }
+      else if (serialResponse.startsWith("echo:busy")) {
+        lastReceivedResponse = serialResponse;
+        lineStartPos = 0;
+        serialResponse = "";      
+        telnetSend("< Printer is busy");  
+      }
+      else if (serialResponse.startsWith("error")) {
+        lastReceivedResponse = serialResponse;
+        lineStartPos = 0;
+        serialResponse = "";
+        telnetSend("< Error Received");  
+      }
       else{
         lineStartPos = serialResponse.length();
-        telnetSend("< New line but No ok or temp report found");
+        telnetSend("< New line but nothing to do with it");
       }
     }
   }
