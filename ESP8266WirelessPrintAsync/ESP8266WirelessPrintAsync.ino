@@ -47,6 +47,12 @@ uint32_t printStartTime;
 float printCompletion;
 
 // Serial communication
+#define GotValidResponse()  { \
+                            lastReceivedResponse = serialResponse; \
+                            lineStartPos = 0; \
+                            serialResponse = ""; \
+                            }
+
 String lastCommandSent, lastReceivedResponse;
 uint32_t lastPrintedLine;
 
@@ -740,12 +746,6 @@ inline void resetSerialReceiveTimeout() {
   serialReceiveTimeoutTimer = millis() + 1000;
 }
 
-inline void GotValidResponse() {
-  lastReceivedResponse = serialResponse;
-  lineStartPos = 0;
-  serialResponse = "";
-}
-
 void SendCommands() {
   String command = commandQueue.peekSend();  //gets the next command to be sent
   if (command != "") {
@@ -775,12 +775,12 @@ void ReceiveResponses() {
     if (ch == '\n') {
       if (serialResponse.startsWith("ok", lineStartPos)) {
         if (!parseTemperatures(serialResponse) || lastCommandSent == "M105") {
-          GOT_VALID_RESPONSE();
+          GotValidResponse();
           unsigned int cmdLen = commandQueue.popAcknowledge().length();  // Command has been processed by printer, buffer has been freed
           printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
           resetSerialReceiveTimeout();
-          if (lastCommandSent.startsWith("M155 S1"))
-            fwAutoreportTempCapEn = true;
+
+          fwAutoreportTempCapEn |= lastCommandSent.startsWith("M155 S1");
 
           telnetSend("< " + lastReceivedResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
         }
