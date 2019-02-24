@@ -28,43 +28,46 @@ DNSServer dns;
 #define MAX_SUPPORTED_EXTRUDERS 6       // Number of supported extruder
 #define USE_FAST_SD                     // Use Default fast SD clock, comment if your SD is an old or slow one.
 //#define OTA_UPDATES                   // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load any code on device)
-const int serialBauds[] = { 1000000, 500000, 250000, 115200, 57600 };   // Marlin valid bauds (removed very low bauds)
+const uint32_t serialBauds[] = { 1000000, 500000, 250000, 115200, 57600 };   // Marlin valid bauds (removed very low bauds)
 
 #define API_VERSION     "0.1"
 #define VERSION         "1.2.10"
 
 // Information from M115
 String fwMachineType = "Unknown";
-int fwExtruders = 1;
+uint8_t fwExtruders = 1;
 bool fwAutoreportTempCap, fwProgressCap, fwBuildPercentCap;
 bool fwAutoreportTempCapEn;
 
-String deviceName = "Unknown";
+// Printer status
 bool printerConnected;
 bool startPrint, isPrinting, printPause, restartPrint, cancelPrint;
-String lastCommandSent, lastReceivedResponse;
-long lastPrintedLine;
 
-unsigned int serialBaudIndex;
-unsigned int printerUsedBuffer;
-unsigned int serialReceiveTimeoutValue;
-unsigned long serialReceiveTimeoutTimer;
-
-unsigned long temperatureTimer;
-
-String uploadedFullname;
-size_t uploadedFileSize, filePos;
-
-unsigned long printStartTime;
+uint32_t printStartTime;
 float printCompletion;
 
+// Serial communication
+String lastCommandSent, lastReceivedResponse;
+uint32_t lastPrintedLine;
+
+uint8_t serialBaudIndex;
+uint16_t printerUsedBuffer;
+uint32_t serialReceiveTimeoutTimer;
+
+// Uploaded file information
+String uploadedFullname;
+size_t uploadedFileSize, filePos;
+uint32_t uploadedFileDate = 1378847754;
+
+// Temperature for printer status reporting
 struct Temperature {
   String actual, target;
 };
+uint32_t temperatureTimer;
 
-// Variables for printer status reporting
 Temperature toolTemperature[MAX_SUPPORTED_EXTRUDERS];
 Temperature bedTemperature;
+
 
 // https://forum.arduino.cc/index.php?topic=228884.msg2670971#msg2670971
 inline String IpAddress2String(const IPAddress& ipAddress) {
@@ -91,7 +94,7 @@ bool parseTemp(const String response, const String whichTemp, Temperature *tempe
     int slashpos = response.indexOf(" /", tpos);
     int spacepos = response.indexOf(" ", slashpos + 1);
     // if match mask T:xxx.xx /xxx.xx
-    if (spacepos - tpos < 17) {
+    if (slashpos != -1 && spacepos - tpos < 17) {
       temperature->actual = response.substring(tpos + whichTemp.length() + 1, slashpos);
       temperature->target = response.substring(slashpos + 2, spacepos);
 
@@ -280,10 +283,18 @@ int apiJobHandler(const uint8_t* data) {
 
 String M115ExtractString(const String response, const String field) {
   int spos = response.indexOf(field);
+<<<<<<< HEAD
   if (spos != -1) {    
     spos += field.length();
     if (response[spos] == ':')            //pre Marlin 1.1.8 compatibility (don't have ":" after field)
       spos++;
+=======
+  if (spos != -1) {
+    spos += field.length();
+    if (response[spos] == ':')    // pre Marlin 1.1.8 compatibility (don't have ":" after field)
+      ++spos;
+
+>>>>>>> pr/5
     int epos = response.indexOf(':', spos);
     if (epos == -1)
       epos = response.indexOf('\n', spos);
@@ -305,28 +316,35 @@ bool M115ExtractBool(const String response, const String field, const bool onErr
   return result == "" ? onErrorValue : (result == "1" ? true : false);
 }
 
+inline String getDeviceName() {
+  return fwMachineType + " (" + String(ESP.getChipId(), HEX) + ")";
+}
+
 void mDNSInit() {
-  deviceName = fwMachineType + " (" + String(ESP.getChipId(), HEX) + ")";
+  #ifdef OTA_UPDATES
+    MDNS.setInstanceName(getDeviceName().c_str());    // Can't call MDNS.init because it has been already done by 'ArduinoOTA.begin', here I just change instance name
+  #else
+    if (!MDNS.begin(getDeviceName().c_str()))
+      return;
+  #endif
 
-  if (MDNS.begin(deviceName.c_str())) {
-    // For Cura WirelessPrint - deprecated in favor of the OctoPrint API
-    MDNS.addService("wirelessprint", "tcp", 80);
-    MDNS.addServiceTxt("wirelessprint", "tcp", "version", SKETCH_VERSION);
+  // For Cura WirelessPrint - deprecated in favor of the OctoPrint API
+  MDNS.addService("wirelessprint", "tcp", 80);
+  MDNS.addServiceTxt("wirelessprint", "tcp", "version", SKETCH_VERSION);
 
-    // OctoPrint API
-    // Unfortunately, Slic3r doesn't seem to recognize it
-    MDNS.addService("octoprint", "tcp", 80);
-    MDNS.addServiceTxt("octoprint", "tcp", "path", "/");
-    MDNS.addServiceTxt("octoprint", "tcp", "api", API_VERSION);
-    MDNS.addServiceTxt("octoprint", "tcp", "version", VERSION);
+  // OctoPrint API
+  // Unfortunately, Slic3r doesn't seem to recognize it
+  MDNS.addService("octoprint", "tcp", 80);
+  MDNS.addServiceTxt("octoprint", "tcp", "path", "/");
+  MDNS.addServiceTxt("octoprint", "tcp", "api", API_VERSION);
+  MDNS.addServiceTxt("octoprint", "tcp", "version", VERSION);
 
-    // For compatibility with Slic3r
-    // Unfortunately, Slic3r doesn't seem to recognize it either. Library bug?
-    MDNS.addService("http", "tcp", 80);
-    MDNS.addServiceTxt("http", "tcp", "path", "/");
-    MDNS.addServiceTxt("http", "tcp", "api", API_VERSION);
-    MDNS.addServiceTxt("http", "tcp", "version", VERSION);
-  }
+  // For compatibility with Slic3r
+  // Unfortunately, Slic3r doesn't seem to recognize it either. Library bug?
+  MDNS.addService("http", "tcp", 80);
+  MDNS.addServiceTxt("http", "tcp", "path", "/");
+  MDNS.addServiceTxt("http", "tcp", "api", API_VERSION);
+  MDNS.addServiceTxt("http", "tcp", "version", VERSION);
 }
 
 bool detectPrinter() {
@@ -336,7 +354,6 @@ bool detectPrinter() {
     case 0:
       // Start printer detection
       serialBaudIndex = 0;
-      serialReceiveTimeoutValue = 1000;
       printerDetectionState = 10;
       break;
 
@@ -362,7 +379,6 @@ bool detectPrinter() {
         }
         else {
           telnetSend("Connected");
-          serialReceiveTimeoutValue = 10000; // Set serial timeout to a safer value (TODO check if it's really needed)
 
           fwMachineType = value;
           value = M115ExtractString(lastReceivedResponse, "EXTRUDER_COUNT");
@@ -372,12 +388,17 @@ bool detectPrinter() {
           fwBuildPercentCap = M115ExtractBool(lastReceivedResponse, "Cap:BUILD_PERCENT");
 
           mDNSInit();
-          
+
           String text = IpAddress2String(WiFi.localIP()) + " " + storageFS.getActiveFS();
           lcd(text);
           playSound();
+<<<<<<< HEAD
           fwAutoreportTempCapEn= 0; // fwAutoreportTempCap ; // fwAutoreportTempCap;  0; //disable for now
           if (fwAutoreportTempCapEn)
+=======
+          
+          if (fwAutoreportTempCap)
+>>>>>>> pr/5
             commandQueue.push("M155 S" + String(TEMPERATURE_REPORT_INTERVAL));   // Start auto report temperatures
           else
             temperatureTimer = millis();
@@ -410,6 +431,10 @@ void initUploadedFilename() {
 
 inline String getState() {
  return !printerConnected ? "Discovering printer" : (isPrinting ? "Printing" : "Operational");
+}
+
+inline String stringify(bool value) {
+  return value ? "true" : "false";
 }
 
 void setup() {
@@ -479,7 +504,7 @@ void setup() {
 
   // Main page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
-    String message = "<h1>" + deviceName + "</h1>"
+    String message = "<h1>" + getDeviceName() + "</h1>"
                      "<form enctype=\"multipart/form-data\" action=\"/api/files/local\" method=\"POST\">\n"
                      "<p>You can also print from the command line using curl:</p>\n"
                      "<pre>curl -F \"file=@/path/to/some.gcode\" " + IpAddress2String(WiFi.localIP()) + "/api/files/local</pre>\n"
@@ -504,6 +529,7 @@ void setup() {
     }
     message += "\n"
                "Last command sent: " + lastCommandSent + "\n"
+<<<<<<< HEAD
                "Last received response: " + lastReceivedResponse + "\n"
                "\n"
                "EXTRUDER_COUNT: " + fwExtruders + "\n"
@@ -511,6 +537,18 @@ void setup() {
                "PROGRESS: " + fwProgressCap + "\n"
                "BUILD_PERCENT: " + fwBuildPercentCap + "\n"               
                "</pre>";
+=======
+               "Last received response: " + lastReceivedResponse + "\n";
+    if (printerConnected) {
+      message += "\n"
+                 "EXTRUDER_COUNT: " + String(fwExtruders) + "\n"
+                 "AUTOREPORT_TEMP: " + stringify(fwAutoreportTempCap) + "\n"
+                 "PROGRESS: " + stringify(fwProgressCap) + "\n"
+                 "BUILD_PERCENT: " + stringify(fwBuildPercentCap) + "\n";
+    }
+    message += "</pre>";
+
+>>>>>>> pr/5
     request->send(200, "text/html", message);
   });
 
@@ -556,7 +594,7 @@ void setup() {
                                            "      \"name\": \"" + getUploadedFilename() + "\",\r\n"
                                            "      \"origin\": \"local\",\r\n"
                                            "      \"size\": " + String(uploadedFileSize) + ",\r\n"
-                                           "      \"date\": 1378847754 \r\n"
+                                           "      \"date\": " + String(uploadedFileDate) + "\r\n"
                                            "    },\r\n"
                                            //"    \"estimatedPrintTime\": \"" + estimatedPrintTime + "\",\r\n"
                                            "    \"filament\": {\r\n"
@@ -581,17 +619,17 @@ void setup() {
 
   server.on("/api/printer", HTTP_GET, [](AsyncWebServerRequest * request) {
     // https://docs.octoprint.org/en/master/api/printer.html#retrieve-the-current-printer-state
-    String sdReadyState = String(storageFS.activeSD() ? "true" : "false");  //  This should request SD status to the printer
-    String readyState = String(printerConnected ? "true" : "false");
+    String sdReadyState = stringify(storageFS.activeSD());   //  This should request SD status to the printer
+    String readyState = stringify(printerConnected);
     String message = "{\r\n"
                      "  \"state\": {\r\n"
                      "    \"text\": \"" + getState() + "\",\r\n"
                      "    \"flags\": {\r\n"
                      "      \"operational\": " + readyState + ",\r\n"
-                     "      \"paused\": " + String(printPause ? "true" : "false") + ",\r\n"
-                     "      \"printing\": " + String(isPrinting ? "true" : "false") + ",\r\n"
+                     "      \"paused\": " + stringify(printPause) + ",\r\n"
+                     "      \"printing\": " + stringify(isPrinting) + ",\r\n"
                      "      \"pausing\": false,\r\n"
-                     "      \"cancelling\": " + String(cancelPrint ? "true" : "false") + ",\r\n"
+                     "      \"cancelling\": " + stringify(cancelPrint) + ",\r\n"
                      "      \"sdReady\": " + sdReadyState + ",\r\n"
                      "      \"error\": false,\r\n"
                      "      \"ready\": " + readyState + ",\r\n"
@@ -650,28 +688,30 @@ void setup() {
   server.begin();
 
   #ifdef OTA_UPDATES
+    // OTA setup
+    ArduinoOTA.setHostname(getDeviceName().c_str());
     ArduinoOTA.begin();
   #endif
 }
 
 void loop() {
   #ifdef OTA_UPDATES
+    //****************
+    //* OTA handling *
+    //****************
     ArduinoOTA.handle();
   #endif
 
-  // look for Client connect trial
-  if (telnetServer.hasClient() && (!serverClient || !serverClient.connected())) {
-    if (serverClient)
-      serverClient.stop();
 
-    serverClient = telnetServer.available();
-    serverClient.flush();  // clear input buffer, else you get strange characters
-  }
-
+  //********************
+  //* Printer handling *
+  //********************
   if (!printerConnected)
     printerConnected = detectPrinter();
   else {
-    MDNS.update();
+    #ifndef OTA_UPDATES
+      MDNS.update();    // When OTA is active it's called by 'handle' method
+    #endif
 
     handlePrint();
 
@@ -700,12 +740,29 @@ void loop() {
   SendCommands();
   ReceiveResponses();
 
+
+  //*******************
+  //* Telnet handling *
+  //*******************
+  // look for Client connect trial
+  if (telnetServer.hasClient() && (!serverClient || !serverClient.connected())) {
+    if (serverClient)
+      serverClient.stop();
+
+    serverClient = telnetServer.available();
+    serverClient.flush();  // clear input buffer, else you get strange characters
+  }
+
   while (serverClient && serverClient.available())  // get data from Client
     Serial.write(serverClient.read());
 }
 
+inline void resetSerialReceiveTimeout() {
+  serialReceiveTimeoutTimer = millis() + 1000;
+}
+
 void SendCommands() {
-  String command = commandQueue.peekSend();
+  String command = commandQueue.peekSend();  //gets the next command to be sent
   if (command != "") {
     bool noResponsePending = commandQueue.isAckEmpty();
     if (noResponsePending || printerUsedBuffer < PRINTER_RX_BUFFER_SIZE * 3 / 4) {  // Let's use no more than 75% of printer RX buffer
@@ -720,45 +777,61 @@ void SendCommands() {
   }
 }
 
-inline void resetSerialReceiveTimeout() {
-  serialReceiveTimeoutTimer = millis() + serialReceiveTimeoutValue;
-}
-
 void ReceiveResponses() {
   static int lineStartPos;
   static String serialResponse;
 
-  if (serialReceiveTimeoutTimer - millis() <= 0) {
+  while (Serial.available()) {
+    char ch = (char)Serial.read();
+    serialResponse += ch;
+    serialReceiveTimeoutTimer = millis() + 100;   // Once a char is received timeout may be shorter
+    if (ch == '\n') {
+      if (serialResponse.startsWith("ok", lineStartPos)) {
+        if (!parseTemperatures(lastReceivedResponse) || lastCommandSent == "M105") {
+          lastReceivedResponse = serialResponse;
+          lineStartPos = 0;
+          serialResponse = "";
+
+          unsigned int cmdLen = commandQueue.popAcknowledge().length();  // Command has been processed by printer, buffer has been freed
+          printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
+          resetSerialReceiveTimeout();
+          if (lastCommandSent.startsWith("M155 S") && !lastCommandSent.startsWith("M155 S0")) {
+            fwAutoreportTempCapEn= true ;
+          }
+          
+
+          telnetSend("< " + lastReceivedResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
+        }        
+      } 
+      else if (fwAutoreportTempCapEn) {
+        if (parseTemperatures(lastReceivedResponse)){
+          lastReceivedResponse = serialResponse;
+          lineStartPos = 0;
+          serialResponse = "";
+          telnetSend("< AutoReportTemps parsed");  
+        } else {
+          lastReceivedResponse = serialResponse;
+          lineStartPos = 0;
+          serialResponse = "";
+          telnetSend("< Could not parse AutoReportTemps");  
+        }
+        
+      }
+      else{
+        lineStartPos = serialResponse.length();
+        telnetSend("< New line but No ok or temp report found");
+      }
+    }
+  }
+
+  if (!commandQueue.isAckEmpty() && serialReceiveTimeoutTimer - millis() <= 0) { // Command has been lost by printer, buffer has been freed
     lineStartPos = 0;
     serialResponse = "";
 
-    unsigned int cmdLen = commandQueue.popAcknowledge().length();  // Command has been lost by printer, buffer has been freed
+    unsigned int cmdLen = commandQueue.popAcknowledge().length();  
     printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
+    resetSerialReceiveTimeout();
 
     telnetSend("< #TIMEOUT#");
-  }
-  else {
-    while (Serial.available()) {
-      char ch = (char)Serial.read();
-      serialResponse += ch;
-      if (ch == '\n') {
-        if (serialResponse.startsWith("ok", lineStartPos)) {
-          if (!parseTemperatures(lastReceivedResponse) || lastCommandSent == "M105") {
-            lastReceivedResponse = serialResponse;
-            lineStartPos = 0;
-            serialResponse = "";
-
-            unsigned int cmdLen = commandQueue.popAcknowledge().length();  // Command has been processed by printer, buffer has been freed
-            printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
-
-            telnetSend("< " + lastReceivedResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
-
-            resetSerialReceiveTimeout();
-          }
-        }
-        else
-          lineStartPos = serialResponse.length();
-      }
-    }
   }
 }
