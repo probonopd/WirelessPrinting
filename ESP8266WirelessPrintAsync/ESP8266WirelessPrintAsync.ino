@@ -29,7 +29,7 @@ DNSServer dns;
 #define MAX_SUPPORTED_EXTRUDERS 6       // Number of supported extruder
 
 #define PRINTER_RX_BUFFER_SIZE 0        // This is printer firmware 'RX_BUFFER_SIZE'. If such parameter is unknown please use 0
-#define TEMPERATURE_REPORT_INTERVAL 10  // Ask the printer for its temperatures status every 10 seconds
+#define TEMPERATURE_REPORT_INTERVAL 2   // Ask the printer for its temperatures status every 2 seconds
 #define KEEPALIVE_INTERVAL 2500         // Marlin defaults to 2 seconds, get a little of margin
 const uint32_t serialBauds[] = { 1000000, 500000, 250000, 115200, 57600 };   // Marlin valid bauds (removed very low bauds)
 
