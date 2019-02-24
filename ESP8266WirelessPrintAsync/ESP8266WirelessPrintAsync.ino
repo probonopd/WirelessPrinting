@@ -37,6 +37,7 @@ const uint32_t serialBauds[] = { 1000000, 500000, 250000, 115200, 57600 };   // 
 String fwMachineType = "Unknown";
 uint8_t fwExtruders = 1;
 bool fwAutoreportTempCap, fwProgressCap, fwBuildPercentCap;
+bool fwAutoreportTempCapEn;
 
 // Printer status
 bool printerConnected;
@@ -384,7 +385,7 @@ bool detectPrinter() {
           String text = IpAddress2String(WiFi.localIP()) + " " + storageFS.getActiveFS();
           lcd(text);
           playSound();
-
+          
           if (fwAutoreportTempCap)
             commandQueue.push("M155 S" + String(TEMPERATURE_REPORT_INTERVAL));   // Start auto report temperatures
           else
@@ -705,7 +706,7 @@ void loop() {
       //lcd("Print cancelled");
     }
 
-    if (!fwAutoreportTempCap) {
+    if (!fwAutoreportTempCapEn) {
       unsigned long curMillis = millis();
       if (curMillis - temperatureTimer >= TEMPERATURE_REPORT_INTERVAL * 1000) {
         commandQueue.push("M105");
@@ -739,7 +740,7 @@ inline void resetSerialReceiveTimeout() {
 }
 
 void SendCommands() {
-  String command = commandQueue.peekSend();
+  String command = commandQueue.peekSend();  //gets the next command to be sent
   if (command != "") {
     bool noResponsePending = commandQueue.isAckEmpty();
     if (noResponsePending || printerUsedBuffer < PRINTER_RX_BUFFER_SIZE * 3 / 4) {  // Let's use no more than 75% of printer RX buffer
@@ -772,20 +773,40 @@ void ReceiveResponses() {
           unsigned int cmdLen = commandQueue.popAcknowledge().length();  // Command has been processed by printer, buffer has been freed
           printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
           resetSerialReceiveTimeout();
+          if (lastCommandSent.startsWith("M155 S") && !lastCommandSent.startsWith("M155 S0")) {
+            fwAutoreportTempCapEn= true ;
+          }
+          
 
           telnetSend("< " + lastReceivedResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
+        }        
+      } 
+      else if (fwAutoreportTempCapEn) {
+        if (parseTemperatures(lastReceivedResponse)){
+          lastReceivedResponse = serialResponse;
+          lineStartPos = 0;
+          serialResponse = "";
+          telnetSend("< AutoReportTemps parsed");  
+        } else {
+          lastReceivedResponse = serialResponse;
+          lineStartPos = 0;
+          serialResponse = "";
+          telnetSend("< Could not parse AutoReportTemps");  
         }
+        
       }
-      else
+      else{
         lineStartPos = serialResponse.length();
+        telnetSend("< New line but No ok or temp report found");
+      }
     }
   }
 
-  if (!commandQueue.isAckEmpty() && serialReceiveTimeoutTimer - millis() <= 0) {
+  if (!commandQueue.isAckEmpty() && serialReceiveTimeoutTimer - millis() <= 0) { // Command has been lost by printer, buffer has been freed
     lineStartPos = 0;
     serialResponse = "";
 
-    unsigned int cmdLen = commandQueue.popAcknowledge().length();  // Command has been lost by printer, buffer has been freed
+    unsigned int cmdLen = commandQueue.popAcknowledge().length();  
     printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
     resetSerialReceiveTimeout();
 
