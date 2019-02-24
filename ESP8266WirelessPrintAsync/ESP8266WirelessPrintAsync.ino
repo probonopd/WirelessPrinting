@@ -774,16 +774,14 @@ void ReceiveResponses() {
     serialReceiveTimeoutTimer = millis() + 500;   // Once a char is received timeout may be shorter
     if (ch == '\n') {
       if (serialResponse.startsWith("ok", lineStartPos)) {
-        if (!parseTemperatures(serialResponse) || lastCommandSent == "M105") {
-          GotValidResponse();
-          unsigned int cmdLen = commandQueue.popAcknowledge().length();  // Command has been processed by printer, buffer has been freed
-          printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
-          resetSerialReceiveTimeout();
+        GotValidResponse();
+        unsigned int cmdLen = commandQueue.popAcknowledge().length();  // Command has been processed by printer, buffer has been freed
+        printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
+        resetSerialReceiveTimeout();
 
-          fwAutoreportTempCapEn |= lastCommandSent.startsWith("M155 S1");
+        fwAutoreportTempCapEn |= lastCommandSent.startsWith("M155 S1");
 
-          telnetSend("< " + lastReceivedResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
-        }
+        telnetSend("< " + lastReceivedResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
       }
       else if (fwAutoreportTempCapEn && parseTemperatures(serialResponse)) {
         GotValidResponse();
