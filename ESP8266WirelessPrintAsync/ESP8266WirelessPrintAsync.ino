@@ -328,7 +328,8 @@ bool M115ExtractBool(const String response, const String field, const bool onErr
 }
 
 inline String getDeviceName() {
-  return fwMachineType + " (" + String(ESP.getChipId(), HEX) + ")";
+  // return fwMachineType + " (" + String(ESP.getChipId(), HEX) + ")";
+  return "OctoPrint instance on " + String(ESP.getChipId(), HEX); // https://github.com/probonopd/WirelessPrinting/pull/52#issuecomment-466820965
 }
 
 void mDNSInit() {
