@@ -5,7 +5,7 @@ CommandQueue commandQueue;    //FIFO Queue
 int CommandQueue::head = 0;
 int CommandQueue::sendTail = 0;
 int CommandQueue::tail = 0;
-String CommandQueue::buffer[COMMAND_BUFFER_SIZE];
+String CommandQueue::commandBuffer[COMMAND_BUFFER_SIZE];
 
 int CommandQueue::getFreeSlots() {
   int freeSlots = COMMAND_BUFFER_SIZE - 1;
@@ -25,7 +25,7 @@ bool CommandQueue::push(const String command) {
   if (next == tail || command == "")
     return false;
 
-  buffer[head] = command;
+  commandBuffer[head] = command;
   head = next;
 
   return true;
@@ -34,9 +34,9 @@ bool CommandQueue::push(const String command) {
 // Returns the next command to be sent, and advances to the next
 String CommandQueue::popSend() {
   if (sendTail == head)
-    return "";
+    return String();
 
-  const String command = buffer[sendTail];
+  const String command = commandBuffer[sendTail];
   sendTail = nextBufferSlot(sendTail);
   
   return command;
@@ -45,9 +45,9 @@ String CommandQueue::popSend() {
 // Returns the last command sent if it was received by the printer, otherwise returns empty
 String CommandQueue::popAcknowledge() {
   if (isAckEmpty())
-    return "";
+    return String();
 
-  const String command = buffer[tail];
+  const String command = commandBuffer[tail];
   tail = nextBufferSlot(tail);
 
   return command;

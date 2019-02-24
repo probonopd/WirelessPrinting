@@ -29,6 +29,7 @@ DNSServer dns;
 #define USE_FAST_SD                     // Use Default fast SD clock, comment if your SD is an old or slow one.
 //#define OTA_UPDATES                   // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load any code on device)
 const uint32_t serialBauds[] = { 1000000, 500000, 250000, 115200, 57600 };   // Marlin valid bauds (removed very low bauds)
+#define KEEPALIVE_INTERVAL 2500         // Marlin defaults to 2 seconds, get a little of margin
 
 #define API_VERSION     "0.1"
 #define VERSION         "1.2.10"
@@ -47,11 +48,11 @@ uint32_t printStartTime;
 float printCompletion;
 
 // Serial communication
-#define GotValidResponse()  { \
-                            lastReceivedResponse = serialResponse; \
-                            lineStartPos = 0; \
-                            serialResponse = ""; \
-                            }
+#define GotValidResponse() { \
+  lastReceivedResponse = serialResponse; \
+  lineStartPos = 0; \
+  serialResponse = ""; \
+}
 
 String lastCommandSent, lastReceivedResponse;
 uint32_t lastPrintedLine;
@@ -393,7 +394,7 @@ bool detectPrinter() {
           String text = IpAddress2String(WiFi.localIP()) + " " + storageFS.getActiveFS();
           lcd(text);
           playSound();
-          
+
           if (fwAutoreportTempCap)
             commandQueue.push("M155 S" + String(TEMPERATURE_REPORT_INTERVAL));   // Start auto report temperatures
           else
@@ -426,7 +427,7 @@ void initUploadedFilename() {
 }
 
 inline String getState() {
- return !printerConnected ? "Discovering printer" : (isPrinting ? "Printing" : "Operational");
+  return !printerConnected ? "Discovering printer" : (isPrinting ? "Printing" : "Operational");
 }
 
 inline String stringify(bool value) {
@@ -470,30 +471,30 @@ void setup() {
   server.on("/api/version", HTTP_GET, [](AsyncWebServerRequest * request) {
     // http://docs.octoprint.org/en/master/api/version.html
     request->send(200, "application/json", "{\r\n"
-                                           "  \"api\": \"" API_VERSION "\",\r\n"
-                                           "  \"server\": \"" VERSION "\"\r\n"
-                                           "}");
+                  "  \"api\": \"" API_VERSION "\",\r\n"
+                  "  \"server\": \"" VERSION "\"\r\n"
+                  "}");
   });
 
   server.on("/api/connection", HTTP_GET, [](AsyncWebServerRequest * request) {
     // http://docs.octoprint.org/en/master/api/connection.html#get-connection-settings
     request->send(200, "application/json", "{\r\n"
-                                           "  \"current\": {\r\n"
-                                           "    \"state\": \"" + getState() + "\",\r\n"
-                                           "    \"port\": \"Serial\",\r\n"
-                                           "    \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"
-                                           "    \"printerProfile\": \"Default\"\r\n"
-                                           "  },\r\n"
-                                           "  \"options\": {\r\n"
-                                           "    \"ports\": \"Serial\",\r\n"
-                                           "    \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"
-                                           "    \"printerProfiles\": \"Default\",\r\n"
-                                           "    \"portPreference\": \"Serial\",\r\n"
-                                           "    \"baudratePreference\": " + serialBauds[serialBaudIndex] + ",\r\n"
-                                           "    \"printerProfilePreference\": \"Default\",\r\n"
-                                           "    \"autoconnect\": true\r\n"
-                                           "  }\r\n"
-                                           "}");
+                  "  \"current\": {\r\n"
+                  "    \"state\": \"" + getState() + "\",\r\n"
+                  "    \"port\": \"Serial\",\r\n"
+                  "    \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"
+                  "    \"printerProfile\": \"Default\"\r\n"
+                  "  },\r\n"
+                  "  \"options\": {\r\n"
+                  "    \"ports\": \"Serial\",\r\n"
+                  "    \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"
+                  "    \"printerProfiles\": \"Default\",\r\n"
+                  "    \"portPreference\": \"Serial\",\r\n"
+                  "    \"baudratePreference\": " + serialBauds[serialBaudIndex] + ",\r\n"
+                  "    \"printerProfilePreference\": \"Default\",\r\n"
+                  "    \"autoconnect\": true\r\n"
+                  "  }\r\n"
+                  "}");
   });
 
   // Todo: http://docs.octoprint.org/en/master/api/connection.html#post--api-connection
@@ -508,7 +509,7 @@ void setup() {
                      "<input type=\"submit\" value=\"Upload\" />\n"
                      "</form>"
                      "<p><a href=\"/download\">Download</a></p>";
-                     "<p><a href=\"/info\">Info</a></p>";
+    "<p><a href=\"/info\">Info</a></p>";
     request->send(200, "text/html", message);
   });
 
@@ -557,14 +558,14 @@ void setup() {
       startPrint = printerConnected && !isPrinting && uploadedFullname != "";
 
     request->send(200, "application/json", "{\r\n"
-                                           "  \"files\": {\r\n"
-                                           "    \"local\": {\r\n"
-                                           "      \"name\": \"" + getUploadedFilename() + "\",\r\n"
-                                           "      \"origin\": \"local\"\r\n"
-                                           "    }\r\n"
-                                           "  },\r\n"
-                                           "  \"done\": true\r\n"
-                                           "}");
+                  "  \"files\": {\r\n"
+                  "    \"local\": {\r\n"
+                  "      \"name\": \"" + getUploadedFilename() + "\",\r\n"
+                  "      \"origin\": \"local\"\r\n"
+                  "    }\r\n"
+                  "  },\r\n"
+                  "  \"done\": true\r\n"
+                  "}");
   }, handleUpload);
 
   server.on("/api/job", HTTP_GET, [](AsyncWebServerRequest * request) {
@@ -575,26 +576,26 @@ void setup() {
       printTimeLeft = printTimeLeft / printCompletion * (100 - printCompletion);
     }
     request->send(200, "application/json", "{\r\n"
-                                           "  \"job\": {\r\n"
-                                           "    \"file\": {\r\n"
-                                           "      \"name\": \"" + getUploadedFilename() + "\",\r\n"
-                                           "      \"origin\": \"local\",\r\n"
-                                           "      \"size\": " + String(uploadedFileSize) + ",\r\n"
-                                           "      \"date\": " + String(uploadedFileDate) + "\r\n"
-                                           "    },\r\n"
-                                           //"    \"estimatedPrintTime\": \"" + estimatedPrintTime + "\",\r\n"
-                                           "    \"filament\": {\r\n"
-                                           //"      \"length\": \"" + filementLength + "\",\r\n"
-                                           //"      \"volume\": \"" + filementVolume + "\"\r\n"
-                                           "    }\r\n"
-                                           "  },\r\n"
-                                           "  \"progress\": {\r\n"
-                                           "    \"completion\": " + String(printCompletion) + ",\r\n"
-                                           "    \"filepos\": " + String(filePos) + ",\r\n"
-                                           "    \"printTime\": " + String(printTime) + ",\r\n"
-                                           "    \"printTimeLeft\": " + String(printTimeLeft) + "\r\n"
-                                           "  }\r\n"
-                                           "}");
+                  "  \"job\": {\r\n"
+                  "    \"file\": {\r\n"
+                  "      \"name\": \"" + getUploadedFilename() + "\",\r\n"
+                  "      \"origin\": \"local\",\r\n"
+                  "      \"size\": " + String(uploadedFileSize) + ",\r\n"
+                  "      \"date\": " + String(uploadedFileDate) + "\r\n"
+                  "    },\r\n"
+                  //"    \"estimatedPrintTime\": \"" + estimatedPrintTime + "\",\r\n"
+                  "    \"filament\": {\r\n"
+                  //"      \"length\": \"" + filementLength + "\",\r\n"
+                  //"      \"volume\": \"" + filementVolume + "\"\r\n"
+                  "    }\r\n"
+                  "  },\r\n"
+                  "  \"progress\": {\r\n"
+                  "    \"completion\": " + String(printCompletion) + ",\r\n"
+                  "    \"filepos\": " + String(filePos) + ",\r\n"
+                  "    \"printTime\": " + String(printTime) + ",\r\n"
+                  "    \"printTimeLeft\": " + String(printTimeLeft) + "\r\n"
+                  "  }\r\n"
+                  "}");
   });
 
   server.on("/api/settings", HTTP_GET, [](AsyncWebServerRequest * request) {
@@ -673,20 +674,20 @@ void setup() {
 
   server.begin();
 
-  #ifdef OTA_UPDATES
-    // OTA setup
-    ArduinoOTA.setHostname(getDeviceName().c_str());
-    ArduinoOTA.begin();
-  #endif
+#ifdef OTA_UPDATES
+  // OTA setup
+  ArduinoOTA.setHostname(getDeviceName().c_str());
+  ArduinoOTA.begin();
+#endif
 }
 
 void loop() {
-  #ifdef OTA_UPDATES
-    //****************
-    //* OTA handling *
-    //****************
-    ArduinoOTA.handle();
-  #endif
+#ifdef OTA_UPDATES
+  //****************
+  //* OTA handling *
+  //****************
+  ArduinoOTA.handle();
+#endif
 
 
   //********************
@@ -695,9 +696,9 @@ void loop() {
   if (!printerConnected)
     printerConnected = detectPrinter();
   else {
-    #ifndef OTA_UPDATES
-      MDNS.update();    // When OTA is active it's called by 'handle' method
-    #endif
+#ifndef OTA_UPDATES
+    MDNS.update();    // When OTA is active it's called by 'handle' method
+#endif
 
     handlePrint();
 
@@ -743,8 +744,8 @@ void loop() {
     Serial.write(serverClient.read());
 }
 
-inline void resetSerialReceiveTimeout() {
-  serialReceiveTimeoutTimer = millis() + 1000;
+inline uint32_t restartSerialTimeout(uint16_t timeout) {
+  serialReceiveTimeoutTimer = millis() + timeout;
 }
 
 void SendCommands() {
@@ -753,13 +754,12 @@ void SendCommands() {
     bool noResponsePending = commandQueue.isAckEmpty();
     if (noResponsePending || printerUsedBuffer < PRINTER_RX_BUFFER_SIZE * 3 / 4) {  // Let's use no more than 75% of printer RX buffer
       if (noResponsePending)
-        resetSerialReceiveTimeout();    // Receive timeout has to be reset only when sending a command and no pending response is expected
+        restartSerialTimeout(KEEPALIVE_INTERVAL);   // Receive timeout has to be reset only when sending a command and no pending response is expected
       Serial.println(command);          // Send to 3D Printer
       printerUsedBuffer += command.length();
       lastCommandSent = command;
       commandQueue.popSend();
-      if (command.startsWith("M109"))   // known commands that make the printer busy add time for timeout. This should be implemented with an array for all the commands like this.
-        serialReceiveTimeoutTimer += 10000; 
+
       telnetSend("> " + command);
     }
   }
@@ -772,35 +772,31 @@ void ReceiveResponses() {
   while (Serial.available()) {
     char ch = (char)Serial.read();
     serialResponse += ch;
-    serialReceiveTimeoutTimer = millis() + 500;   // Once a char is received timeout may be shorter
+    restartSerialTimeout(500);    // Once a char is received timeout may be shorter
     if (ch == '\n') {
       if (serialResponse.startsWith("ok", lineStartPos)) {
         GotValidResponse();
-        unsigned int cmdLen = commandQueue.popAcknowledge().length();  // Command has been processed by printer, buffer has been freed
-        printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
-        resetSerialReceiveTimeout();
-
+        commandAcknowledged();
         fwAutoreportTempCapEn |= lastCommandSent.startsWith("M155 S1");
-
         telnetSend("< " + lastReceivedResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
       }
       else if (fwAutoreportTempCapEn && parseTemperatures(serialResponse)) {
         GotValidResponse();
-        telnetSend("< AutoReportTemps parsed");         
+        telnetSend("< AutoReportTemps parsed");
       }
       else if (serialResponse.startsWith("echo:busy")) {
         GotValidResponse();
-        serialReceiveTimeoutTimer += 5000;       
-        telnetSend("< Printer is busy, giving it more time");  
+        restartSerialTimeout(KEEPALIVE_INTERVAL);
+        telnetSend("< Printer is busy, giving it more time");
       }
       else if (serialResponse.startsWith("echo: cold extrusion prevented")) {
         GotValidResponse();
-        // To do: Pause sending gcode, or do something similar 
-        telnetSend("< Printer is cold, can't move");  
-      }      
+        // To do: Pause sending gcode, or do something similar
+        telnetSend("< Printer is cold, can't move");
+      }
       else if (serialResponse.startsWith("error")) {
         GotValidResponse();
-        telnetSend("< Error Received");  
+        telnetSend("< Error Received");
       }
       else {
         lineStartPos = serialResponse.length();
@@ -809,14 +805,17 @@ void ReceiveResponses() {
     }
   }
 
-  if (!commandQueue.isAckEmpty() && serialReceiveTimeoutTimer - millis() <= 0) { // Command has been lost by printer, buffer has been freed
+  if (!commandQueue.isAckEmpty() && serialReceiveTimeoutTimer - millis() <= 0) {  // Command has been lost by printer, buffer has been freed
     lineStartPos = 0;
     serialResponse = "";
-
-    unsigned int cmdLen = commandQueue.popAcknowledge().length();  
-    printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
-    resetSerialReceiveTimeout();
+    commandAcknowledged();
 
     telnetSend("< #TIMEOUT#");
   }
+}
+
+inline void commandAcknowledged() {
+  unsigned int cmdLen = commandQueue.popAcknowledge().length();
+  printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
+  restartSerialTimeout(KEEPALIVE_INTERVAL);
 }
