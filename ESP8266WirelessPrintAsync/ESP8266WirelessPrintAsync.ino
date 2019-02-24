@@ -24,7 +24,7 @@ DNSServer dns;
 // Configurable parameters
 #define SKETCH_VERSION "2.0"
 #define PRINTER_RX_BUFFER_SIZE 0        // This is printer firmware 'RX_BUFFER_SIZE'. If such parameter is unknown please use 0
-#define TEMPERATURE_REPORT_INTERVAL 2   // Ask the printer for its temperatures status every 2 seconds
+#define TEMPERATURE_REPORT_INTERVAL 10   // Ask the printer for its temperatures status every 2 seconds
 #define MAX_SUPPORTED_EXTRUDERS 6       // Number of supported extruder
 #define USE_FAST_SD                     // Use Default fast SD clock, comment if your SD is an old or slow one.
 //#define OTA_UPDATES                   // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load any code on device)
@@ -767,7 +767,7 @@ void ReceiveResponses() {
     serialReceiveTimeoutTimer = millis() + 100;   // Once a char is received timeout may be shorter
     if (ch == '\n') {
       if (serialResponse.startsWith("ok", lineStartPos)) {
-        if (!parseTemperatures(lastReceivedResponse) || lastCommandSent == "M105") {
+        if (!parseTemperatures(serialResponse) || lastCommandSent == "M105") {
           lastReceivedResponse = serialResponse;
           lineStartPos = 0;
           serialResponse = "";
@@ -778,13 +778,11 @@ void ReceiveResponses() {
           if (lastCommandSent.startsWith("M155 S") && !lastCommandSent.startsWith("M155 S0")) {
             fwAutoreportTempCapEn= true ;
           }
-          
-
           telnetSend("< " + lastReceivedResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
         }        
       } 
       else if (fwAutoreportTempCapEn) {
-        if (parseTemperatures(lastReceivedResponse)){
+        if (parseTemperatures(serialResponse)){
           lastReceivedResponse = serialResponse;
           lineStartPos = 0;
           serialResponse = "";
