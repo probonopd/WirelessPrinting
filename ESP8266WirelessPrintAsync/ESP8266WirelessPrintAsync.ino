@@ -584,6 +584,9 @@ void setup() {
       printTime = (millis() - printStartTime) / 1000;
       printTimeLeft = printTimeLeft / printCompletion * (100 - printCompletion);
     }
+    // https://docs.octoprint.org/en/master/api/printer.html#retrieve-the-current-printer-state
+    String sdReadyState = stringify(storageFS.activeSD());   //  This should request SD status to the printer
+    String readyState = stringify(printerConnected);
     request->send(200, "application/json", "{\r\n"
                                            // BEGIN https://github.com/probonopd/WirelessPrinting/issues/30#issuecomment-467097709
                                            "  \"state\": {\r\n"
