@@ -585,6 +585,22 @@ void setup() {
       printTimeLeft = printTimeLeft / printCompletion * (100 - printCompletion);
     }
     request->send(200, "application/json", "{\r\n"
+                                           // BEGIN https://github.com/probonopd/WirelessPrinting/issues/30#issuecomment-467097709
+                                           "  \"state\": {\r\n"
+                                           "    \"text\": \"" + getState() + "\",\r\n"
+                                           "    \"flags\": {\r\n"
+                                           "      \"operational\": " + readyState + ",\r\n"
+                                           "      \"paused\": " + stringify(printPause) + ",\r\n"
+                                           "      \"printing\": " + stringify(isPrinting) + ",\r\n"
+                                           "      \"pausing\": false,\r\n"
+                                           "      \"cancelling\": " + stringify(cancelPrint) + ",\r\n"
+                                           "      \"sdReady\": " + sdReadyState + ",\r\n"
+                                           "      \"error\": false,\r\n"
+                                           "      \"ready\": " + readyState + ",\r\n"
+                                           "      \"closedOrError\": false\r\n"
+                                           "    }\r\n"
+                                           "  },\r\n"
+                                           // END https://github.com/probonopd/WirelessPrinting/issues/30#issuecomment-467097709
                                            "  \"job\": {\r\n"
                                            "    \"file\": {\r\n"
                                            "      \"name\": \"" + getUploadedFilename() + "\",\r\n"
