@@ -514,7 +514,10 @@ void setup() {
                      "<p>You can also print from the command line using curl:</p>\n"
                      "<pre>curl -F \"file=@\\\"/path/to/some.gcode\\\";print=true\" " + IpAddress2String(WiFi.localIP()) + "/api/files/local</pre>\n"
                      "Choose a file to upload: <input name=\"file\" type=\"file\"/><br/>\n"
-                     "<input type=\"hidden\" name=\"print\" value=\"true\"> <input type=\"submit\" value=\"Upload\" />\n"
+                     //"<input type=\"hidden\"   name=\"print\" value=\"false\">"
+                     "<input type=\"checkbox\" name=\"print\" id = \"printInmediately\" value=\"true\" checked>\n"
+                     "<label for = \"printInmediately\">Print Inmediately</label><br/>\n"
+                     "<input type=\"submit\" value=\"Upload\" />\n"
                      "</form>"
                      "<p><a href=\"/download\">Download</a></p>"
                      "<p><a href=\"/info\">Info</a></p>";
