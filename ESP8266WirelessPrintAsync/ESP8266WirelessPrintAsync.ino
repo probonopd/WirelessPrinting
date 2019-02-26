@@ -298,14 +298,9 @@ int apiJobHandler(const uint8_t* data) {
 }
 
 String M115ExtractString(const String response, const String field) {
-  int spos = response.indexOf(field);
-
+  int spos = response.indexOf(field + ":");
   if (spos != -1) {
-    spos += field.length();
-    if (response[spos] == ':')    // pre Marlin 1.1.8 compatibility (don't have ":" after field)
-      ++spos;
-
-
+    spos += field.length() + 1;
     int epos = response.indexOf(':', spos);
     if (epos == -1)
       epos = response.indexOf('\n', spos);
@@ -514,7 +509,10 @@ void setup() {
                      "<p>You can also print from the command line using curl:</p>\n"
                      "<pre>curl -F \"file=@/path/to/some.gcode\" -F \"print=true\" " + IpAddress2String(WiFi.localIP()) + "/api/files/local</pre>\n"
                      "Choose a file to upload: <input name=\"file\" type=\"file\"/><br/>\n"
-                     "<input type=\"hidden\" name=\"print\" value=\"true\"> <input type=\"submit\" value=\"Upload\" />\n"
+                     //"<input type=\"hidden\"   name=\"print\" value=\"false\">"
+                     "<input type=\"checkbox\" name=\"print\" id = \"printInmediately\" value=\"true\" checked>\n"
+                     "<label for = \"printInmediately\">Print Inmediately</label><br/>\n"
+                     "<input type=\"submit\" value=\"Upload\" />\n"
                      "</form>"
                      "<p><a href=\"/download\">Download</a></p>"
                      "<p><a href=\"/info\">Info</a></p>";
