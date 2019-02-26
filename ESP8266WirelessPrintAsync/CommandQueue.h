@@ -7,7 +7,7 @@
 class CommandQueue {
   private:
     static int head, sendTail, tail;
-    static String buffer[COMMAND_BUFFER_SIZE];
+    static String commandBuffer[COMMAND_BUFFER_SIZE];
 
     // Returns the next buffer slot (after index slot) if it's in between the size of the buffer
     static inline int nextBufferSlot(int index) {
@@ -37,9 +37,9 @@ class CommandQueue {
 
     // If there is a command pending to be sent returns it
     inline static String peekSend() {
-      return (sendTail == head) ? "" : buffer[sendTail];
+      return (sendTail == head) ? String() : commandBuffer[sendTail];
     }
-
+    
     static String popSend();
     static String popAcknowledge();
 };

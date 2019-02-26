@@ -1,4 +1,4 @@
- // Required: https://github.com/greiman/SdFat
+// Required: https://github.com/greiman/SdFat
 
 #include <ArduinoOTA.h>
 #if defined(ESP8266)
@@ -23,30 +23,43 @@ DNSServer dns;
 
 // Configurable parameters
 #define SKETCH_VERSION "2.0"
-#define PRINTER_RX_BUFFER_SIZE 0        // This is printer firmware 'RX_BUFFER_SIZE'. If such parameter is unknown please use 0
-#define TEMPERATURE_REPORT_INTERVAL 10   // Ask the printer for its temperatures status every 2 seconds
-#define MAX_SUPPORTED_EXTRUDERS 6       // Number of supported extruder
 #define USE_FAST_SD                     // Use Default fast SD clock, comment if your SD is an old or slow one.
-//#define OTA_UPDATES                   // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load any code on device)
+#define OTA_UPDATES                     // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load any code on device)
+//#define OTA_PASSWORD ""               // Uncomment to protect OTA updates and assign a password (inside "")
+#define MAX_SUPPORTED_EXTRUDERS 6       // Number of supported extruder
+
+#define PRINTER_RX_BUFFER_SIZE 0        // This is printer firmware 'RX_BUFFER_SIZE'. If such parameter is unknown please use 0
+#define TEMPERATURE_REPORT_INTERVAL 2   // Ask the printer for its temperatures status every 2 seconds
+#define KEEPALIVE_INTERVAL 2500         // Marlin defaults to 2 seconds, get a little of margin
 const uint32_t serialBauds[] = { 1000000, 500000, 250000, 115200, 57600 };   // Marlin valid bauds (removed very low bauds)
 
 #define API_VERSION     "0.1"
-#define VERSION         "1.2.10"
+#define VERSION         "1.3.10"
 
 // Information from M115
 String fwMachineType = "Unknown";
 uint8_t fwExtruders = 1;
 bool fwAutoreportTempCap, fwProgressCap, fwBuildPercentCap;
-bool fwAutoreportTempCapEn;
 
 // Printer status
-bool printerConnected;
-bool startPrint, isPrinting, printPause, restartPrint, cancelPrint;
+bool printerConnected,
+     startPrint,
+     isPrinting,
+     printPause,
+     restartPrint,
+     cancelPrint,
+     autoreportTempEnabled;
 
 uint32_t printStartTime;
 float printCompletion;
 
 // Serial communication
+#define GotValidResponse() { \
+  lastReceivedResponse = serialResponse; \
+  lineStartPos = 0; \
+  serialResponse = ""; \
+}
+
 String lastCommandSent, lastReceivedResponse;
 uint32_t lastPrintedLine;
 
@@ -60,9 +73,12 @@ size_t uploadedFileSize, filePos;
 uint32_t uploadedFileDate = 1378847754;
 
 // Temperature for printer status reporting
+#define AUTOTEMP_COMMAND "M155 S"
+
 struct Temperature {
   String actual, target;
 };
+
 uint32_t temperatureTimer;
 
 Temperature toolTemperature[MAX_SUPPORTED_EXTRUDERS];
@@ -82,7 +98,7 @@ inline void setLed(const bool status) {
 }
 
 inline void telnetSend(const String line) {
-  if (serverClient && serverClient.connected())   // send data to telnet client if connected
+  if (serverClient && serverClient.connected())     // send data to telnet client if connected
     serverClient.println(line);
 }
 
@@ -282,14 +298,9 @@ int apiJobHandler(const uint8_t* data) {
 }
 
 String M115ExtractString(const String response, const String field) {
-  int spos = response.indexOf(field);
-
+  int spos = response.indexOf(field+":");
   if (spos != -1) {
-    spos += field.length();
-    if (response[spos] == ':')    // pre Marlin 1.1.8 compatibility (don't have ":" after field)
-      ++spos;
-
-
+    spos += field.length()+1;
     int epos = response.indexOf(':', spos);
     if (epos == -1)
       epos = response.indexOf('\n', spos);
@@ -387,9 +398,9 @@ bool detectPrinter() {
           String text = IpAddress2String(WiFi.localIP()) + " " + storageFS.getActiveFS();
           lcd(text);
           playSound();
-          
+
           if (fwAutoreportTempCap)
-            commandQueue.push("M155 S" + String(TEMPERATURE_REPORT_INTERVAL));   // Start auto report temperatures
+            commandQueue.push(AUTOTEMP_COMMAND + String(TEMPERATURE_REPORT_INTERVAL));   // Start auto report temperatures
           else
             temperatureTimer = millis();
 
@@ -420,7 +431,7 @@ void initUploadedFilename() {
 }
 
 inline String getState() {
- return !printerConnected ? "Discovering printer" : (isPrinting ? "Printing" : "Operational");
+  return !printerConnected ? "Discovering printer" : (isPrinting ? "Printing" : "Operational");
 }
 
 inline String stringify(bool value) {
@@ -466,8 +477,7 @@ void setup() {
     request->send(200, "application/json", "{\r\n"
                                            "  \"api\": \"" API_VERSION "\",\r\n"
                                            "  \"server\": \"" VERSION "\"\r\n"
-                                           "}");
-  });
+                                           "}");  });
 
   server.on("/api/connection", HTTP_GET, [](AsyncWebServerRequest * request) {
     // http://docs.octoprint.org/en/master/api/connection.html#get-connection-settings
@@ -499,9 +509,13 @@ void setup() {
                      "<p>You can also print from the command line using curl:</p>\n"
                      "<pre>curl -F \"file=@/path/to/some.gcode\" -F \"print=true\" " + IpAddress2String(WiFi.localIP()) + "/api/files/local</pre>\n"
                      "Choose a file to upload: <input name=\"file\" type=\"file\"/><br/>\n"
+                     //"<input type=\"hidden\"   name=\"print\" value=\"false\">"
+                     "<input type=\"checkbox\" name=\"print\" id = \"printInmediately\" value=\"true\" checked>\n"
+                     "<label for = \"printInmediately\">Print Inmediately</label><br/>\n"
                      "<input type=\"submit\" value=\"Upload\" />\n"
                      "</form>"
-                     "<p><a href=\"/download\">Download</a></p>";
+                     "<p><a href=\"/download\">Download</a></p>"
+                     "<p><a href=\"/info\">Info</a></p>";
     request->send(200, "text/html", message);
   });
 
@@ -532,13 +546,13 @@ void setup() {
   });
 
   // File Operations
-  //server.on("/api/files", HTTP_GET, [](AsyncWebServerRequest * request) {
-  //  Pending: http://docs.octoprint.org/en/master/api/files.html#retrieve-all-files
-  //  request->send(200, "application/json", "{\r\n"
-  //                                         "  \"files\": {\r\n"
-  //                                         "  }\r\n"
-  //                                         "}");
-  //});
+  // Pending: http://docs.octoprint.org/en/master/api/files.html#retrieve-all-files
+  server.on("/api/files", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send(200, "application/json", "{\r\n"
+                                           "  \"files\": {\r\n"
+                                           "  }\r\n"
+                                           "}");
+  });
 
   // For Slic3r OctoPrint compatibility
   server.on("/api/files/local", HTTP_POST, [](AsyncWebServerRequest * request) {
@@ -669,6 +683,9 @@ void setup() {
   #ifdef OTA_UPDATES
     // OTA setup
     ArduinoOTA.setHostname(getDeviceName().c_str());
+    #ifdef OTA_PASSWORD
+      ArduinoOTA.setPassword(OTA_PASSWORD);
+    #endif
     ArduinoOTA.begin();
   #endif
 }
@@ -707,7 +724,7 @@ void loop() {
       //lcd("Print cancelled");
     }
 
-    if (!fwAutoreportTempCapEn) {
+    if (!autoreportTempEnabled) {
       unsigned long curMillis = millis();
       if (curMillis - temperatureTimer >= TEMPERATURE_REPORT_INTERVAL * 1000) {
         commandQueue.push("M105");
@@ -736,8 +753,8 @@ void loop() {
     Serial.write(serverClient.read());
 }
 
-inline void resetSerialReceiveTimeout() {
-  serialReceiveTimeoutTimer = millis() + 1000;
+inline uint32_t restartSerialTimeout(uint16_t timeout) {
+  serialReceiveTimeoutTimer = millis() + timeout;
 }
 
 void SendCommands() {
@@ -746,13 +763,12 @@ void SendCommands() {
     bool noResponsePending = commandQueue.isAckEmpty();
     if (noResponsePending || printerUsedBuffer < PRINTER_RX_BUFFER_SIZE * 3 / 4) {  // Let's use no more than 75% of printer RX buffer
       if (noResponsePending)
-        resetSerialReceiveTimeout();    // Receive timeout has to be reset only when sending a command and no pending response is expected
-      Serial.println(command);   // Send to 3D Printer
+        restartSerialTimeout(KEEPALIVE_INTERVAL);   // Receive timeout has to be reset only when sending a command and no pending response is expected
+      Serial.println(command);          // Send to 3D Printer
       printerUsedBuffer += command.length();
       lastCommandSent = command;
       commandQueue.popSend();
-      if (command.startsWith("M109"))           // known commands that make the printer busy add time for timeout. This should be implemented with an array for all the commands like this.
-        serialReceiveTimeoutTimer+=10000; 
+
       telnetSend("> " + command);
     }
   }
@@ -765,64 +781,51 @@ void ReceiveResponses() {
   while (Serial.available()) {
     char ch = (char)Serial.read();
     serialResponse += ch;
-    serialReceiveTimeoutTimer += 500;   // Once a char is received timeout may be shorter
+    restartSerialTimeout(500);    // Once a char is received timeout may be shorter
     if (ch == '\n') {
       if (serialResponse.startsWith("ok", lineStartPos)) {
-        if (!parseTemperatures(serialResponse) || lastCommandSent == "M105") {
-          lastReceivedResponse = serialResponse;
-          lineStartPos = 0;
-          serialResponse = "";
+        GotValidResponse();
+        commandAcknowledged();
+        telnetSend("< " + lastReceivedResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
 
-          unsigned int cmdLen = commandQueue.popAcknowledge().length();  // Command has been processed by printer, buffer has been freed
-          printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
-          resetSerialReceiveTimeout();
-          if (lastCommandSent.startsWith("M155 S") && !lastCommandSent.startsWith("M155 S0")) {
-            fwAutoreportTempCapEn= true ;
-          }
-          telnetSend("< " + lastReceivedResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
-        }        
-      } 
-      else if (fwAutoreportTempCapEn && parseTemperatures(serialResponse)) {
-          lastReceivedResponse = serialResponse;
-          lineStartPos = 0;
-          serialResponse = "";
-          telnetSend("< AutoReportTemps parsed");         
+        autoreportTempEnabled |= (fwAutoreportTempCap && lastCommandSent.startsWith(AUTOTEMP_COMMAND) && lastCommandSent[6] != '0');
+      }
+      else if (autoreportTempEnabled && parseTemperatures(serialResponse)) {
+        GotValidResponse();
+        telnetSend("< AutoReportTemps parsed");
       }
       else if (serialResponse.startsWith("echo:busy")) {
-        lastReceivedResponse = serialResponse;
-        lineStartPos = 0;
-        serialResponse = "";
-        serialReceiveTimeoutTimer += 5000;       
-        telnetSend("< Printer is busy, giving it more time");  
+        GotValidResponse();
+        restartSerialTimeout(KEEPALIVE_INTERVAL);
+        telnetSend("< Printer is busy, giving it more time");
       }
       else if (serialResponse.startsWith("echo: cold extrusion prevented")) {
-        lastReceivedResponse = serialResponse;
-        lineStartPos = 0;
-        serialResponse = "";
-        // To do: Pause sending gcode, or do something similar 
-        telnetSend("< Printer is cold, can't move");  
-      }      
-      else if (serialResponse.startsWith("error")) {
-        lastReceivedResponse = serialResponse;
-        lineStartPos = 0;
-        serialResponse = "";
-        telnetSend("< Error Received");  
+        GotValidResponse();
+        // To do: Pause sending gcode, or do something similar
+        telnetSend("< Printer is cold, can't move");
       }
-      else{
+      else if (serialResponse.startsWith("error")) {
+        GotValidResponse();
+        telnetSend("< Error Received");
+      }
+      else {
         lineStartPos = serialResponse.length();
         telnetSend("< New line but nothing to do with it");
       }
     }
   }
 
-  if (!commandQueue.isAckEmpty() && serialReceiveTimeoutTimer - millis() <= 0) { // Command has been lost by printer, buffer has been freed
+  if (!commandQueue.isAckEmpty() && serialReceiveTimeoutTimer - millis() <= 0) {  // Command has been lost by printer, buffer has been freed
     lineStartPos = 0;
     serialResponse = "";
-
-    unsigned int cmdLen = commandQueue.popAcknowledge().length();  
-    printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
-    resetSerialReceiveTimeout();
+    commandAcknowledged();
 
     telnetSend("< #TIMEOUT#");
   }
+}
+
+inline void commandAcknowledged() {
+  unsigned int cmdLen = commandQueue.popAcknowledge().length();
+  printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
+  restartSerialTimeout(KEEPALIVE_INTERVAL);
 }
