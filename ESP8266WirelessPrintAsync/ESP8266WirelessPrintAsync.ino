@@ -507,7 +507,7 @@ void setup() {
     String message = "<h1>" + getDeviceName() + "</h1>"
                      "<form enctype=\"multipart/form-data\" action=\"/api/files/local\" method=\"POST\">\n"
                      "<p>You can also print from the command line using curl:</p>\n"
-                     "<pre>curl -F \"file=@\\\"/path/to/some.gcode\\\";print=true\" " + IpAddress2String(WiFi.localIP()) + "/api/files/local</pre>\n"
+                     "<pre>curl -F \"file=@/path/to/some.gcode\" -F \"print=true\" " + IpAddress2String(WiFi.localIP()) + "/api/files/local</pre>\n"
                      "Choose a file to upload: <input name=\"file\" type=\"file\"/><br/>\n"
                      //"<input type=\"hidden\"   name=\"print\" value=\"false\">"
                      "<input type=\"checkbox\" name=\"print\" id = \"printInmediately\" value=\"true\" checked>\n"
