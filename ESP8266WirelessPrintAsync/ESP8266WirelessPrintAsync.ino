@@ -579,7 +579,7 @@ void setup() {
     int printTime = 0, printTimeLeft = 0;
     if (isPrinting) {
       printTime = (millis() - printStartTime) / 1000;
-      printTimeLeft = printTimeLeft / printCompletion * (100 - printCompletion);
+      printTimeLeft = printTime / printCompletion * (100 - printCompletion);
     }
     request->send(200, "application/json", "{\r\n"
                                            "  \"job\": {\r\n"
