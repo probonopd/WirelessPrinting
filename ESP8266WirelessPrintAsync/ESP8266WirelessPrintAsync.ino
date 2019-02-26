@@ -752,8 +752,8 @@ void loop() {
     Serial.write(serverClient.read());
 }
 
-inline uint32_t restartSerialTimeout(uint16_t timeout) {
-  serialReceiveTimeoutTimer = millis() + timeout;
+inline uint32_t restartSerialTimeout() {
+  serialReceiveTimeoutTimer = millis() + KEEPALIVE_INTERVAL;
 }
 
 void SendCommands() {
@@ -762,7 +762,7 @@ void SendCommands() {
     bool noResponsePending = commandQueue.isAckEmpty();
     if (noResponsePending || printerUsedBuffer < PRINTER_RX_BUFFER_SIZE * 3 / 4) {  // Let's use no more than 75% of printer RX buffer
       if (noResponsePending)
-        restartSerialTimeout(KEEPALIVE_INTERVAL);   // Receive timeout has to be reset only when sending a command and no pending response is expected
+        restartSerialTimeout();   // Receive timeout has to be reset only when sending a command and no pending response is expected
       Serial.println(command);          // Send to 3D Printer
       printerUsedBuffer += command.length();
       lastCommandSent = command;
@@ -780,7 +780,6 @@ void ReceiveResponses() {
   while (Serial.available()) {
     char ch = (char)Serial.read();
     serialResponse += ch;
-    restartSerialTimeout(500);    // Once a char is received timeout may be shorter
     if (ch == '\n') {
       if (serialResponse.startsWith("ok", lineStartPos)) {
         GotValidResponse();
@@ -795,7 +794,7 @@ void ReceiveResponses() {
       }
       else if (serialResponse.startsWith("echo:busy")) {
         GotValidResponse();
-        restartSerialTimeout(KEEPALIVE_INTERVAL);
+        restartSerialTimeout();
         telnetSend("< Printer is busy, giving it more time");
       }
       else if (serialResponse.startsWith("echo: cold extrusion prevented")) {
@@ -826,5 +825,5 @@ void ReceiveResponses() {
 inline void commandAcknowledged() {
   unsigned int cmdLen = commandQueue.popAcknowledge().length();
   printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
-  restartSerialTimeout(KEEPALIVE_INTERVAL);
+  restartSerialTimeout();
 }
