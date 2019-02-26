@@ -298,14 +298,9 @@ int apiJobHandler(const uint8_t* data) {
 }
 
 String M115ExtractString(const String response, const String field) {
-  int spos = response.indexOf(field);
-
+  int spos = response.indexOf(field+":");
   if (spos != -1) {
-    spos += field.length();
-    if (response[spos] == ':')    // pre Marlin 1.1.8 compatibility (don't have ":" after field)
-      ++spos;
-
-
+    spos += field.length()+1;
     int epos = response.indexOf(':', spos);
     if (epos == -1)
       epos = response.indexOf('\n', spos);
