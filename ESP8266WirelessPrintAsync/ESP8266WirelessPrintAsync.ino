@@ -523,6 +523,7 @@ void setup() {
     String message = "<pre>"
                      "Free heap: " + String(ESP.getFreeHeap()) + "\n\n"
                      "File system: " + storageFS.getActiveFS() + "\n";
+    message += String(millis()) + " " + String(temperatureTimer) + " " + String(printerUsedBuffer) + " " + stringify(commandQueue.isAckEmpty()) + "\n";
     if (storageFS.isActive()) {
       message += "Filename length limit: " + String(storageFS.getMaxPathLength()) + "\n";
       if (uploadedFullname != "") {
@@ -725,9 +726,9 @@ void loop() {
 
     if (!autoreportTempEnabled) {
       unsigned long curMillis = millis();
-      if (curMillis - temperatureTimer >= TEMPERATURE_REPORT_INTERVAL * 1000) {
+      if ((signed)(temperatureTimer - curMillis) < 0) {
         commandQueue.push("M105");
-        temperatureTimer = curMillis;
+        temperatureTimer = curMillis + TEMPERATURE_REPORT_INTERVAL * 1000;
       }
     }
   }
@@ -786,7 +787,8 @@ void ReceiveResponses() {
         commandAcknowledged();
         telnetSend("< " + lastReceivedResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
 
-        autoreportTempEnabled |= (fwAutoreportTempCap && lastCommandSent.startsWith(AUTOTEMP_COMMAND) && lastCommandSent[6] != '0');
+        if (fwAutoreportTempCap && lastCommandSent.startsWith(AUTOTEMP_COMMAND));
+          autoreportTempEnabled = (lastCommandSent[6] != '0');
       }
       else if (autoreportTempEnabled && parseTemperatures(serialResponse)) {
         GotValidResponse();
@@ -813,7 +815,7 @@ void ReceiveResponses() {
     }
   }
 
-  if (!commandQueue.isAckEmpty() && serialReceiveTimeoutTimer - millis() <= 0) {  // Command has been lost by printer, buffer has been freed
+  if (!commandQueue.isAckEmpty() && (signed)(serialReceiveTimeoutTimer - millis()) < 0) {  // Command has been lost by printer, buffer has been freed
     lineStartPos = 0;
     serialResponse = "";
     commandAcknowledged();
