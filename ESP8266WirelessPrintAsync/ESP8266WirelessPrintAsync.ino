@@ -431,7 +431,16 @@ void initUploadedFilename() {
 }
 
 inline String getState() {
-  return !printerConnected ? "Discovering printer" : (isPrinting ? "Printing" : "Operational");
+  if (!printerConnected)
+    return "Discovering printer";
+  else if (cancelPrint)
+    return "Cancelling";
+  else if (printPause)
+    return "Paused";
+  else if (isPrinting)
+    return "Printing";
+  else
+    return "Operational";
 }
 
 inline String stringify(bool value) {
@@ -576,10 +585,10 @@ void setup() {
 
   server.on("/api/job", HTTP_GET, [](AsyncWebServerRequest * request) {
     // http://docs.octoprint.org/en/master/api/job.html#retrieve-information-about-the-current-job
-    int printTime = 0, printTimeLeft = 0;
+    int32_t printTime = 0, printTimeLeft = 0;
     if (isPrinting) {
       printTime = (millis() - printStartTime) / 1000;
-      printTimeLeft = printTime / printCompletion * (100 - printCompletion);
+      printTimeLeft = (printCompletion > 0) ? printTime / printCompletion * (100 - printCompletion) : INT32_MAX;
     }
     request->send(200, "application/json", "{\r\n"
                                            "  \"job\": {\r\n"
@@ -600,7 +609,8 @@ void setup() {
                                            "    \"filepos\": " + String(filePos) + ",\r\n"
                                            "    \"printTime\": " + String(printTime) + ",\r\n"
                                            "    \"printTimeLeft\": " + String(printTimeLeft) + "\r\n"
-                                           "  }\r\n"
+                                           "  },\r\n"
+                                           "  \"state\": \"" + getState() + "\"\r\n"
                                            "}");
   });
 
@@ -612,7 +622,6 @@ void setup() {
 
   server.on("/api/printer", HTTP_GET, [](AsyncWebServerRequest * request) {
     // https://docs.octoprint.org/en/master/api/printer.html#retrieve-the-current-printer-state
-    String sdReadyState = stringify(storageFS.activeSD());   //  This should request SD status to the printer
     String readyState = stringify(printerConnected);
     String message = "{\r\n"
                      "  \"state\": {\r\n"
@@ -623,14 +632,14 @@ void setup() {
                      "      \"printing\": " + stringify(isPrinting) + ",\r\n"
                      "      \"pausing\": false,\r\n"
                      "      \"cancelling\": " + stringify(cancelPrint) + ",\r\n"
-                     "      \"sdReady\": " + sdReadyState + ",\r\n"
+                     "      \"sdReady\": false,\r\n"
                      "      \"error\": false,\r\n"
                      "      \"ready\": " + readyState + ",\r\n"
-                     "      \"closedOrError\": false\r\n"
+                     "      \"closedOrError\": " + stringify(!printerConnected) + "\r\n"
                      "    }\r\n"
                      "  },\r\n"
                      "  \"temperature\": {\r\n";
-    for (int t = 0; t < fwExtruders; t++) {
+    for (int t = 0; t < fwExtruders; ++t) {
       message += "    \"tool" + String(t) + "\": {\r\n"
                  "      \"actual\": " + toolTemperature[t].actual + ",\r\n"
                  "      \"target\": " + toolTemperature[t].target + ",\r\n"
@@ -644,7 +653,7 @@ void setup() {
                "    }\r\n"
                "  },\r\n"
                "  \"sd\": {\r\n"
-               "    \"ready\": " + sdReadyState + "\r\n"
+               "    \"ready\": false\r\n"
                "  }\r\n"
                "}";
     request->send(200, "application/json", message);
