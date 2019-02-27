@@ -468,7 +468,7 @@ void setup() {
   initUploadedFilename();
 
   server.onNotFound([](AsyncWebServerRequest * request) {
-    telnetSend("404 | Page '" + request->url() + "' not found\r\n");
+    telnetSend("404 | Page '" + request->url() + "' not found");
     request->send(404, "text/html", "<h1>Page not found!</h1>");
   });
 
@@ -726,7 +726,7 @@ void loop() {
 
     if (!autoreportTempEnabled) {
       unsigned long curMillis = millis();
-      if ((signed)(temperatureTimer - curMillis) < 0) {
+      if ((signed)(temperatureTimer - curMillis) <= 0) {
         commandQueue.push("M105");
         temperatureTimer = curMillis + TEMPERATURE_REPORT_INTERVAL * 1000;
       }
@@ -749,8 +749,20 @@ void loop() {
     serverClient.flush();  // clear input buffer, else you get strange characters
   }
 
-  while (serverClient && serverClient.available())  // get data from Client
-    Serial.write(serverClient.read());
+  static String telnetCommand;
+  while (serverClient && serverClient.available()) {  // get data from Client
+    {
+    char ch = serverClient.read();
+    if (ch == '\r' || ch == '\n') {
+      if (telnetCommand.length() > 0) {
+        commandQueue.push(telnetCommand);
+        telnetCommand = "";
+      }
+    }
+    else
+      telnetCommand += ch;
+    }
+  }
 }
 
 inline uint32_t restartSerialTimeout() {
@@ -815,7 +827,7 @@ void ReceiveResponses() {
     }
   }
 
-  if (!commandQueue.isAckEmpty() && (signed)(serialReceiveTimeoutTimer - millis()) < 0) {  // Command has been lost by printer, buffer has been freed
+  if (!commandQueue.isAckEmpty() && (signed)(serialReceiveTimeoutTimer - millis()) <= 0) {  // Command has been lost by printer, buffer has been freed
     lineStartPos = 0;
     serialResponse = "";
     commandAcknowledged();
