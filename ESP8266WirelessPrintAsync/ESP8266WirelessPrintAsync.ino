@@ -136,6 +136,24 @@ bool parseTemperatures(const String response) {
   return tempResponse;
 }
 
+
+// Parse position  responses from printer like
+// X:-33.00 Y:-10.00 Z:5.00 E:37.95 Count X:-3300 Y:-1000 Z:2000
+bool parsePosition(const String response) {
+  int MPosition[4];
+  MPosition[0] = response.indexOf("X:");
+  MPosition[1] = response.indexOf("Y:");
+  MPosition[2] = response.indexOf("Z:");
+  MPosition[3] = response.indexOf("E:");
+  for (int i= 0; i< 4 ; ++i  ) {
+    if (MPosition[i] == -1) { // This response does not contain a position
+      return false;
+    }
+  } 
+  return true;
+}
+
+
 inline void lcd(const String text) {
   commandQueue.push("M117 " + text);
 }
@@ -402,8 +420,7 @@ bool detectPrinter() {
           if (fwAutoreportTempCap)
             commandQueue.push(AUTOTEMP_COMMAND + String(TEMPERATURE_REPORT_INTERVAL));   // Start auto report temperatures
           else
-            temperatureTimer = millis();
-
+            temperatureTimer = millis();            
           return true;
         }
       }
@@ -546,7 +563,7 @@ void setup() {
     if (printerConnected) {
       message += "\n"
                  "EXTRUDER_COUNT: " + String(fwExtruders) + "\n"
-                 "AUTOREPORT_TEMP: " + stringify(fwAutoreportTempCap) + "\n"
+                 "AUTOREPORT_TEMP: " + stringify(fwAutoreportTempCap) + " Enabled: " + stringify(autoreportTempEnabled) +  "\n"
                  "PROGRESS: " + stringify(fwProgressCap) + "\n"
                  "BUILD_PERCENT: " + stringify(fwBuildPercentCap) + "\n";
     }
@@ -738,7 +755,9 @@ void loop() {
       if ((signed)(temperatureTimer - curMillis) <= 0) {
         commandQueue.push("M105");
         temperatureTimer = curMillis + TEMPERATURE_REPORT_INTERVAL * 1000;
-      }
+        //telnetSend("Asked Temps");
+      } 
+      
     }
   }
 
@@ -807,14 +826,20 @@ void ReceiveResponses() {
         GotValidResponse();
         commandAcknowledged();
         telnetSend("< " + lastReceivedResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
-
-        if (fwAutoreportTempCap && lastCommandSent.startsWith(AUTOTEMP_COMMAND));
+        if (fwAutoreportTempCap && lastCommandSent.startsWith(AUTOTEMP_COMMAND)){
           autoreportTempEnabled = (lastCommandSent[6] != '0');
+        }
+          
       }
       else if (autoreportTempEnabled && parseTemperatures(serialResponse)) {
         GotValidResponse();
-        telnetSend("< AutoReportTemps parsed");
+        telnetSend("< AutoReportTemps parsed");        
       }
+      else if (parsePosition(serialResponse)) {
+        GotValidResponse();
+        restartSerialTimeout();
+        telnetSend("< MPosition parsed");
+      }      
       else if (serialResponse.startsWith("echo:busy")) {
         GotValidResponse();
         restartSerialTimeout();
