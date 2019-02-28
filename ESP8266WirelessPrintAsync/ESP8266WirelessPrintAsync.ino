@@ -831,9 +831,9 @@ void ReceiveResponses() {
         }
           
       }
-      else if (autoreportTempEnabled && parseTemperatures(serialResponse)) {
+      else if (parseTemperatures(serialResponse)) {
         GotValidResponse();
-        telnetSend("< AutoReportTemps parsed");        
+        telnetSend("< Temps parsed");        
       }
       else if (parsePosition(serialResponse)) {
         GotValidResponse();
