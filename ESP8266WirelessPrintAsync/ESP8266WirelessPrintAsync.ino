@@ -820,8 +820,7 @@ void ReceiveResponses() {
           autoreportTempEnabled = (lastCommandSent[6] != '0');
         else
           parseTemperatures(serialResponse);    // Try to parse, required when M105 has been sent
-        }
-          
+        } 
       }
       else if (autoreportTempEnabled && parseTemperatures(serialResponse)) {
         GotValidResponse();
