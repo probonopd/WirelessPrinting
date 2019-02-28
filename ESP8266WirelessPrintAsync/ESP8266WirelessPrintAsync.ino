@@ -820,7 +820,7 @@ void ReceiveResponses() {
         telnetSend("< " + lastReceivedResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
 
         if (lastCommandSent.startsWith(TEMP_COMMAND))
-          parseTemperatures(serialResponse);
+          parseTemperatures(lastReceivedResponse);
         else if (fwAutoreportTempCap && lastCommandSent.startsWith(AUTOTEMP_COMMAND))
           autoreportTempEnabled = (lastCommandSent[6] != '0');
       }
