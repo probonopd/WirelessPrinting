@@ -73,7 +73,8 @@ size_t uploadedFileSize, filePos;
 uint32_t uploadedFileDate = 1378847754;
 
 // Temperature for printer status reporting
-#define AUTOTEMP_COMMAND "M155 S"
+#define TEMP_COMMAND      "M105"
+#define AUTOTEMP_COMMAND  "M155 S"
 
 struct Temperature {
   String actual, target;
@@ -546,7 +547,10 @@ void setup() {
     if (printerConnected) {
       message += "\n"
                  "EXTRUDER_COUNT: " + String(fwExtruders) + "\n"
-                 "AUTOREPORT_TEMP: " + stringify(fwAutoreportTempCap) + "\n"
+                 "AUTOREPORT_TEMP: " + stringify(fwAutoreportTempCap);
+      if (fwAutoreportTempCap)
+        message += " Enabled: " + stringify(autoreportTempEnabled);
+      message += "\n"
                  "PROGRESS: " + stringify(fwProgressCap) + "\n"
                  "BUILD_PERCENT: " + stringify(fwBuildPercentCap) + "\n";
     }
@@ -736,7 +740,7 @@ void loop() {
     if (!autoreportTempEnabled) {
       unsigned long curMillis = millis();
       if ((signed)(temperatureTimer - curMillis) <= 0) {
-        commandQueue.push("M105");
+        commandQueue.push(TEMP_COMMAND);
         temperatureTimer = curMillis + TEMPERATURE_REPORT_INTERVAL * 1000;
       }
     }
@@ -806,9 +810,11 @@ void ReceiveResponses() {
       if (serialResponse.startsWith("ok", lineStartPos)) {
         GotValidResponse();
         commandAcknowledged();
-        telnetSend("< " + lastReceivedResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
+        telnetSend("< " + serialResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
 
-        if (fwAutoreportTempCap && lastCommandSent.startsWith(AUTOTEMP_COMMAND));
+        if (lastCommandSent.startsWith(TEMP_COMMAND))
+          parseTemperatures(serialResponse);
+        else if (fwAutoreportTempCap && lastCommandSent.startsWith(AUTOTEMP_COMMAND))
           autoreportTempEnabled = (lastCommandSent[6] != '0');
       }
       else if (autoreportTempEnabled && parseTemperatures(serialResponse)) {
@@ -825,8 +831,9 @@ void ReceiveResponses() {
         // To do: Pause sending gcode, or do something similar
         telnetSend("< Printer is cold, can't move");
       }
-      else if (serialResponse.startsWith("error")) {
+      else if (serialResponse.startsWith("Error:")) {
         GotValidResponse();
+        cancelPrint = true;
         telnetSend("< Error Received");
       }
       else {
