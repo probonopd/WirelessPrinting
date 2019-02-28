@@ -137,6 +137,13 @@ bool parseTemperatures(const String response) {
   return tempResponse;
 }
 
+// Parse position responses from printer like
+// X:-33.00 Y:-10.00 Z:5.00 E:37.95 Count X:-3300 Y:-1000 Z:2000
+inline bool parsePosition(const String response) {
+  return response.indexOf("X:") != -1 && response.indexOf("Y:") != -1 &&
+         response.indexOf("Z:") != -1 && response.indexOf("E:") != -1;
+}
+
 inline void lcd(const String text) {
   commandQueue.push("M117 " + text);
 }
@@ -817,9 +824,17 @@ void ReceiveResponses() {
         else if (fwAutoreportTempCap && lastCommandSent.startsWith(AUTOTEMP_COMMAND))
           autoreportTempEnabled = (lastCommandSent[6] != '0');
       }
-      else if (autoreportTempEnabled && parseTemperatures(serialResponse)) {
+      else if (parseTemperatures(serialResponse)) {
         GotValidResponse();
+        if (lastCommandSent.startsWith("M109") || lastCommandSent.startsWith("M190"))
+          restartSerialTimeout();   // When firmware doesn't have 'BUSY_WHILE_HEATING' temperature sent during heating may be used to prevent timeout
         telnetSend("< AutoReportTemps parsed");
+      }
+      else if (parsePosition(serialResponse)) {
+        GotValidResponse();
+        if (lastCommandSent.startsWith("G28"))
+          restartSerialTimeout();   // Some firmware doesn't send busy while homing but just position. It can be used to prevent timeout
+        telnetSend("< MPosition parsed");
       }
       else if (serialResponse.startsWith("echo:busy")) {
         GotValidResponse();
