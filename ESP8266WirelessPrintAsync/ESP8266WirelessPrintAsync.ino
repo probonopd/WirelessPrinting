@@ -137,7 +137,7 @@ bool parseTemperatures(const String response) {
 }
 
 
-// Parse position  responses from printer like
+// Parse position responses from printer like
 // X:-33.00 Y:-10.00 Z:5.00 E:37.95 Count X:-3300 Y:-1000 Z:2000
 inline bool parsePosition(const String response) {
   return response.indexOf("X:") != -1 && response.indexOf("Y:") != -1 &&
