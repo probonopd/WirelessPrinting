@@ -746,8 +746,7 @@ void loop() {
       if ((signed)(temperatureTimer - curMillis) <= 0) {
         commandQueue.push("M105");
         temperatureTimer = curMillis + TEMPERATURE_REPORT_INTERVAL * 1000;
-      } 
-      
+      }
     }
   }
 
