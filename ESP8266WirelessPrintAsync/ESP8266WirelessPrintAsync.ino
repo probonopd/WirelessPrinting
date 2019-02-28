@@ -817,7 +817,7 @@ void ReceiveResponses() {
       if (serialResponse.startsWith("ok", lineStartPos)) {
         GotValidResponse();
         commandAcknowledged();
-        telnetSend("< " + serialResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
+        telnetSend("< " + lastReceivedResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
 
         if (lastCommandSent.startsWith(TEMP_COMMAND))
           parseTemperatures(serialResponse);
