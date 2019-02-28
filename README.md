@@ -54,7 +54,7 @@ cd $HOME/Arduino/libraries/
 git clone https://github.com/me-no-dev/ESPAsyncWebServer
 git clone -o 991f855 https://github.com/me-no-dev/ESPAsyncTCP
 git clone -o 6734c16 https://github.com/alanswx/ESPAsyncWiFiManager
-git clone -o ed98ea4 https://github.com/bblanchon/ArduinoJson
+( git clone -b 5.x https://github.com/bblanchon/ArduinoJson ; cd ArduinoJson ; git reset --hard ed98ea4 )
 git clone https://github.com/greiman/SdFat # SD long names support
 git clone https://github.com/bertmelis/Ticker-esp32 # for ESP32
 git clone https://github.com/me-no-dev/AsyncTCP # for ESP32
@@ -66,8 +66,7 @@ Can be flashed via USB or (subsequently) over the air. You can use the Arduino I
 
 ```
 # USB
- sudo chmod a+x /dev/ttyUSB0
-/tmp/.mount_*/usr/bin/hardware/esp8266/esp8266/tools/esptool/esptool -vv -cd nodemcu -cb 921600 -cp /dev/ttyUSB0 -ca 0x00000 -cf ESP8266WirelessPrint*.bin
+sudo chmod a+x /dev/ttyUSB0 ; /tmp/.mount_*/usr/bin/hardware/esp8266/esp8266/tools/esptool/esptool -vv -cd nodemcu -cb 921600 -cp /dev/ttyUSB0 -ca 0x00000 -cf ESP8266WirelessPrint*.bin
 
 # Wireless
 wget -c "https://raw.githubusercontent.com/esp8266/Arduino/master/tools/espota.py"
