@@ -815,41 +815,40 @@ void ReceiveResponses() {
     serialResponse += ch;
     if (ch == '\n') {
       if (serialResponse.startsWith("ok", lineStartPos)) {
-        GotValidResponse();
-        commandAcknowledged();
-        telnetSend("< " + lastReceivedResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
-
+        telnetSend("< " + serialResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
         if (lastCommandSent.startsWith(TEMP_COMMAND))
-          parseTemperatures(lastReceivedResponse);
+          parseTemperatures(serialResponse);
         else if (fwAutoreportTempCap && lastCommandSent.startsWith(AUTOTEMP_COMMAND))
           autoreportTempEnabled = (lastCommandSent[6] != '0');
+        GotValidResponse();   // Warning, this will empty 'serialResponse'
+        commandAcknowledged();
       }
       else if (parseTemperatures(serialResponse)) {
-        GotValidResponse();
+        telnetSend("< AutoReportTemps parsed");
         if (lastCommandSent.startsWith("M109") || lastCommandSent.startsWith("M190"))
           restartSerialTimeout();   // When firmware doesn't have 'BUSY_WHILE_HEATING' temperature sent during heating may be used to prevent timeout
-        telnetSend("< AutoReportTemps parsed");
+        GotValidResponse();   // Warning, this will empty 'serialResponse'
       }
       else if (parsePosition(serialResponse)) {
-        GotValidResponse();
+        telnetSend("< MPosition parsed");
         if (lastCommandSent.startsWith("G28"))
           restartSerialTimeout();   // Some firmware doesn't send busy while homing but just position. It can be used to prevent timeout
-        telnetSend("< MPosition parsed");
+        GotValidResponse();   // Warning, this will empty 'serialResponse'
       }
       else if (serialResponse.startsWith("echo:busy")) {
-        GotValidResponse();
-        restartSerialTimeout();
         telnetSend("< Printer is busy, giving it more time");
+        restartSerialTimeout();
+        GotValidResponse();   // Warning, this will empty 'serialResponse'
       }
       else if (serialResponse.startsWith("echo: cold extrusion prevented")) {
-        GotValidResponse();
-        // To do: Pause sending gcode, or do something similar
         telnetSend("< Printer is cold, can't move");
+        // To do: Pause sending gcode, or do something similar
+        GotValidResponse();   // Warning, this will empty 'serialResponse'
       }
       else if (serialResponse.startsWith("Error:")) {
-        GotValidResponse();
-        cancelPrint = true;
         telnetSend("< Error Received");
+        cancelPrint = true;
+        GotValidResponse();   // Warning, this will empty 'serialResponse'
       }
       else {
         lineStartPos = serialResponse.length();
@@ -859,11 +858,10 @@ void ReceiveResponses() {
   }
 
   if (!commandQueue.isAckEmpty() && (signed)(serialReceiveTimeoutTimer - millis()) <= 0) {  // Command has been lost by printer, buffer has been freed
+    telnetSend("< #TIMEOUT#");
     lineStartPos = 0;
     serialResponse = "";
     commandAcknowledged();
-
-    telnetSend("< #TIMEOUT#");
   }
 }
 
