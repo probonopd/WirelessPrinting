@@ -833,6 +833,7 @@ void ReceiveResponses() {
       }
       else if (parseTemperatures(serialResponse)) {
         GotValidResponse();
+        restartSerialTimeout();
         telnetSend("< Temps parsed");        
       }
       else if (parsePosition(serialResponse)) {
@@ -847,6 +848,7 @@ void ReceiveResponses() {
       }
       else if (serialResponse.startsWith("echo: cold extrusion prevented")) {
         GotValidResponse();
+        restartSerialTimeout();
         // To do: Pause sending gcode, or do something similar
         telnetSend("< Printer is cold, can't move");
       }
@@ -866,7 +868,6 @@ void ReceiveResponses() {
     lineStartPos = 0;
     serialResponse = "";
     commandAcknowledged();
-
     telnetSend("< #TIMEOUT#");
   }
 }
