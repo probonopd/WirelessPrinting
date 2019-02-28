@@ -149,7 +149,7 @@ bool parsePosition(const String response) {
     if (MPosition[i] == -1) { // This response does not contain a position
       return false;
     }
-  } 
+  }
   return true;
 }
 
@@ -420,7 +420,7 @@ bool detectPrinter() {
           if (fwAutoreportTempCap)
             commandQueue.push(AUTOTEMP_COMMAND + String(TEMPERATURE_REPORT_INTERVAL));   // Start auto report temperatures
           else
-            temperatureTimer = millis();            
+            temperatureTimer = millis();
           return true;
         }
       }
@@ -755,7 +755,6 @@ void loop() {
       if ((signed)(temperatureTimer - curMillis) <= 0) {
         commandQueue.push("M105");
         temperatureTimer = curMillis + TEMPERATURE_REPORT_INTERVAL * 1000;
-
       }
     }
   }
@@ -830,19 +829,19 @@ void ReceiveResponses() {
         }
         else {
           parseTemperatures(serialResponse);    // Try to parse, required when M105 has been sent
-        } 
+        }
 
       }
       else if (parseTemperatures(serialResponse)) {
         GotValidResponse();
         restartSerialTimeout();
-        telnetSend("< Temps parsed");        
+        telnetSend("< Temps parsed");
       }
       else if (parsePosition(serialResponse)) {
         GotValidResponse();
         restartSerialTimeout();
         telnetSend("< MPosition parsed");
-      }      
+      }
       else if (serialResponse.startsWith("echo:busy")) {
         GotValidResponse();
         restartSerialTimeout();
