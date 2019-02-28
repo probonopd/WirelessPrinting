@@ -35,10 +35,6 @@ The ESP8266 module is connected with your 3D printer via the serial connection a
 
 The [esp8266/Arduino](https://github.com/esp8266/Arduino) sketch `ESP8266WirelessPrintAsync.ino` is uploaded to a ESP8266 module. As or July 2017, this code compiled on Arduino hourly and esp8266/Arduino git master. See `.travis.yml` for how this is compiled on Travis CI.
 
-### Set Baudrate
-
-Make sure to set the correct baudrate in sketch `ESP8266WirelessPrintAsync.ino` search DEFAULT_BAUD, typical values are 115200 (default for this repo) and 250000 (newest firmwares use this) 
-
 ### Building
 
 Pre-built binaries are available on GitHub Releases.
@@ -80,7 +76,7 @@ The first time the sketch is uploaded the ESP will enter in Access Point mode, s
 
 ## Wireless printing with Cura
 
-Cura 2.6 and later come with a bundled plugin which discovers OctoPrint instances using Zeroconf and enables printing directly to them. No further software needs to be installed. To use it,
+Cura 2.6 and later come with a bundled plugin which discovers OctoPrint instances using Zeroconf and enables printing directly to them. In newer versions of Cura, you need to install the [Cura OctoPrint Plugin](https://github.com/fieldOfView/Cura-OctoPrintPlugin) from the "Toolbox" menu. To use it,
 - In Cura, add a Printer matching the 3D printer you have connected to WirelessPrint
 - Select "Connect to OctoPrint" on the Manage Printers page
 - Select your OctoPrint instance from the list
@@ -110,5 +106,5 @@ To print, just open http://the-ip-address/ and upload a G-Code file using the fo
 Ycan also print from the command line using curl:
 
 ```
-curl -F "file=@/path/to/some.gcode" http://the-ip-address/print
+curl -F "file=@/path/to/some.gcode" -F "print=true" http://the-ip-address/print
 ```
