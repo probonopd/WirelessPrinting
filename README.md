@@ -28,20 +28,16 @@ _Readymade, pre-assembled, flashed and tested hardware may be available, please 
 The ESP8266 module is connected with your 3D printer via the serial connection and to a SD card (acting as a cache during printing). You need to connect
 * TX, RX from your 3D printer to the ESP8266 module (__AUX-1__ header on RAMPS boards)
 * Power and GND from your 3D printer to the ESP8266 module (attention, the __AUX-1__ header on RAMPS boards has 5V while the ESP8266 needs 3.3V)
-* Optional: SD card shield to the ESP8266 module (a capacitor across the power pins of the SD card; SD shields have this). Using a SanDisk 2 GB card formatted with the [SD Card Formatter](https://www.sdcard.org/downloads/formatter_4/) from the SD Association seems to work for me. If no SD card is connected, then the internal SPIFFS memory (3 MB) is used
+* Optional: SD card shield to the ESP8266 module (a capacitor across the power pins of the SD card; SD shields have this). Using a SanDisk 2 GB card formatted with `mkfs.vfat` on Linux seems to work for me. If no SD card is connected, then the internal SPIFFS memory (3 MB) is used
 * A matching case for a WeMos D1 mini and microSD shield can be found at http://www.thingiverse.com/thing:2287618
 
 ## esp8266/Arduino sketch
 
 The [esp8266/Arduino](https://github.com/esp8266/Arduino) sketch `ESP8266WirelessPrintAsync.ino` is uploaded to a ESP8266 module. As or July 2017, this code compiled on Arduino hourly and esp8266/Arduino git master. See `.travis.yml` for how this is compiled on Travis CI.
 
-### Set Baudrate
-
-Make sure to set the correct baudrate in sketch `ESP8266WirelessPrintAsync.ino` search DEFAULT_BAUD, typical values are 115200 (default for this repo) and 250000 (newest firmwares use this) 
-
 ### Building
 
-Pre-built binaries are available on GitHub Releases.
+Pre-built binaries are available for download on [GitHub Releases](https://github.com/probonopd/WirelessPrinting/releases).
 
 The following external libraries need to be installed:
 
@@ -80,7 +76,7 @@ The first time the sketch is uploaded the ESP will enter in Access Point mode, s
 
 ## Wireless printing with Cura
 
-Cura 2.6 and later come with a bundled plugin which discovers OctoPrint instances using Zeroconf and enables printing directly to them. No further software needs to be installed. To use it,
+Cura 2.6 and later come with a bundled plugin which discovers OctoPrint instances using Zeroconf and enables printing directly to them. In newer versions of Cura, you need to install the [Cura OctoPrint Plugin](https://github.com/fieldOfView/Cura-OctoPrintPlugin) from the "Toolbox" menu. To use it,
 - In Cura, add a Printer matching the 3D printer you have connected to WirelessPrint
 - Select "Connect to OctoPrint" on the Manage Printers page
 - Select your OctoPrint instance from the list
@@ -110,5 +106,5 @@ To print, just open http://the-ip-address/ and upload a G-Code file using the fo
 Ycan also print from the command line using curl:
 
 ```
-curl -F "file=@/path/to/some.gcode" http://the-ip-address/print
+curl -F "file=@/path/to/some.gcode" -F "print=true" http://the-ip-address/print
 ```

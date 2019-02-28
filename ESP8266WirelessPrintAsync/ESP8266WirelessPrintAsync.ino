@@ -73,7 +73,8 @@ size_t uploadedFileSize, filePos;
 uint32_t uploadedFileDate = 1378847754;
 
 // Temperature for printer status reporting
-#define AUTOTEMP_COMMAND "M155 S"
+#define TEMP_COMMAND      "M105"
+#define AUTOTEMP_COMMAND  "M155 S"
 
 struct Temperature {
   String actual, target;
@@ -134,6 +135,13 @@ bool parseTemperatures(const String response) {
   tempResponse |= parseTemp(response, " B", &bedTemperature);
 
   return tempResponse;
+}
+
+// Parse position responses from printer like
+// X:-33.00 Y:-10.00 Z:5.00 E:37.95 Count X:-3300 Y:-1000 Z:2000
+inline bool parsePosition(const String response) {
+  return response.indexOf("X:") != -1 && response.indexOf("Y:") != -1 &&
+         response.indexOf("Z:") != -1 && response.indexOf("E:") != -1;
 }
 
 inline void lcd(const String text) {
@@ -548,7 +556,10 @@ void setup() {
     if (printerConnected) {
       message += "\n"
                  "EXTRUDER_COUNT: " + String(fwExtruders) + "\n"
-                 "AUTOREPORT_TEMP: " + stringify(fwAutoreportTempCap) + "\n"
+                 "AUTOREPORT_TEMP: " + stringify(fwAutoreportTempCap);
+      if (fwAutoreportTempCap)
+        message += " Enabled: " + stringify(autoreportTempEnabled);
+      message += "\n"
                  "PROGRESS: " + stringify(fwProgressCap) + "\n"
                  "BUILD_PERCENT: " + stringify(fwBuildPercentCap) + "\n";
     }
@@ -738,7 +749,7 @@ void loop() {
     if (!autoreportTempEnabled) {
       unsigned long curMillis = millis();
       if ((signed)(temperatureTimer - curMillis) <= 0) {
-        commandQueue.push("M105");
+        commandQueue.push(TEMP_COMMAND);
         temperatureTimer = curMillis + TEMPERATURE_REPORT_INTERVAL * 1000;
       }
     }
@@ -806,30 +817,40 @@ void ReceiveResponses() {
     serialResponse += ch;
     if (ch == '\n') {
       if (serialResponse.startsWith("ok", lineStartPos)) {
-        GotValidResponse();
-        commandAcknowledged();
-        telnetSend("< " + lastReceivedResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
-
-        if (fwAutoreportTempCap && lastCommandSent.startsWith(AUTOTEMP_COMMAND));
+        telnetSend("< " + serialResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
+        if (lastCommandSent.startsWith(TEMP_COMMAND))
+          parseTemperatures(serialResponse);
+        else if (fwAutoreportTempCap && lastCommandSent.startsWith(AUTOTEMP_COMMAND))
           autoreportTempEnabled = (lastCommandSent[6] != '0');
+        GotValidResponse();   // Warning, this will empty 'serialResponse'
+        commandAcknowledged();
       }
-      else if (autoreportTempEnabled && parseTemperatures(serialResponse)) {
-        GotValidResponse();
+      else if (parseTemperatures(serialResponse)) {
         telnetSend("< AutoReportTemps parsed");
+        if (lastCommandSent.startsWith("M109") || lastCommandSent.startsWith("M190"))
+          restartSerialTimeout();   // When firmware doesn't have 'BUSY_WHILE_HEATING' temperature sent during heating may be used to prevent timeout
+        GotValidResponse();   // Warning, this will empty 'serialResponse'
+      }
+      else if (parsePosition(serialResponse)) {
+        telnetSend("< MPosition parsed");
+        if (lastCommandSent.startsWith("G28"))
+          restartSerialTimeout();   // Some firmware doesn't send busy while homing but just position. It can be used to prevent timeout
+        GotValidResponse();   // Warning, this will empty 'serialResponse'
       }
       else if (serialResponse.startsWith("echo:busy")) {
-        GotValidResponse();
-        restartSerialTimeout();
         telnetSend("< Printer is busy, giving it more time");
+        restartSerialTimeout();
+        GotValidResponse();   // Warning, this will empty 'serialResponse'
       }
       else if (serialResponse.startsWith("echo: cold extrusion prevented")) {
-        GotValidResponse();
-        // To do: Pause sending gcode, or do something similar
         telnetSend("< Printer is cold, can't move");
+        // To do: Pause sending gcode, or do something similar
+        GotValidResponse();   // Warning, this will empty 'serialResponse'
       }
-      else if (serialResponse.startsWith("error")) {
-        GotValidResponse();
+      else if (serialResponse.startsWith("Error:")) {
         telnetSend("< Error Received");
+        cancelPrint = true;
+        GotValidResponse();   // Warning, this will empty 'serialResponse'
       }
       else {
         lineStartPos = serialResponse.length();
@@ -839,11 +860,10 @@ void ReceiveResponses() {
   }
 
   if (!commandQueue.isAckEmpty() && (signed)(serialReceiveTimeoutTimer - millis()) <= 0) {  // Command has been lost by printer, buffer has been freed
+    telnetSend("< #TIMEOUT#");
     lineStartPos = 0;
     serialResponse = "";
     commandAcknowledged();
-
-    telnetSend("< #TIMEOUT#");
   }
 }
 
