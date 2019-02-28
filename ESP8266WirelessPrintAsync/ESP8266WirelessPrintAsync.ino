@@ -431,7 +431,16 @@ void initUploadedFilename() {
 }
 
 inline String getState() {
-  return !printerConnected ? "Discovering printer" : (isPrinting ? "Printing" : "Operational");
+  if (!printerConnected)
+    return "Discovering printer";
+  else if (cancelPrint)
+    return "Cancelling";
+  else if (printPause)
+    return "Paused";
+  else if (isPrinting)
+    return "Printing";
+  else
+    return "Operational";
 }
 
 inline String stringify(bool value) {
@@ -468,7 +477,7 @@ void setup() {
   initUploadedFilename();
 
   server.onNotFound([](AsyncWebServerRequest * request) {
-    telnetSend("404 | Page '" + request->url() + "' not found\r\n");
+    telnetSend("404 | Page '" + request->url() + "' not found");
     request->send(404, "text/html", "<h1>Page not found!</h1>");
   });
 
@@ -509,7 +518,6 @@ void setup() {
                      "<p>You can also print from the command line using curl:</p>\n"
                      "<pre>curl -F \"file=@/path/to/some.gcode\" -F \"print=true\" " + IpAddress2String(WiFi.localIP()) + "/api/files/local</pre>\n"
                      "Choose a file to upload: <input name=\"file\" type=\"file\"/><br/>\n"
-                     //"<input type=\"hidden\"   name=\"print\" value=\"false\">"
                      "<input type=\"checkbox\" name=\"print\" id = \"printInmediately\" value=\"true\" checked>\n"
                      "<label for = \"printInmediately\">Print Inmediately</label><br/>\n"
                      "<input type=\"submit\" value=\"Upload\" />\n"
@@ -524,6 +532,7 @@ void setup() {
     String message = "<pre>"
                      "Free heap: " + String(ESP.getFreeHeap()) + "\n\n"
                      "File system: " + storageFS.getActiveFS() + "\n";
+    message += String(millis()) + " " + String(temperatureTimer) + " " + String(printerUsedBuffer) + " " + stringify(commandQueue.isAckEmpty()) + "\n";
     if (storageFS.isActive()) {
       message += "Filename length limit: " + String(storageFS.getMaxPathLength()) + "\n";
       if (uploadedFullname != "") {
@@ -576,10 +585,10 @@ void setup() {
 
   server.on("/api/job", HTTP_GET, [](AsyncWebServerRequest * request) {
     // http://docs.octoprint.org/en/master/api/job.html#retrieve-information-about-the-current-job
-    int printTime = 0, printTimeLeft = 0;
+    int32_t printTime = 0, printTimeLeft = 0;
     if (isPrinting) {
       printTime = (millis() - printStartTime) / 1000;
-      printTimeLeft = printTimeLeft / printCompletion * (100 - printCompletion);
+      printTimeLeft = (printCompletion > 0) ? printTime / printCompletion * (100 - printCompletion) : INT32_MAX;
     }
     request->send(200, "application/json", "{\r\n"
                                            "  \"job\": {\r\n"
@@ -600,7 +609,8 @@ void setup() {
                                            "    \"filepos\": " + String(filePos) + ",\r\n"
                                            "    \"printTime\": " + String(printTime) + ",\r\n"
                                            "    \"printTimeLeft\": " + String(printTimeLeft) + "\r\n"
-                                           "  }\r\n"
+                                           "  },\r\n"
+                                           "  \"state\": \"" + getState() + "\"\r\n"
                                            "}");
   });
 
@@ -612,7 +622,6 @@ void setup() {
 
   server.on("/api/printer", HTTP_GET, [](AsyncWebServerRequest * request) {
     // https://docs.octoprint.org/en/master/api/printer.html#retrieve-the-current-printer-state
-    String sdReadyState = stringify(storageFS.activeSD());   //  This should request SD status to the printer
     String readyState = stringify(printerConnected);
     String message = "{\r\n"
                      "  \"state\": {\r\n"
@@ -623,14 +632,14 @@ void setup() {
                      "      \"printing\": " + stringify(isPrinting) + ",\r\n"
                      "      \"pausing\": false,\r\n"
                      "      \"cancelling\": " + stringify(cancelPrint) + ",\r\n"
-                     "      \"sdReady\": " + sdReadyState + ",\r\n"
+                     "      \"sdReady\": false,\r\n"
                      "      \"error\": false,\r\n"
                      "      \"ready\": " + readyState + ",\r\n"
-                     "      \"closedOrError\": false\r\n"
+                     "      \"closedOrError\": " + stringify(!printerConnected) + "\r\n"
                      "    }\r\n"
                      "  },\r\n"
                      "  \"temperature\": {\r\n";
-    for (int t = 0; t < fwExtruders; t++) {
+    for (int t = 0; t < fwExtruders; ++t) {
       message += "    \"tool" + String(t) + "\": {\r\n"
                  "      \"actual\": " + toolTemperature[t].actual + ",\r\n"
                  "      \"target\": " + toolTemperature[t].target + ",\r\n"
@@ -644,7 +653,7 @@ void setup() {
                "    }\r\n"
                "  },\r\n"
                "  \"sd\": {\r\n"
-               "    \"ready\": " + sdReadyState + "\r\n"
+               "    \"ready\": false\r\n"
                "  }\r\n"
                "}";
     request->send(200, "application/json", message);
@@ -726,9 +735,9 @@ void loop() {
 
     if (!autoreportTempEnabled) {
       unsigned long curMillis = millis();
-      if (curMillis - temperatureTimer >= TEMPERATURE_REPORT_INTERVAL * 1000) {
+      if ((signed)(temperatureTimer - curMillis) <= 0) {
         commandQueue.push("M105");
-        temperatureTimer = curMillis;
+        temperatureTimer = curMillis + TEMPERATURE_REPORT_INTERVAL * 1000;
       }
     }
   }
@@ -749,12 +758,24 @@ void loop() {
     serverClient.flush();  // clear input buffer, else you get strange characters
   }
 
-  while (serverClient && serverClient.available())  // get data from Client
-    Serial.write(serverClient.read());
+  static String telnetCommand;
+  while (serverClient && serverClient.available()) {  // get data from Client
+    {
+    char ch = serverClient.read();
+    if (ch == '\r' || ch == '\n') {
+      if (telnetCommand.length() > 0) {
+        commandQueue.push(telnetCommand);
+        telnetCommand = "";
+      }
+    }
+    else
+      telnetCommand += ch;
+    }
+  }
 }
 
-inline uint32_t restartSerialTimeout(uint16_t timeout) {
-  serialReceiveTimeoutTimer = millis() + timeout;
+inline uint32_t restartSerialTimeout() {
+  serialReceiveTimeoutTimer = millis() + KEEPALIVE_INTERVAL;
 }
 
 void SendCommands() {
@@ -763,7 +784,7 @@ void SendCommands() {
     bool noResponsePending = commandQueue.isAckEmpty();
     if (noResponsePending || printerUsedBuffer < PRINTER_RX_BUFFER_SIZE * 3 / 4) {  // Let's use no more than 75% of printer RX buffer
       if (noResponsePending)
-        restartSerialTimeout(KEEPALIVE_INTERVAL);   // Receive timeout has to be reset only when sending a command and no pending response is expected
+        restartSerialTimeout();   // Receive timeout has to be reset only when sending a command and no pending response is expected
       Serial.println(command);          // Send to 3D Printer
       printerUsedBuffer += command.length();
       lastCommandSent = command;
@@ -781,14 +802,14 @@ void ReceiveResponses() {
   while (Serial.available()) {
     char ch = (char)Serial.read();
     serialResponse += ch;
-    restartSerialTimeout(500);    // Once a char is received timeout may be shorter
     if (ch == '\n') {
       if (serialResponse.startsWith("ok", lineStartPos)) {
         GotValidResponse();
         commandAcknowledged();
         telnetSend("< " + lastReceivedResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
 
-        autoreportTempEnabled |= (fwAutoreportTempCap && lastCommandSent.startsWith(AUTOTEMP_COMMAND) && lastCommandSent[6] != '0');
+        if (fwAutoreportTempCap && lastCommandSent.startsWith(AUTOTEMP_COMMAND));
+          autoreportTempEnabled = (lastCommandSent[6] != '0');
       }
       else if (autoreportTempEnabled && parseTemperatures(serialResponse)) {
         GotValidResponse();
@@ -796,7 +817,7 @@ void ReceiveResponses() {
       }
       else if (serialResponse.startsWith("echo:busy")) {
         GotValidResponse();
-        restartSerialTimeout(KEEPALIVE_INTERVAL);
+        restartSerialTimeout();
         telnetSend("< Printer is busy, giving it more time");
       }
       else if (serialResponse.startsWith("echo: cold extrusion prevented")) {
@@ -804,7 +825,8 @@ void ReceiveResponses() {
         // To do: Pause sending gcode, or do something similar
         telnetSend("< Printer is cold, can't move");
       }
-      else if (serialResponse.startsWith("error")) {
+      else if (serialResponse.startsWith("Error:")) {
+        cancelPrint = true;
         GotValidResponse();
         telnetSend("< Error Received");
       }
@@ -815,7 +837,7 @@ void ReceiveResponses() {
     }
   }
 
-  if (!commandQueue.isAckEmpty() && serialReceiveTimeoutTimer - millis() <= 0) {  // Command has been lost by printer, buffer has been freed
+  if (!commandQueue.isAckEmpty() && (signed)(serialReceiveTimeoutTimer - millis()) <= 0) {  // Command has been lost by printer, buffer has been freed
     lineStartPos = 0;
     serialResponse = "";
     commandAcknowledged();
@@ -827,5 +849,5 @@ void ReceiveResponses() {
 inline void commandAcknowledged() {
   unsigned int cmdLen = commandQueue.popAcknowledge().length();
   printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
-  restartSerialTimeout(KEEPALIVE_INTERVAL);
+  restartSerialTimeout();
 }
