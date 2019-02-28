@@ -825,7 +825,8 @@ void ReceiveResponses() {
         // To do: Pause sending gcode, or do something similar
         telnetSend("< Printer is cold, can't move");
       }
-      else if (serialResponse.startsWith("error")) {
+      else if (serialResponse.startsWith("Error:")) {
+        cancelPrint = true;
         GotValidResponse();
         telnetSend("< Error Received");
       }
