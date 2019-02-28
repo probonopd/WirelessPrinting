@@ -37,7 +37,7 @@ The [esp8266/Arduino](https://github.com/esp8266/Arduino) sketch `ESP8266Wireles
 
 ### Building
 
-Pre-built binaries are available on GitHub Releases.
+Pre-built binaries are available for download on [GitHub Releases](https://github.com/probonopd/WirelessPrinting/releases).
 
 The following external libraries need to be installed:
 
