@@ -755,13 +755,8 @@ void loop() {
       if ((signed)(temperatureTimer - curMillis) <= 0) {
         commandQueue.push("M105");
         temperatureTimer = curMillis + TEMPERATURE_REPORT_INTERVAL * 1000;
-<<<<<<< HEAD
+
       }
-=======
-        //telnetSend("Asked Temps");
-      } 
-      
->>>>>>> parent of e182b64... autotemp vs temp response discrimination
     }
   }
 
@@ -832,14 +827,11 @@ void ReceiveResponses() {
         telnetSend("< " + lastReceivedResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
         if (fwAutoreportTempCap && lastCommandSent.startsWith(AUTOTEMP_COMMAND)){
           autoreportTempEnabled = (lastCommandSent[6] != '0');
-<<<<<<< HEAD
-        else
+        }
+        else {
           parseTemperatures(serialResponse);    // Try to parse, required when M105 has been sent
         } 
-=======
-        }
-          
->>>>>>> parent of e182b64... autotemp vs temp response discrimination
+
       }
       else if (parseTemperatures(serialResponse)) {
         GotValidResponse();
