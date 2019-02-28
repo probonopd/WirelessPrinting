@@ -1,31 +1,19 @@
-#if defined(ESP8266)
-#include <ESP8266WiFi.h>
-#include <ESP8266mDNS.h>
-#include <ESPAsyncTCP.h>
-#include <Ticker.h>
-#endif
-
-#if defined(ESP32)
-#include <WiFi.h>
-#include <ESPmDNS.h>
-#include <AsyncTCP.h>
-#include <ESP32Ticker.h>
-#endif
+// Required: https://github.com/greiman/SdFat
 
 #include <ArduinoOTA.h>
-
-#define FS_NO_GLOBALS //allow spiffs to coexist with SD card, define BEFORE including FS.h
-
-#include <SPI.h>
-#include <SD.h>
-
-#include <FS.h>
+#if defined(ESP8266)
+  #include <ESP8266mDNS.h>        // https://github.com/esp8266/Arduino/tree/master/libraries/ESP8266mDNS
+#elif defined(ESP32)
+  #include <ESPmDNS.h>
+#endif
+#include <ArduinoJson.h>          // https://github.com/bblanchon/ArduinoJson (for implementing a subset of the OctoPrint API)
+#include <DNSServer.h>
+#include "StorageFS.h"
+#include <ESPAsyncWebServer.h>    // https://github.com/me-no-dev/ESPAsyncWebServer
+#include <ESPAsyncWiFiManager.h>  // https://github.com/alanswx/ESPAsyncWiFiManager/
 #include <SPIFFSEditor.h>
 
-#include <DNSServer.h>
-
-#include <ESPAsyncWebServer.h>
-#include <ESPAsyncWiFiManager.h> // https://github.com/alanswx/ESPAsyncWiFiManager/
+#include "CommandQueue.h"
 
 WiFiServer telnetServer(23);
 WiFiClient serverClient;
@@ -33,479 +21,660 @@ WiFiClient serverClient;
 AsyncWebServer server(80);
 DNSServer dns;
 
-// For implementing (a subset of) the OctoPrint API
-#include "AsyncJson.h"
-#include "ArduinoJson.h"
+// Configurable parameters
+#define SKETCH_VERSION "2.0"
+#define USE_FAST_SD                     // Use Default fast SD clock, comment if your SD is an old or slow one.
+#define OTA_UPDATES                     // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load any code on device)
+//#define OTA_PASSWORD ""               // Uncomment to protect OTA updates and assign a password (inside "")
+#define MAX_SUPPORTED_EXTRUDERS 6       // Number of supported extruder
 
-const char* sketch_version = "1.0";
+#define PRINTER_RX_BUFFER_SIZE 0        // This is printer firmware 'RX_BUFFER_SIZE'. If such parameter is unknown please use 0
+#define TEMPERATURE_REPORT_INTERVAL 2   // Ask the printer for its temperatures status every 2 seconds
+#define KEEPALIVE_INTERVAL 2500         // Marlin defaults to 2 seconds, get a little of margin
+const uint32_t serialBauds[] = { 1000000, 500000, 250000, 115200, 57600 };   // Marlin valid bauds (removed very low bauds)
 
-const int DEFAULT_BAUD = 115200;  // Set your printer's baud
+#define API_VERSION     "0.1"
+#define VERSION         "1.3.10"
 
-bool useFastSD=true; // Use Default fast SD clock in SD.begin(), set to false if your SD is an old or slow one.
+// Information from M115
+String fwMachineType = "Unknown";
+uint8_t fwExtruders = 1;
+bool fwAutoreportTempCap, fwProgressCap, fwBuildPercentCap;
 
-bool okFound = true; // Set to true if last response from 3D printer was "ok", otherwise false
-String response; // The last response from 3D printer
+// Printer status
+bool printerConnected,
+     startPrint,
+     isPrinting,
+     printPause,
+     restartPrint,
+     cancelPrint,
+     autoreportTempEnabled;
 
-bool isPrinting = false;
-bool shouldPrint = false;
-bool shouldCancelPrint = false;
-long lineNumberLastPrinted = 0;
-String lineLastSent = "";
-String lineLastReceived = "";
-String lineSecondLastReceived = "";
-bool hasSD = false; // will be set true if SD card is detected and usable; otherwise use SPIFFS
+uint32_t printStartTime;
+float printCompletion;
 
-String priorityLine = ""; // A line that should be sent to the printer "in between"/before any other lines being sent. TODO: Extend to an array of lines
-String commandLine = "";
+// Serial communication
+#define GotValidResponse() { \
+  lastReceivedResponse = serialResponse; \
+  lineStartPos = 0; \
+  serialResponse = ""; \
+}
 
-String fwM115 = "Unknown"; // Result of M115
-String device_name = "Unknown"; // Will be parsed from M115
+String lastCommandSent, lastReceivedResponse;
+uint32_t lastPrintedLine;
 
-Ticker statusTimer;
-int statusInterval(2); // Ask the printer for its status every 2 seconds
-bool shouldAskPrinterForStatus = false;
+uint8_t serialBaudIndex;
+uint16_t printerUsedBuffer;
+uint32_t serialReceiveTimeoutTimer;
 
-String filename = "cache.gco";
-String filename_with_slash = filename; // Will be changed in setup()
+// Uploaded file information
+String uploadedFullname;
+size_t uploadedFileSize, filePos;
+uint32_t uploadedFileDate = 1378847754;
 
-String upload_name = "Unknown";
-size_t filesize = 0;
-size_t filesize_read = 0;
+// Temperature for printer status reporting
+#define AUTOTEMP_COMMAND "M155 S"
 
-unsigned long millis_start;
+struct Temperature {
+  String actual, target;
+};
 
-Ticker blinker;
+uint32_t temperatureTimer;
 
-// Variables for printer status reporting
-String temperature_actual = "0.0";
-String temperature_target = "0.0";
-String temperature_tool0_actual = "0.0";
-String temperature_tool0_target = "0.0";
-String temperature_bed_actual = "0.0";
-String temperature_bed_target = "0.0";
+Temperature toolTemperature[MAX_SUPPORTED_EXTRUDERS];
+Temperature bedTemperature;
+
 
 // https://forum.arduino.cc/index.php?topic=228884.msg2670971#msg2670971
-String IpAddress2String(const IPAddress& ipAddress)
-{
-  return String(ipAddress[0]) + String(".") + \
-         String(ipAddress[1]) + String(".") + \
-         String(ipAddress[2]) + String(".") + \
-         String(ipAddress[3])  ;
+inline String IpAddress2String(const IPAddress& ipAddress) {
+  return String(ipAddress[0]) + "." +
+         String(ipAddress[1]) + "." +
+         String(ipAddress[2]) + "." +
+         String(ipAddress[3]);
 }
 
-void flip()
-{
-  int state = digitalRead(LED_BUILTIN);  // get the current state of GPIO1 pin
-  digitalWrite(LED_BUILTIN, !state);     // set pin to the opposite state
+inline void setLed(const bool status) {
+  digitalWrite(LED_BUILTIN, status ? LOW : HIGH);   // Note: LOW turn the LED on
 }
 
-void startBlinking(float secs) {
-  blinker.attach(secs, flip);
-}
-
-void stopBlinking() {
-  digitalWrite(LED_BUILTIN, HIGH);
-  blinker.detach();
+inline void telnetSend(const String line) {
+  if (serverClient && serverClient.connected())     // send data to telnet client if connected
+    serverClient.println(line);
 }
 
 // Parse temperatures from printer responses like
 // ok T:32.8 /0.0 B:31.8 /0.0 T0:32.8 /0.0 @:0 B@:0
-String parseTemp(String response, String whichTemp, bool getTarget = false) {
-  String temperature;
-  int Tpos = response.indexOf(whichTemp + ":");
-  if (Tpos > -1) { // This response contains a temperature
-    int slashpos = response.indexOf(" /", Tpos);
+bool parseTemp(const String response, const String whichTemp, Temperature *temperature) {
+  int tpos = response.indexOf(whichTemp + ":");
+  if (tpos != -1) { // This response contains a temperature
+    int slashpos = response.indexOf(" /", tpos);
     int spacepos = response.indexOf(" ", slashpos + 1);
-    //if match mask T:xxx.xx /xxx.xx
-    if (spacepos - Tpos < 17) {
-      if (! getTarget) {
-        temperature = response.substring(Tpos + whichTemp.length() + 1, slashpos);
-      } else {
-        temperature = response.substring(slashpos + 2, spacepos);
-      }
+    // if match mask T:xxx.xx /xxx.xx
+    if (slashpos != -1 && spacepos - tpos < 17) {
+      temperature->actual = response.substring(tpos + whichTemp.length() + 1, slashpos);
+      temperature->target = response.substring(slashpos + 2, spacepos);
+
+      return true;
     }
   }
-  return (temperature);
+
+  return false;
 }
 
-void parseTemperatures(String response) {
-  if (parseTemp(response, "T") != "") temperature_actual = parseTemp(response, "T");
-  if (parseTemp(response, "T", true) != "") temperature_target = parseTemp(response, "T", true);
-  if (parseTemp(response, "T0") != "") temperature_tool0_actual = parseTemp(response, "T0");
-  if (parseTemp(response, "T0", true) != "") temperature_tool0_target = parseTemp(response, "T0", true);
-  if (parseTemp(response, "B") != "") temperature_bed_actual = parseTemp(response, "B");
-  if (parseTemp(response, "B", true) != "") temperature_bed_target = parseTemp(response, "B", true);
+bool parseTemperatures(const String response) {
+  bool tempResponse;
+
+  if (fwExtruders == 1)
+    tempResponse = parseTemp(response, " T", &toolTemperature[0]);
+  else {
+    tempResponse = false;
+    for (int t = 0; t < fwExtruders; t++)
+      tempResponse |= parseTemp(response, " T" + String(t), &toolTemperature[t]);
+  }
+  tempResponse |= parseTemp(response, " B", &bedTemperature);
+
+  return tempResponse;
 }
 
-String sendToPrinter(String line) {
-
-  /* Although this function does not return before okFound is true,
-     somewhere else in the sketch this function might also have been called
-     hence we make sure we have okFound before we start sending. */
-
-  while (okFound == false) {
-    yield();
-  }
-
-  Serial.setTimeout(240000); // How long we wait for "ok" in milliseconds
-
-  if (shouldCancelPrint == true) {
-    // Apparently we need to decide how to handle this
-    // For now using M112 - Emergency Stop
-    // http://marlinfw.org/docs/gcode/M112.html
-        if (serverClient && serverClient.connected()) {  // send data to telnet client if connected
-      serverClient.println("Should cancel print! This is not working yet");
-    }
-    Serial.println("M112"); // Send to 3D Printer immediately w/o waiting for anything
-    Serial.println("M112"); // Send to 3D Printer immediately w/o waiting for anything
-    Serial.println("M112"); // Send to 3D Printer immediately w/o waiting for anything
-    Serial.println("M300 S500 P50"); // M300 - Play beep sound; Send to 3D Printer immediately w/o waiting for anything
-    // sendToPrinter("M112");
-    // sendToPrinter("M300 S500 P50"); // M300 - Play beep sound
-    lcd("Print cancelled");
-    // ESP.restart(); // Maybe a bit too drastic?
-    return "";
-  }
-
-  /* If a priority line exists, then send it before anything else.
-     TODO: Extend this to handle multiple priority lines. */
-  if (priorityLine != "") {
-    String originalLine = line;
-    line = priorityLine;
-    priorityLine = "";
-    sendToPrinter(line);
-    sendToPrinter(originalLine);
-  }
-
-  Serial.println(line); // Send to 3D Printer
-
-  if (serverClient && serverClient.connected()) {  // send data to telnet client if connected
-    serverClient.println("> " + line);
-  }
-
-  lineLastSent = line;
-  okFound = false;
-  while (okFound == false) {
-    response = Serial.readStringUntil('\n');
-    if (serverClient && serverClient.connected()) {  // send data to telnet client if connected
-      serverClient.println("< " + response);
-      serverClient.print(millis());
-      serverClient.print(", free heap RAM: ");
-      serverClient.println(ESP.getFreeHeap());
-      serverClient.println();
-    }
-    parseTemperatures(response);
-    lineSecondLastReceived = lineLastReceived;
-    lineLastReceived = response;
-    if (response.startsWith("ok")) okFound = true;
-  }
-  return (response);
+inline void lcd(const String text) {
+  commandQueue.push("M117 " + text);
 }
 
-void lcd(String string) {
-  sendToPrinter("M117 " + string);
+inline void playSound() {
+  commandQueue.push("M300 S500 P50");
 }
 
-void askPrinterForStatus() {
-  if (isPrinting == false) {
-    // Doing the following here takes too long and can crash:
-    // sendToPrinter("M105");
-    // Hence we just indicate that this should be done via setting a variable
-    // and do the actual work from loop()
-    shouldAskPrinterForStatus = true;
-  }
+inline String getUploadedFilename() {
+  return uploadedFullname == "" ? "Unknown" : uploadedFullname.substring(1);
 }
 
 void handlePrint() {
+  static FileWrapper gcodeFile;
+  static float prevM73Completion, prevM532Completion;
 
-  // Do nothing if we are already printing. TODO: Give clear response
   if (isPrinting) {
-    return;
+    const bool abortPrint = (restartPrint || cancelPrint);
+    if (abortPrint || !gcodeFile.available()) {
+      gcodeFile.close();
+      if (fwProgressCap)
+        commandQueue.push("M530 S0");
+      if (!abortPrint)
+        lcd("Complete");
+      printPause = false;
+      isPrinting = false;
+    }
+    else if (!printPause && commandQueue.getFreeSlots() > 4) {    // Keep some space for "service" commands
+      ++lastPrintedLine;
+      String line = gcodeFile.readStringUntil('\n'); // The G-Code line being worked on
+      filePos += line.length();
+      int pos = line.indexOf(';');
+      if (line.length() > 0 && pos != 0 && line[0] != '(' && line[0] != '\r') {
+        if (pos != -1)
+          line = line.substring(0, pos);
+        commandQueue.push(line);
+      }
+
+      // Send to printer completion (if supported)
+      printCompletion = (float)filePos / uploadedFileSize * 100;
+      if (fwBuildPercentCap && printCompletion - prevM73Completion >= 1) {
+        commandQueue.push("M73 P" + String((int)printCompletion));
+        prevM73Completion = printCompletion;
+      }
+      if (fwProgressCap && printCompletion - prevM532Completion >= 0.1) {
+        commandQueue.push("M532 X" + String((int)(printCompletion * 10) / 10.0));
+        prevM532Completion = printCompletion;
+      }
+    }
   }
 
-  sendToPrinter("M300 S500 P50"); // M300 - Play beep sound
-  lcd("Printing...");
-  millis_start = millis();
-  shouldPrint = false;
-  isPrinting = true;
-  statusTimer.detach();
+  if (!isPrinting && (startPrint || restartPrint)) {
+    startPrint = restartPrint = false;
 
-  int i = 0;
-  filesize_read = 0;
-  String line;
+    filePos = 0;
+    lastPrintedLine = 0;
+    prevM73Completion = prevM532Completion = 0.0;
 
-  if (!hasSD) {
-    fs::File gcodeFile = SPIFFS.open("/" + filename, "r");
-
-    if (gcodeFile) {
-      while (gcodeFile.available()) {
-        if(shouldCancelPrint == true){
-          shouldCancelPrint == false;
-          isPrinting = false;
-          return;
-        }
-        lineNumberLastPrinted = lineNumberLastPrinted + 1;
-        line = gcodeFile.readStringUntil('\n'); // The G-Code line being worked on
-        filesize_read = filesize_read + line.length();
-        int pos = line.indexOf(';');
-        if (pos != -1) {
-          line = line.substring(0, pos);
-        }
-        if ((line.startsWith("(")) || line.startsWith(";") || line.length() == 0 || line.startsWith("\r")) {
-          continue;
-        }
-        sendToPrinter(line);
-
+    gcodeFile = storageFS.open(uploadedFullname);
+    if (!gcodeFile)
+      lcd("Can't open file");
+    else {
+      lcd("Printing...");
+      playSound();
+      printStartTime = millis();
+      isPrinting = true;
+      if (fwProgressCap) {
+        commandQueue.push("M530 S1 L0");
+        commandQueue.push("M531 " + getUploadedFilename());
       }
-    } else {
-      lcd("Cannot open file");
     }
-    isPrinting = false;
-    statusTimer.attach(statusInterval, askPrinterForStatus);
-    lcd("Complete");
-    gcodeFile.close();
-  } else {
-    File gcodeFile = SD.open(filename, FILE_READ);
+  }
+}
 
-    if (gcodeFile) {
-      while (gcodeFile.available()) {
-        if(shouldCancelPrint == true){
-          shouldCancelPrint == false;
-          isPrinting = false;
-          return;
-        }
-        lineNumberLastPrinted = lineNumberLastPrinted + 1;
-        line = gcodeFile.readStringUntil('\n'); // The G-Code line being worked on
-        filesize_read = filesize_read + line.length();
-        int pos = line.indexOf(';');
-        if (pos != -1) {
-          line = line.substring(0, pos);
-        }
-        if ((line.startsWith("(")) || line.startsWith(";") || line.length() == 0 || line.startsWith("\r")) {
-          continue;
-        }
-        sendToPrinter(line);
+void handleUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+  static FileWrapper file;
 
-      }
-    } else {
-      lcd("Cannot open file");
-    }
-    isPrinting = false;
-    statusTimer.attach(statusInterval, askPrinterForStatus);
-    lcd("Complete");
-    gcodeFile.close();
+  if (!index) {
+    lcd("Receiving...");
 
+    if (uploadedFullname != "")
+      storageFS.remove(uploadedFullname);     // Remove previous file
+    int pos = filename.lastIndexOf("/");
+    uploadedFullname = pos == -1 ? "/" + filename : filename.substring(pos);
+    if (uploadedFullname.length() > storageFS.getMaxPathLength())
+      uploadedFullname = "/cached.gco";   // TODO maybe a different solution
+    file = storageFS.open(uploadedFullname, "w"); // create or truncate file
   }
 
+  file.write(data, len);
+
+  if (final) { // upload finished
+    file.close();
+    uploadedFileSize = index + len;
+  }
+  else
+    uploadedFileSize = 0;
+}
+
+int apiPrinterCommandHandler(const uint8_t* data) {
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject& root = jsonBuffer.parseObject(data);
+  if (root.success()) {
+    if (root.containsKey("command")) {
+      telnetSend(root["command"]);
+      String command = root["command"].asString();
+      commandQueue.push(command);
+    }
+  }
+  else if (root.containsKey("commands")) {
+    JsonArray& node = root["commands"];
+    for (JsonArray::iterator item = node.begin(); item != node.end(); ++item)
+      commandQueue.push(item->as<char*>());
+  }
+
+  return 204;
+}
+
+// Job commands http://docs.octoprint.org/en/master/api/job.html#issue-a-job-command
+int apiJobHandler(const uint8_t* data) {
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject& root = jsonBuffer.parseObject(data);
+  if (root.success() && root.containsKey("command")) {
+    telnetSend(root["command"]);
+    String command = root["command"].asString();
+    if (command == "cancel") {
+      if (!isPrinting)
+        return 409;
+      cancelPrint = true;
+    }
+    else if (command == "start") {
+      if (isPrinting || !printerConnected || uploadedFullname == "")
+        return 409;
+      startPrint = true;
+    }
+    else if (command == "restart") {
+      if (!printPause)
+        return 409;
+      restartPrint = true;
+    }
+    else if (command == "pause") {
+      if (!isPrinting)
+        return 409;
+      if (!root.containsKey("action"))
+        printPause = !printPause;
+      else {
+        telnetSend(root["action"]);
+        String action = root["action"].asString();
+        if (action == "pause")
+          printPause = true;
+        else if (action == "resume")
+          printPause = false;
+        else if (action == "toggle")
+          printPause = !printPause;
+      }
+    }
+  }
+
+  return 204;
+}
+
+String M115ExtractString(const String response, const String field) {
+  int spos = response.indexOf(field + ":");
+  if (spos != -1) {
+    spos += field.length() + 1;
+    int epos = response.indexOf(':', spos);
+    if (epos == -1)
+      epos = response.indexOf('\n', spos);
+    if (epos == -1)
+      return response.substring(spos);
+    else {
+      while (epos >= spos && response[epos] != ' ' && response[epos] != '\n')
+        --epos;
+      return response.substring(spos, epos);
+    }
+  }
+
+  return "";
+}
+
+bool M115ExtractBool(const String response, const String field, const bool onErrorValue = false) {
+  String result = M115ExtractString(response, field);
+
+  return result == "" ? onErrorValue : (result == "1" ? true : false);
+}
+
+inline String getDeviceName() {
+  return fwMachineType + " (" + String(ESP.getChipId(), HEX) + ")";
+}
+
+void mDNSInit() {
+  #ifdef OTA_UPDATES
+    MDNS.setInstanceName(getDeviceName().c_str());    // Can't call MDNS.init because it has been already done by 'ArduinoOTA.begin', here I just change instance name
+  #else
+    if (!MDNS.begin(getDeviceName().c_str()))
+      return;
+  #endif
+
+  // For Cura WirelessPrint - deprecated in favor of the OctoPrint API
+  MDNS.addService("wirelessprint", "tcp", 80);
+  MDNS.addServiceTxt("wirelessprint", "tcp", "version", SKETCH_VERSION);
+
+  // OctoPrint API
+  // Unfortunately, Slic3r doesn't seem to recognize it
+  MDNS.addService("octoprint", "tcp", 80);
+  MDNS.addServiceTxt("octoprint", "tcp", "path", "/");
+  MDNS.addServiceTxt("octoprint", "tcp", "api", API_VERSION);
+  MDNS.addServiceTxt("octoprint", "tcp", "version", VERSION);
+
+  // For compatibility with Slic3r
+  // Unfortunately, Slic3r doesn't seem to recognize it either. Library bug?
+  MDNS.addService("http", "tcp", 80);
+  MDNS.addServiceTxt("http", "tcp", "path", "/");
+  MDNS.addServiceTxt("http", "tcp", "api", API_VERSION);
+  MDNS.addServiceTxt("http", "tcp", "version", VERSION);
+}
+
+bool detectPrinter() {
+  static int printerDetectionState;
+
+  switch (printerDetectionState) {
+    case 0:
+      // Start printer detection
+      serialBaudIndex = 0;
+      printerDetectionState = 10;
+      break;
+
+    case 10:
+      // Initialize baud and send a request to printezr
+      Serial.begin(serialBauds[serialBaudIndex]);
+      telnetSend("Connecting at " + String(serialBauds[serialBaudIndex]));
+      commandQueue.push("M115"); // M115 - Firmware Info
+      commandQueue.push("M115"); // M115 - Send it al least twice
+      printerDetectionState = 20;
+      break;
+
+    case 20:
+      // Check if there is a printer response
+      if (commandQueue.isEmpty()) {
+        String value = M115ExtractString(lastReceivedResponse, "MACHINE_TYPE");
+        if (value == "") {
+          ++serialBaudIndex;
+          if (serialBaudIndex < sizeof(serialBauds) / sizeof(serialBauds[0]))
+            printerDetectionState = 10;
+          else
+            printerDetectionState = 0;
+        }
+        else {
+          telnetSend("Connected");
+
+          fwMachineType = value;
+          value = M115ExtractString(lastReceivedResponse, "EXTRUDER_COUNT");
+          fwExtruders = value == "" ? 1 : min(value.toInt(), (long)MAX_SUPPORTED_EXTRUDERS);
+          fwAutoreportTempCap = M115ExtractBool(lastReceivedResponse, "Cap:AUTOREPORT_TEMP");
+          fwProgressCap = M115ExtractBool(lastReceivedResponse, "Cap:PROGRESS");
+          fwBuildPercentCap = M115ExtractBool(lastReceivedResponse, "Cap:BUILD_PERCENT");
+
+          mDNSInit();
+
+          String text = IpAddress2String(WiFi.localIP()) + " " + storageFS.getActiveFS();
+          lcd(text);
+          playSound();
+
+          if (fwAutoreportTempCap)
+            commandQueue.push(AUTOTEMP_COMMAND + String(TEMPERATURE_REPORT_INTERVAL));   // Start auto report temperatures
+          else
+            temperatureTimer = millis();
+
+          return true;
+        }
+      }
+      break;
+  }
+
+  return false;
+}
+
+void initUploadedFilename() {
+  FileWrapper dir = storageFS.open("/");
+  if (dir) {
+    FileWrapper file = dir.openNextFile();
+    while (file && file.isDirectory()) {
+      file.close();
+      file = dir.openNextFile();
+    }
+    if (file) {
+      uploadedFullname = "/" + file.name();
+      uploadedFileSize = file.size();
+      file.close();
+    }
+    dir.close();
+  }
+}
+
+inline String getState() {
+  if (!printerConnected)
+    return "Discovering printer";
+  else if (cancelPrint)
+    return "Cancelling";
+  else if (printPause)
+    return "Paused";
+  else if (isPrinting)
+    return "Printing";
+  else
+    return "Operational";
+}
+
+inline String stringify(bool value) {
+  return value ? "true" : "false";
 }
 
 void setup() {
-  delay(3000);
+  pinMode(LED_BUILTIN, OUTPUT);     // Initialize the LED_BUILTIN pin as an output
 
+  #ifdef USE_FAST_SD
+    storageFS.begin(true);
+  #else
+    storageFS.begin(false);
+  #endif
 
-  if (!filename.startsWith("/")) filename_with_slash = "/" + filename;
-
-  if(useFastSD){
-    if (SD.begin(SS, 50000000)) { // https://github.com/esp8266/Arduino/issues/1853
-    hasSD = true;
-    }
-  } else {
-    if (SD.begin()) { 
-      hasSD = true;
-    }
-  }
-
-  Serial.begin(DEFAULT_BAUD);
-
-  // Wait until we detect a printer - seemingly not needed? Using this would have the disadvantage that you always need to reset the printer as well as the ESP
-  // Serial.flush(); //flush all previous received and transmitted data
-  // while(!Serial.available()) ; // hang program until a byte is received notice the ; after the while()
-
-  String text;
+  for (int t = 0; t < MAX_SUPPORTED_EXTRUDERS; t++)
+    toolTemperature[t] = { "0.0", "0.0" };
+  bedTemperature = { "0.0", "0.0" };
 
   // Wait for connection
-  pinMode(LED_BUILTIN, OUTPUT);     // Initialize the LED_BUILTIN pin as an output
-  digitalWrite(LED_BUILTIN, LOW);   // Turn the LED on (Note that LOW is the voltage level
+  setLed(true);
   AsyncWiFiManager wifiManager(&server, &dns);
   // wifiManager.resetSettings();   // Uncomment this to reset the settings on the device, then you will need to reflash with USB and this commented out!
-  wifiManager.setDebugOutput(false); // So that it does not send stuff to the printer that the printer does not understand
+  wifiManager.setDebugOutput(false);  // So that it does not send stuff to the printer that the printer does not understand
   wifiManager.autoConnect("AutoConnectAP");
-  digitalWrite(LED_BUILTIN, HIGH);  // Turn the LED off (Note that LOW is the voltage level
+  setLed(false);
 
   telnetServer.begin();
   telnetServer.setNoDelay(true);
 
-  text = IpAddress2String(WiFi.localIP());
-  if (hasSD) {
-    text += " SD";
-  } else {
-    text += " SPIFFS";
-  }
-  lcd(text);
-  sendToPrinter("M300 S500 P50"); // M300 - Play beep sound
-
-  sendToPrinter("M115"); // M115 - Firmware Info
-
-  // Parse the name of the machine from M115
-  fwM115 = lineSecondLastReceived;
-  String fwMACHINE_TYPE = "Unknown";
-  if ((lineSecondLastReceived.indexOf("MACHINE_TYPE:") > -1) && (lineSecondLastReceived.indexOf("EXTRUDER_COUNT:") > -1)) {
-    fwMACHINE_TYPE = lineSecondLastReceived.substring(lineSecondLastReceived.indexOf("MACHINE_TYPE:") + 13, lineSecondLastReceived.indexOf("EXTRUDER_COUNT:") - 1);
-  }
-
-  char output[9];
-  itoa(ESP.getChipId(), output, 16);
-  String chip_id = String(output);
-  device_name = fwMACHINE_TYPE + " (" + chip_id + ")";
-
-  if (MDNS.begin(device_name.c_str())) {
-
-    // For Cura WirelessPrint - deprecated in favor of the OctoPrint API
-    MDNS.addService("wirelessprint", "tcp", 80);
-    MDNS.addServiceTxt("wirelessprint", "tcp", "version", sketch_version);
-
-    // OctoPrint API
-    // Unfortunately, Slic3r doesn't seem to recognize it
-    MDNS.addService("octoprint", "tcp", 80);
-    MDNS.addServiceTxt("octoprint", "tcp", "path", "/");
-    MDNS.addServiceTxt("octoprint", "tcp", "api", "0.1");
-    MDNS.addServiceTxt("octoprint", "tcp", "version", "1.2.10");
-
-    // For compatibility with Slic3r
-    // Unfortunately, Slic3r doesn't seem to recognize it either. Library bug?
-    MDNS.addService("http", "tcp", 80);
-    MDNS.addServiceTxt("http", "tcp", "path", "/");
-    MDNS.addServiceTxt("http", "tcp", "api", "0.1");
-    MDNS.addServiceTxt("http", "tcp", "version", "1.2.10");
-  }
-
-  // ArduinoOTA.setHostname(host);
-  ArduinoOTA.begin();
-
-  MDNS.addService("http", "tcp", 80);
-
-  if (!hasSD) {
-    SPIFFS.begin();
+  if (storageFS.activeSPIFFS())
     server.addHandler(new SPIFFSEditor());
-  }
 
-  server.on("/heap", HTTP_GET, [](AsyncWebServerRequest * request) {
-    request->send(200, "text/plain", String(ESP.getFreeHeap()));
+  initUploadedFilename();
+
+  server.onNotFound([](AsyncWebServerRequest * request) {
+    telnetSend("404 | Page '" + request->url() + "' not found");
+    request->send(404, "text/html", "<h1>Page not found!</h1>");
   });
 
+  server.on("/api/version", HTTP_GET, [](AsyncWebServerRequest * request) {
+    // http://docs.octoprint.org/en/master/api/version.html
+    request->send(200, "application/json", "{\r\n"
+                                           "  \"api\": \"" API_VERSION "\",\r\n"
+                                           "  \"server\": \"" VERSION "\"\r\n"
+                                           "}");  });
+
+  server.on("/api/connection", HTTP_GET, [](AsyncWebServerRequest * request) {
+    // http://docs.octoprint.org/en/master/api/connection.html#get-connection-settings
+    request->send(200, "application/json", "{\r\n"
+                                           "  \"current\": {\r\n"
+                                           "    \"state\": \"" + getState() + "\",\r\n"
+                                           "    \"port\": \"Serial\",\r\n"
+                                           "    \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"
+                                           "    \"printerProfile\": \"Default\"\r\n"
+                                           "  },\r\n"
+                                           "  \"options\": {\r\n"
+                                           "    \"ports\": \"Serial\",\r\n"
+                                           "    \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"
+                                           "    \"printerProfiles\": \"Default\",\r\n"
+                                           "    \"portPreference\": \"Serial\",\r\n"
+                                           "    \"baudratePreference\": " + serialBauds[serialBaudIndex] + ",\r\n"
+                                           "    \"printerProfilePreference\": \"Default\",\r\n"
+                                           "    \"autoconnect\": true\r\n"
+                                           "  }\r\n"
+                                           "}");
+  });
+
+  // Todo: http://docs.octoprint.org/en/master/api/connection.html#post--api-connection
+
+  // Main page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
-    String message = "<h1>" + device_name + "</h1>";
-    message += "<form enctype=\"multipart/form-data\" action=\"/api/files/local\" method=\"POST\">\n";
-    message += "<p>You can also print from the command line using curl:</p>\n";
-    message += "<pre>curl -F \"file=@/path/to/some.gcode\" ";
-    message += IpAddress2String(WiFi.localIP());
-    message += "/api/files/local</pre>\n";
-    message += "<input type=\"hidden\" name=\"MAX_FILE_SIZE\" value=\"100000\" />\n";
-    message += "Choose a file to upload: <input name=\"file\" type=\"file\" /><br />\n";
-    message += "<input type=\"submit\" value=\"Upload\" />\n";
-    message += "</form>";
-    message += "";
-    message += "<p><a href=\"/download\">Download</a></p>";
-    message +=  String("<pre>") +
-                String("fwM115: ") + fwM115 + String("\n") +
-                String("filesize_read: ") + String(filesize_read) + String("\n") +
-                String("lineLastSent: ") + lineLastSent + String("\n") +
-                String("lineSecondLastReceived: ") + lineSecondLastReceived + String("\n") +
-                String("lineLastReceived: ") + lineLastReceived + String("\n") + String("</pre>");
+    String message = "<h1>" + getDeviceName() + "</h1>"
+                     "<form enctype=\"multipart/form-data\" action=\"/api/files/local\" method=\"POST\">\n"
+                     "<p>You can also print from the command line using curl:</p>\n"
+                     "<pre>curl -F \"file=@/path/to/some.gcode\" -F \"print=true\" " + IpAddress2String(WiFi.localIP()) + "/api/files/local</pre>\n"
+                     "Choose a file to upload: <input name=\"file\" type=\"file\"/><br/>\n"
+                     "<input type=\"checkbox\" name=\"print\" id = \"printImmediately\" value=\"true\" checked>\n"
+                     "<label for = \"printImmediately\">Print Immediately</label><br/>\n"
+                     "<input type=\"submit\" value=\"Upload\" />\n"
+                     "</form>"
+                     "<p><a href=\"/download\">Download</a></p>"
+                     "<p><a href=\"/info\">Info</a></p>";
     request->send(200, "text/html", message);
   });
 
-  // For Slic3r OctoPrint compatibility
-
-  server.on("/api/files/local", HTTP_POST, [](AsyncWebServerRequest * request) {
-    // sendToPrinter("M300 S500 P50"); // M300 - Play beep sound - THIS LEADS TO CRASHES DURING UPLOAD!
-    // lcd("Receiving..."); - THIS LEADS TO CRASHES DURING UPLOAD!
-    // lcd(request->contentType()); - THIS LEADS TO CRASHES DURING UPLOAD!
-    // http://docs.octoprint.org/en/master/api/files.html#upload-response
-
-    if (!request->hasParam("file", true, true)) {
-      lcd("Needs PR #192"); // Cura
-      // Cura needs https://github.com/me-no-dev/ESPAsyncWebServer/pull/192
+  // Info page
+  server.on("/info", HTTP_GET, [](AsyncWebServerRequest * request) {
+    String message = "<pre>"
+                     "Free heap: " + String(ESP.getFreeHeap()) + "\n\n"
+                     "File system: " + storageFS.getActiveFS() + "\n";
+    message += String(millis()) + " " + String(temperatureTimer) + " " + String(printerUsedBuffer) + " " + stringify(commandQueue.isAckEmpty()) + "\n";
+    if (storageFS.isActive()) {
+      message += "Filename length limit: " + String(storageFS.getMaxPathLength()) + "\n";
+      if (uploadedFullname != "") {
+        message += "Uploaded file: " + getUploadedFilename() + "\n"
+                   "Uploaded file size: " + String(uploadedFileSize) + "\n";
+      }
     }
+    message += "\n"
+               "Last command sent: " + lastCommandSent + "\n"
+               "Last received response: " + lastReceivedResponse + "\n";
+    if (printerConnected) {
+      message += "\n"
+                 "EXTRUDER_COUNT: " + String(fwExtruders) + "\n"
+                 "AUTOREPORT_TEMP: " + stringify(fwAutoreportTempCap) + "\n"
+                 "PROGRESS: " + stringify(fwProgressCap) + "\n"
+                 "BUILD_PERCENT: " + stringify(fwBuildPercentCap) + "\n";
+    }
+    message += "</pre>";
+    request->send(200, "text/html", message);
+  });
 
-    request->send(200, "application/json", "{\r\n  \"files\": {\r\n    \"local\": {\r\n      \"name\": \"" + filename + "\",\r\n      \"size\": \"" + String(filesize) + "\",\r\n      \"origin\": \"local\",\r\n      \"refs\": {\r\n        \"resource\": \"\",\r\n        \"download\": \"\"\r\n      }\r\n    }\r\n  },\r\n  \"done\": true\r\n}\r\n");
+  // File Operations
+  // Pending: http://docs.octoprint.org/en/master/api/files.html#retrieve-all-files
+  server.on("/api/files", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send(200, "application/json", "{\r\n"
+                                           "  \"files\": {\r\n"
+                                           "  }\r\n"
+                                           "}");
+  });
+
+  // For Slic3r OctoPrint compatibility
+  server.on("/api/files/local", HTTP_POST, [](AsyncWebServerRequest * request) {
+    // https://docs.octoprint.org/en/master/api/files.html?highlight=api%2Ffiles%2Flocal#upload-file-or-create-folder
+    lcd("Received");
+    playSound();
+
+    if (request->hasParam("print", true))
+      startPrint = printerConnected && !isPrinting && uploadedFullname != "";
+
+    request->send(200, "application/json", "{\r\n"
+                                           "  \"files\": {\r\n"
+                                           "    \"local\": {\r\n"
+                                           "      \"name\": \"" + getUploadedFilename() + "\",\r\n"
+                                           "      \"origin\": \"local\"\r\n"
+                                           "    }\r\n"
+                                           "  },\r\n"
+                                           "  \"done\": true\r\n"
+                                           "}");
   }, handleUpload);
 
-  // For Cura 2.6.0 OctoPrintPlugin compatibility
-  // Must be valid JSON
-  // http://docs.octoprint.org/en/master/api
-  // TODO: Fill with values that actually make sense; currently this is enough for Cura 2.6.0 not to crash
-
-  // Poor Man's JSON:
-  // https://jsonformatter.curiousconcept.com/
-  // https://www.freeformatter.com/json-escape.html
-
   server.on("/api/job", HTTP_GET, [](AsyncWebServerRequest * request) {
-    // http://docs.octoprint.org/en/master/api/datamodel.html#sec-api-datamodel-jobs-job
-    float percentage = 0.0;
-    if ( filesize_read > 0 ) {
-      percentage = ((float)filesize_read / (float)filesize) * 100; // Not super accurate but what OctoPrint does, too
+    // http://docs.octoprint.org/en/master/api/job.html#retrieve-information-about-the-current-job
+    int32_t printTime = 0, printTimeLeft = 0;
+    if (isPrinting) {
+      printTime = (millis() - printStartTime) / 1000;
+      printTimeLeft = (printCompletion > 0) ? printTime / printCompletion * (100 - printCompletion) : INT32_MAX;
     }
-    int seconds_since_start = 0;
-    int seconds_remaining = 0;
-    if (isPrinting == true) {
-      seconds_since_start = (millis() - millis_start) / 1000;
-      seconds_remaining = seconds_since_start / percentage * (100.0 - percentage);
-    }
-    request->send(200, "application/json", "{\r\n  \"job\": {\r\n    \"file\": {\r\n      \"name\": \"" + upload_name + "\",\r\n      \"origin\": \"local\",\r\n      \"size\": " + String(filesize) + ",\r\n      \"date\": 1378847754\r\n    },\r\n    \"estimatedPrintTime\": 8811,\r\n    \"filament\": {\r\n      \"length\": 810,\r\n      \"volume\": 5.36\r\n    }\r\n  },\r\n  \"progress\": {\r\n    \"completion\": " + String(percentage) + ",\r\n    \"filepos\": " + String(filesize_read) + ",\r\n    \"printTime\": " + String(seconds_since_start) + ",\r\n    \"printTimeLeft\": " + String(seconds_remaining) + "\r\n  }\r\n}");
+    request->send(200, "application/json", "{\r\n"
+                                           "  \"job\": {\r\n"
+                                           "    \"file\": {\r\n"
+                                           "      \"name\": \"" + getUploadedFilename() + "\",\r\n"
+                                           "      \"origin\": \"local\",\r\n"
+                                           "      \"size\": " + String(uploadedFileSize) + ",\r\n"
+                                           "      \"date\": " + String(uploadedFileDate) + "\r\n"
+                                           "    },\r\n"
+                                           //"    \"estimatedPrintTime\": \"" + estimatedPrintTime + "\",\r\n"
+                                           "    \"filament\": {\r\n"
+                                           //"      \"length\": \"" + filementLength + "\",\r\n"
+                                           //"      \"volume\": \"" + filementVolume + "\"\r\n"
+                                           "    }\r\n"
+                                           "  },\r\n"
+                                           "  \"progress\": {\r\n"
+                                           "    \"completion\": " + String(printCompletion) + ",\r\n"
+                                           "    \"filepos\": " + String(filePos) + ",\r\n"
+                                           "    \"printTime\": " + String(printTime) + ",\r\n"
+                                           "    \"printTimeLeft\": " + String(printTimeLeft) + "\r\n"
+                                           "  },\r\n"
+                                           "  \"state\": \"" + getState() + "\"\r\n"
+                                           "}");
   });
-  // TODO: Implement POST. Cura uses this to pause and abort prints.
-  
+
   server.on("/api/settings", HTTP_GET, [](AsyncWebServerRequest * request) {
     // https://github.com/probonopd/WirelessPrinting/issues/30
-    request->send(200, "application/json", "{\r\n}");
+    // https://github.com/probonopd/WirelessPrinting/issues/18#issuecomment-321927016
+    request->send(200, "application/json", "{}");
   });
 
   server.on("/api/printer", HTTP_GET, [](AsyncWebServerRequest * request) {
-    // http://docs.octoprint.org/en/master/api/datamodel.html#printer-state
-    // NOTE: Currently reporting T instead of T0 because not all machines report T0; see https://github.com/probonopd/WirelessPrinting/issues/4#issuecomment-321975846
-    request->send(200, "application/json", "{\r\n  \"temperature\": {\r\n    \"tool0\": {\r\n      \"actual\": " + temperature_actual + ",\r\n      \"target\": " + temperature_target + ",\r\n      \"offset\": 0\r\n    },\r\n    \"bed\": {\r\n      \"actual\": " + temperature_bed_actual + ",\r\n      \"target\": " + temperature_bed_target + ",\r\n      \"offset\": 0\r\n    }\r\n  },\r\n  \"sd\": {\r\n    \"ready\": " + String(hasSD) + "\r\n  },\r\n  \"state\": {\r\n    \"text\": \"Operational\",\r\n    \"flags\": {\r\n      \"operational\": true,\r\n      \"paused\": false,\r\n      \"printing\": " + String(isPrinting) + ",\r\n      \"sdReady\": " + String(hasSD) + ",\r\n      \"error\": false,\r\n      \"ready\": true,\r\n      \"closedOrError\": false\r\n    }\r\n  }\r\n}");
-    // request->send(200, "application/json", "{\r\n  \"temperature\": {\r\n    \"tool0\": {\r\n      \"actual\": 0.0,\r\n      \"target\": 0.0,\r\n      \"offset\": 0\r\n    },\r\n    \"bed\": {\r\n      \"actual\": 0.0,\r\n      \"target\": 0.0,\r\n      \"offset\": 0\r\n    }\r\n  },\r\n  \"sd\": {\r\n    \"ready\": true\r\n  },\r\n  \"state\": {\r\n    \"text\": \"Operational\",\r\n    \"flags\": {\r\n      \"operational\": true,\r\n      \"paused\": false,\r\n      \"printing\": " + String(isPrinting) + ",\r\n      \"sdReady\": true,\r\n      \"error\": false,\r\n      \"ready\": true,\r\n      \"closedOrError\": false\r\n    }\r\n  }\r\n}");
+    // https://docs.octoprint.org/en/master/api/printer.html#retrieve-the-current-printer-state
+    String readyState = stringify(printerConnected);
+    String message = "{\r\n"
+                     "  \"state\": {\r\n"
+                     "    \"text\": \"" + getState() + "\",\r\n"
+                     "    \"flags\": {\r\n"
+                     "      \"operational\": " + readyState + ",\r\n"
+                     "      \"paused\": " + stringify(printPause) + ",\r\n"
+                     "      \"printing\": " + stringify(isPrinting) + ",\r\n"
+                     "      \"pausing\": false,\r\n"
+                     "      \"cancelling\": " + stringify(cancelPrint) + ",\r\n"
+                     "      \"sdReady\": false,\r\n"
+                     "      \"error\": false,\r\n"
+                     "      \"ready\": " + readyState + ",\r\n"
+                     "      \"closedOrError\": " + stringify(!printerConnected) + "\r\n"
+                     "    }\r\n"
+                     "  },\r\n"
+                     "  \"temperature\": {\r\n";
+    for (int t = 0; t < fwExtruders; ++t) {
+      message += "    \"tool" + String(t) + "\": {\r\n"
+                 "      \"actual\": " + toolTemperature[t].actual + ",\r\n"
+                 "      \"target\": " + toolTemperature[t].target + ",\r\n"
+                 "      \"offset\": 0\r\n"
+                 "    },\r\n";
+    }
+    message += "    \"bed\": {\r\n"
+               "      \"actual\": " + bedTemperature.actual + ",\r\n"
+               "      \"target\": " + bedTemperature.target + ",\r\n"
+               "      \"offset\": 0\r\n"
+               "    }\r\n"
+               "  },\r\n"
+               "  \"sd\": {\r\n"
+               "    \"ready\": false\r\n"
+               "  }\r\n"
+               "}";
+    request->send(200, "application/json", message);
   });
 
   // Parse POST JSON data, https://github.com/me-no-dev/ESPAsyncWebServer/issues/195
   server.onRequestBody([](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total) {
-    DynamicJsonBuffer jsonBuffer;
-    if ((request->url() == "/api/printer/command") || (request->url() == "/api/job")) {
 
-      JsonObject& root = jsonBuffer.parseObject((const char*)data);
-      if (root.success()) {
-        if (root.containsKey("command")) {
-
-          String command = root["command"].asString();
-
-          // Cura uses this to Pre-heat the build plate (M140)
-          // http://docs.octoprint.org/en/master/api/printer.html#send-an-arbitrary-command-to-the-printer
-          // sendToPrinter(root["command"]); // Crashes when done here. Takes too long for inside a callback?
-          if (serverClient && serverClient.connected()) {  // send data to telnet client if connected
-            root.prettyPrintTo(serverClient);
-          }
-
-          // Cura uses this to "Abort print"
-          // http://docs.octoprint.org/en/master/api/job.html
-          if (command == "cancel") {
-            shouldCancelPrint = true;
-          } else {
-            commandLine = command;
-            if (isPrinting == true) {
-              priorityLine = commandLine;
-            }
-          }
-        }
-      }
-      request->send(204);
+    int returnCode;
+    if (request->url() == "/api/printer/command") {
+      // http://docs.octoprint.org/en/master/api/printer.html#send-an-arbitrary-command-to-the-printer
+      returnCode = apiPrinterCommandHandler(data);
     }
-  });
+    else if (request->url() == "/api/job") {
+      // http://docs.octoprint.org/en/master/api/job.html
+      returnCode = apiJobHandler(data);
+    }
+    else
+      returnCode = 204;
 
-  // For Cura 2.7.0 OctoPrintPlugin compatibility
-  // https://github.com/probonopd/WirelessPrinting/issues/18#issuecomment-321927016
-  server.on("/api/settings", HTTP_GET, [](AsyncWebServerRequest * request) {
-    request->send(200, "application/json", "{}");
+    request->send(returnCode);
   });
 
   // For legacy PrusaControlWireless - deprecated in favor of the OctoPrint API
@@ -518,106 +687,166 @@ void setup() {
     request->send(200, "text/plain", "Received");
   }, handleUpload);
 
-
-  server.onNotFound([](AsyncWebServerRequest * request) {
-    request->send(404);
-    if (serverClient && serverClient.connected()) {  // send data to telnet client if connected
-      serverClient.println("404");
-      serverClient.println(request->url());
-      serverClient.println("");
-    }
-
-  });
-
   server.begin();
 
-  /* Set up the timer to fire every 2 seconds */
-  statusTimer.attach(statusInterval, askPrinterForStatus);
-
-}
-
-fs::File f; // SPIFFS
-File uploadFile; // SD card
-
-void handleUpload(AsyncWebServerRequest * request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
-  filesize = 0; // Will set the correct one below
-  upload_name = filename;
-
-  if (!hasSD) { // No SD, hence use SPIFFS
-
-
-
-    if (!index) {
-      f = SPIFFS.open(filename_with_slash, "w"); // create or truncate file
-    }
-
-    if (len) { // uploading
-      f = SPIFFS.open(filename_with_slash, "a"); // append to file (for chunked upload) //////////// REALLY NEEDED???
-      ESP.wdtDisable();
-      f.write(data, len);
-      ESP.wdtEnable(10);
-    }
-
-    if (final) { // upload finished
-      f.close();
-      filesize = index + len;
-      shouldPrint = true;
-    }
-
-  } else { // has SD, hence use it
-
-    if (!index) {
-      if (SD.exists((char *)filename_with_slash.c_str())) SD.remove((char *)filename_with_slash.c_str());
-      uploadFile = SD.open(filename_with_slash.c_str(), FILE_WRITE);
-    }
-
-    if (len) { // uploading
-      for (size_t i = 0; i < len; i++) {
-        uploadFile.write(data[i]);
-      }
-    }
-
-    if (final) { // upload finished
-      uploadFile.close();
-      filesize = index + len;
-      shouldPrint = true;
-    }
-  }
+  #ifdef OTA_UPDATES
+    // OTA setup
+    ArduinoOTA.setHostname(getDeviceName().c_str());
+    #ifdef OTA_PASSWORD
+      ArduinoOTA.setPassword(OTA_PASSWORD);
+    #endif
+    ArduinoOTA.begin();
+  #endif
 }
 
 void loop() {
-  ArduinoOTA.handle();
-  if (shouldPrint == true) handlePrint();
+  #ifdef OTA_UPDATES
+    //****************
+    //* OTA handling *
+    //****************
+    ArduinoOTA.handle();
+  #endif
 
-  if (commandLine != "") {
-    if (isPrinting == false) {
-      sendToPrinter(commandLine);
-      commandLine = "";
-    } else {
-      priorityLine = commandLine;
+
+  //********************
+  //* Printer handling *
+  //********************
+  if (!printerConnected)
+    printerConnected = detectPrinter();
+  else {
+    #ifndef OTA_UPDATES
+      MDNS.update();    // When OTA is active it's called by 'handle' method
+    #endif
+
+    handlePrint();
+
+    if (cancelPrint && !isPrinting) { // Only when cancelPrint has been processed by 'handlePrint'
+      cancelPrint = false;
+      commandQueue.clear();
+      printerUsedBuffer = 0;
+      // Apparently we need to decide how to handle this
+      // For now using M112 - Emergency Stop
+      // http://marlinfw.org/docs/gcode/M112.html
+      telnetSend("Should cancel print! This is not working yet");
+      commandQueue.push("M112"); // Send to 3D Printer immediately w/o waiting for anything
+      //playSound();
+      //lcd("Print cancelled");
     }
-  }
 
-  if (shouldAskPrinterForStatus) {
-    shouldAskPrinterForStatus = false;
-    sendToPrinter("M105"); // Doing this in the ticker callback would take too long and crash it
-  }
-
-  // look for Client connect trial
-  if (telnetServer.hasClient()) {
-    if (!serverClient || !serverClient.connected()) {
-      if (serverClient) {
-        serverClient.stop();
+    if (!autoreportTempEnabled) {
+      unsigned long curMillis = millis();
+      if ((signed)(temperatureTimer - curMillis) <= 0) {
+        commandQueue.push("M105");
+        temperatureTimer = curMillis + TEMPERATURE_REPORT_INTERVAL * 1000;
       }
-      serverClient = telnetServer.available();
-      serverClient.flush();  // clear input buffer, else you get strange characters
     }
   }
 
-  while (serverClient.available()) { // get data from Client
-    Serial.write(serverClient.read());
+  SendCommands();
+  ReceiveResponses();
+
+
+  //*******************
+  //* Telnet handling *
+  //*******************
+  // look for Client connect trial
+  if (telnetServer.hasClient() && (!serverClient || !serverClient.connected())) {
+    if (serverClient)
+      serverClient.stop();
+
+    serverClient = telnetServer.available();
+    serverClient.flush();  // clear input buffer, else you get strange characters
   }
 
-  // delay(10);  // to avoid strange characters left in buffer
+  static String telnetCommand;
+  while (serverClient && serverClient.available()) {  // get data from Client
+    {
+    char ch = serverClient.read();
+    if (ch == '\r' || ch == '\n') {
+      if (telnetCommand.length() > 0) {
+        commandQueue.push(telnetCommand);
+        telnetCommand = "";
+      }
+    }
+    else
+      telnetCommand += ch;
+    }
+  }
+}
 
+inline uint32_t restartSerialTimeout() {
+  serialReceiveTimeoutTimer = millis() + KEEPALIVE_INTERVAL;
+}
+
+void SendCommands() {
+  String command = commandQueue.peekSend();  //gets the next command to be sent
+  if (command != "") {
+    bool noResponsePending = commandQueue.isAckEmpty();
+    if (noResponsePending || printerUsedBuffer < PRINTER_RX_BUFFER_SIZE * 3 / 4) {  // Let's use no more than 75% of printer RX buffer
+      if (noResponsePending)
+        restartSerialTimeout();   // Receive timeout has to be reset only when sending a command and no pending response is expected
+      Serial.println(command);          // Send to 3D Printer
+      printerUsedBuffer += command.length();
+      lastCommandSent = command;
+      commandQueue.popSend();
+
+      telnetSend("> " + command);
+    }
+  }
+}
+
+void ReceiveResponses() {
+  static int lineStartPos;
+  static String serialResponse;
+
+  while (Serial.available()) {
+    char ch = (char)Serial.read();
+    serialResponse += ch;
+    if (ch == '\n') {
+      if (serialResponse.startsWith("ok", lineStartPos)) {
+        GotValidResponse();
+        commandAcknowledged();
+        telnetSend("< " + lastReceivedResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
+
+        if (fwAutoreportTempCap && lastCommandSent.startsWith(AUTOTEMP_COMMAND));
+          autoreportTempEnabled = (lastCommandSent[6] != '0');
+      }
+      else if (autoreportTempEnabled && parseTemperatures(serialResponse)) {
+        GotValidResponse();
+        telnetSend("< AutoReportTemps parsed");
+      }
+      else if (serialResponse.startsWith("echo:busy")) {
+        GotValidResponse();
+        restartSerialTimeout();
+        telnetSend("< Printer is busy, giving it more time");
+      }
+      else if (serialResponse.startsWith("echo: cold extrusion prevented")) {
+        GotValidResponse();
+        // To do: Pause sending gcode, or do something similar
+        telnetSend("< Printer is cold, can't move");
+      }
+      else if (serialResponse.startsWith("error")) {
+        GotValidResponse();
+        telnetSend("< Error Received");
+      }
+      else {
+        lineStartPos = serialResponse.length();
+        telnetSend("< New line but nothing to do with it");
+      }
+    }
+  }
+
+  if (!commandQueue.isAckEmpty() && (signed)(serialReceiveTimeoutTimer - millis()) <= 0) {  // Command has been lost by printer, buffer has been freed
+    lineStartPos = 0;
+    serialResponse = "";
+    commandAcknowledged();
+
+    telnetSend("< #TIMEOUT#");
+  }
+}
+
+inline void commandAcknowledged() {
+  unsigned int cmdLen = commandQueue.popAcknowledge().length();
+  printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
+  restartSerialTimeout();
 }

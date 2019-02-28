@@ -51,10 +51,11 @@ cd $HOME
 git clone https://github.com/probonopd/WirelessPrinting
 cd $HOME/Arduino/libraries/
 # wget "https://raw.githubusercontent.com/probonopd/WirelessPrinting/master/.travis.yml" -O - | grep "git clone" | cut -d " " -f 4-99
-git clone -o 2e6dff3 https://github.com/probonopd/ESPAsyncWebServer
+git clone https://github.com/me-no-dev/ESPAsyncWebServer
 git clone -o 991f855 https://github.com/me-no-dev/ESPAsyncTCP
 git clone -o 6734c16 https://github.com/alanswx/ESPAsyncWiFiManager
 git clone -o ed98ea4 https://github.com/bblanchon/ArduinoJson
+git clone https://github.com/greiman/SdFat # SD long names support
 git clone https://github.com/bertmelis/Ticker-esp32 # for ESP32
 git clone https://github.com/me-no-dev/AsyncTCP # for ESP32
 cd -
