@@ -531,8 +531,8 @@ void setup() {
                      "<input type=\"submit\" value=\"Upload\" />\n"
                      "</form>"
                      "<p><a href=\"/download\">Download</a></p>"
-                     "<p><a href=\"/info\">Info</a></p>";
-                     "<p>WirelessPrinting <a href=\"https://github.com/probonopd/WirelessPrinting/commit/XXXVERSIONXXX\">";
+                     "<p><a href=\"/info\">Info</a></p>"
+                     "<p>WirelessPrinting <a href=\"https://github.com/probonopd/WirelessPrinting/commit/XXXVERSIONXXX\">"
                      "XXXVERSIONXXX</a></p>";
     request->send(200, "text/html", message);
   });
