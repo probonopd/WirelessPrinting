@@ -22,7 +22,7 @@ AsyncWebServer server(80);
 DNSServer dns;
 
 // Configurable parameters
-#define SKETCH_VERSION "XXXVERSIONXXX"  // Gets inserted at build time by .travis.yml
+#define SKETCH_VERSION "2.x-localbuild" // Gets inserted at build time by .travis.yml
 #define USE_FAST_SD                     // Use Default fast SD clock, comment if your SD is an old or slow one.
 #define OTA_UPDATES                     // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load any code on device)
 //#define OTA_PASSWORD ""               // Uncomment to protect OTA updates and assign a password (inside "")

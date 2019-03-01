@@ -26,7 +26,7 @@ install:
 
 script:
   - VERSION=$(git rev-parse --short HEAD)
-  - sed -i -e 's|XXXVERSIONXXX|'$VERSION'|' $PWD/ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
+  - sed -i -e 's|#define SKETCH_VERSION ".*"|#define SKETCH_VERSION "'$VERSION'"|' $PWD/ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
   - arduino-1.8.8/arduino --pref build.path=. --verify --verbose-build --board $BD $PWD/ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
   - BOARD=$(echo $BD | cut -d ":" -f 3)
   - mv ./ESP8266WirelessPrintAsync.ino.bin "ESP8266WirelessPrintAsync_${BOARD}_${VERSION}.bin"
