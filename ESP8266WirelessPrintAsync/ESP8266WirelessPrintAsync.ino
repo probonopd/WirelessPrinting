@@ -103,6 +103,16 @@ inline void telnetSend(const String line) {
     serverClient.println(line);
 }
 
+bool isFloat(const String value) {
+  for (int i = 0; i < value.length(); ++i) {
+    char ch = value[i];
+    if (ch != ' ' && ch != '.' && ch != '-' && !isDigit(ch))
+      return false;
+  }
+
+  return true;
+}
+
 // Parse temperatures from printer responses like
 // ok T:32.8 /0.0 B:31.8 /0.0 T0:32.8 /0.0 @:0 B@:0
 bool parseTemp(const String response, const String whichTemp, Temperature *temperature) {
@@ -111,11 +121,15 @@ bool parseTemp(const String response, const String whichTemp, Temperature *tempe
     int slashpos = response.indexOf(" /", tpos);
     int spacepos = response.indexOf(" ", slashpos + 1);
     // if match mask T:xxx.xx /xxx.xx
-    if (slashpos != -1 && spacepos - tpos < 17) {
-      temperature->actual = response.substring(tpos + whichTemp.length() + 1, slashpos);
-      temperature->target = response.substring(slashpos + 2, spacepos);
+    if (slashpos != -1 && spacepos != -1) {
+      String actual = response.substring(tpos + whichTemp.length() + 1, slashpos);
+      String target = response.substring(slashpos + 2, spacepos);
+      if (isFloat(actual) && isFloat(target)) {
+        temperature->actual = actual;
+        temperature->target = target;
 
-      return true;
+        return true;
+      }
     }
   }
 
@@ -126,13 +140,13 @@ bool parseTemperatures(const String response) {
   bool tempResponse;
 
   if (fwExtruders == 1)
-    tempResponse = parseTemp(response, " T", &toolTemperature[0]);
+    tempResponse = parseTemp(response, "T", &toolTemperature[0]);
   else {
     tempResponse = false;
     for (int t = 0; t < fwExtruders; t++)
-      tempResponse |= parseTemp(response, " T" + String(t), &toolTemperature[t]);
+      tempResponse |= parseTemp(response, "T" + String(t), &toolTemperature[t]);
   }
-  tempResponse |= parseTemp(response, " B", &bedTemperature);
+  tempResponse |= parseTemp(response, "B", &bedTemperature);
 
   return tempResponse;
 }
