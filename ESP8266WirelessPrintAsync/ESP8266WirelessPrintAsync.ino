@@ -22,7 +22,7 @@ AsyncWebServer server(80);
 DNSServer dns;
 
 // Configurable parameters
-#define SKETCH_VERSION "2.0"
+#define SKETCH_VERSION "XXXVERSIONXXX"  // Gets inserted at build time by .travis.yml
 #define USE_FAST_SD                     // Use Default fast SD clock, comment if your SD is an old or slow one.
 #define OTA_UPDATES                     // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load any code on device)
 //#define OTA_PASSWORD ""               // Uncomment to protect OTA updates and assign a password (inside "")
@@ -532,8 +532,7 @@ void setup() {
                      "</form>"
                      "<p><a href=\"/download\">Download</a></p>"
                      "<p><a href=\"/info\">Info</a></p>"
-                     "<p>WirelessPrinting <a href=\"https://github.com/probonopd/WirelessPrinting/commit/XXXVERSIONXXX\">"
-                     "XXXVERSIONXXX</a></p>";
+                     "<p>WirelessPrinting <a href=\"https://github.com/probonopd/WirelessPrinting/commit/" + SKETCH_VERSION + "\">" + SKETCH_VERSION + "</a></p>";
     request->send(200, "text/html", message);
   });
 
