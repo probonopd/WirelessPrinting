@@ -851,6 +851,7 @@ void ReceiveResponses() {
       else {
         lineStartPos = serialResponse.length();
         telnetSend("< New line but nothing to do with it");
+        telnetSend("<" + String(serialResponse) );
       }
     }
   }
