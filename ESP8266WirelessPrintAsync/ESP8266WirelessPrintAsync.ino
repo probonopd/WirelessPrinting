@@ -351,14 +351,12 @@ void mDNSInit() {
   MDNS.addService("octoprint", "tcp", 80);
   MDNS.addServiceTxt("octoprint", "tcp", "path", "/");
   MDNS.addServiceTxt("octoprint", "tcp", "api", API_VERSION);
-  MDNS.addServiceTxt("octoprint", "tcp", "version", VERSION);
+  MDNS.addServiceTxt("octoprint", "tcp", "version", SKETCH_VERSION);
 
-  // For compatibility with Slic3r
-  // Unfortunately, Slic3r doesn't seem to recognize it either. Library bug?
   MDNS.addService("http", "tcp", 80);
   MDNS.addServiceTxt("http", "tcp", "path", "/");
   MDNS.addServiceTxt("http", "tcp", "api", API_VERSION);
-  MDNS.addServiceTxt("http", "tcp", "version", VERSION);
+  MDNS.addServiceTxt("http", "tcp", "version", SKETCH_VERSION);
 }
 
 bool detectPrinter() {
