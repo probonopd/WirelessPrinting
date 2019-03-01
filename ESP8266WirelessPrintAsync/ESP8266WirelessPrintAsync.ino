@@ -555,7 +555,10 @@ void setup() {
     if (printerConnected) {
       message += "\n"
                  "EXTRUDER_COUNT: " + String(fwExtruders) + "\n"
-                 "AUTOREPORT_TEMP: " + stringify(fwAutoreportTempCap) + " Enabled: " + stringify(autoreportTempEnabled) +  "\n"
+                 "AUTOREPORT_TEMP: " + stringify(fwAutoreportTempCap);
+      if (fwAutoreportTempCap)
+        message += " Enabled: " + stringify(autoreportTempEnabled);
+      message += "\n"
                  "PROGRESS: " + stringify(fwProgressCap) + "\n"
                  "BUILD_PERCENT: " + stringify(fwBuildPercentCap) + "\n";
     }
