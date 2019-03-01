@@ -538,7 +538,6 @@ void setup() {
     String message = "<pre>"
                      "Free heap: " + String(ESP.getFreeHeap()) + "\n\n"
                      "File system: " + storageFS.getActiveFS() + "\n";
-    message += String(millis()) + " " + String(temperatureTimer) + " " + String(printerUsedBuffer) + " " + stringify(commandQueue.isAckEmpty()) + "\n";
     if (storageFS.isActive()) {
       message += "Filename length limit: " + String(storageFS.getMaxPathLength()) + "\n";
       if (uploadedFullname != "") {
