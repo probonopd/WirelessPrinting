@@ -8,7 +8,7 @@ before_install:
   - export DISPLAY=:1.0
   - wget http://downloads.arduino.cc/arduino-1.8.8-linux64.tar.xz
   - tar xf arduino-1.8.8-linux64.tar.xz
-  
+
 install:
   - arduino-1.8.8/arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json" --save-prefs
   - arduino-1.8.8/arduino --install-boards esp8266:esp8266
@@ -23,7 +23,7 @@ install:
   - git clone -o 6734c16 https://github.com/alanswx/ESPAsyncWiFiManager
   - ( git clone -b 5.x https://github.com/bblanchon/ArduinoJson ; cd ArduinoJson ; git reset --hard ed98ea4 )
   - cd -
-  
+
 script:
   - VERSION=$(git rev-parse --short HEAD)
   - sed -i -e 's|XXXVERSIONXXX|'$VERSION'|' $PWD/ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
@@ -34,7 +34,7 @@ script:
 after_success:
   - wget -c https://github.com/probonopd/uploadtool/raw/master/upload.sh
   - bash ./upload.sh *.bin
-  
+
 branches:
   except:
     - # Do not build tags that we create when we upload to GitHub Releases

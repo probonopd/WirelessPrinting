@@ -409,7 +409,6 @@ bool detectPrinter() {
             commandQueue.push(AUTOTEMP_COMMAND + String(TEMPERATURE_REPORT_INTERVAL));   // Start auto report temperatures
           else
             temperatureTimer = millis();
-
           return true;
         }
       }
@@ -823,35 +822,37 @@ void ReceiveResponses() {
         commandAcknowledged();
       }
       else if (parseTemperatures(serialResponse)) {
-        telnetSend("< AutoReportTemps parsed");
+        telnetSend("AutoReportTemps parsed");
         if (lastCommandSent.startsWith("M109") || lastCommandSent.startsWith("M190"))
           restartSerialTimeout();   // When firmware doesn't have 'BUSY_WHILE_HEATING' temperature sent during heating may be used to prevent timeout
         GotValidResponse();   // Warning, this will empty 'serialResponse'
       }
       else if (parsePosition(serialResponse)) {
-        telnetSend("< MPosition parsed");
+        telnetSend("MPosition parsed");
         if (lastCommandSent.startsWith("G28"))
           restartSerialTimeout();   // Some firmware doesn't send busy while homing but just position. It can be used to prevent timeout
         GotValidResponse();   // Warning, this will empty 'serialResponse'
       }
       else if (serialResponse.startsWith("echo:busy")) {
-        telnetSend("< Printer is busy, giving it more time");
+        telnetSend("Printer is busy, giving it more time");
         restartSerialTimeout();
         GotValidResponse();   // Warning, this will empty 'serialResponse'
       }
       else if (serialResponse.startsWith("echo: cold extrusion prevented")) {
-        telnetSend("< Printer is cold, can't move");
+        telnetSend("Printer is cold, can't move");
         // To do: Pause sending gcode, or do something similar
         GotValidResponse();   // Warning, this will empty 'serialResponse'
       }
       else if (serialResponse.startsWith("Error:")) {
-        telnetSend("< Error Received");
+        telnetSend("Error received: ");
+        telnetSend("<" + String(serialResponse) );
         cancelPrint = true;
         GotValidResponse();   // Warning, this will empty 'serialResponse'
       }
       else {
         lineStartPos = serialResponse.length();
-        telnetSend("< New line but nothing to do with it");
+        telnetSend("Unhandled line received:");
+        telnetSend("<" + String(serialResponse) );
       }
     }
   }
