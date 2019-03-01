@@ -411,7 +411,6 @@ bool detectPrinter() {
             commandQueue.push(AUTOTEMP_COMMAND + String(TEMPERATURE_REPORT_INTERVAL));   // Start auto report temperatures
           else
             temperatureTimer = millis();
-
           return true;
         }
       }
@@ -556,10 +555,7 @@ void setup() {
     if (printerConnected) {
       message += "\n"
                  "EXTRUDER_COUNT: " + String(fwExtruders) + "\n"
-                 "AUTOREPORT_TEMP: " + stringify(fwAutoreportTempCap);
-      if (fwAutoreportTempCap)
-        message += " Enabled: " + stringify(autoreportTempEnabled);
-      message += "\n"
+                 "AUTOREPORT_TEMP: " + stringify(fwAutoreportTempCap) + " Enabled: " + stringify(autoreportTempEnabled) +  "\n"
                  "PROGRESS: " + stringify(fwProgressCap) + "\n"
                  "BUILD_PERCENT: " + stringify(fwBuildPercentCap) + "\n";
     }
