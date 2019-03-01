@@ -836,15 +836,13 @@ void ReceiveResponses() {
       }
       else if (parseTemperatures(serialResponse)) {
         telnetSend("AutoReportTemps parsed");
-        if (lastCommandSent.startsWith("M109") || lastCommandSent.startsWith("M190"))
-          restartSerialTimeout();   // When firmware doesn't have 'BUSY_WHILE_HEATING' temperature sent during heating may be used to prevent timeout
-        GotValidResponse();   // Warning, this will empty 'serialResponse'
+        restartSerialTimeout();   // When firmware doesn't have 'BUSY_WHILE_HEATING' temperature sent during heating may be used to prevent timeout
+        GotValidResponse();       // Warning, this will empty 'serialResponse'
       }
       else if (parsePosition(serialResponse)) {
         telnetSend("MPosition parsed");
-        if (lastCommandSent.startsWith("G28"))
-          restartSerialTimeout();   // Some firmware doesn't send busy while homing but just position. It can be used to prevent timeout
-        GotValidResponse();   // Warning, this will empty 'serialResponse'
+        restartSerialTimeout();   // Some firmware doesn't send busy while homing but just position. It can be used to prevent timeout
+        GotValidResponse();       // Warning, this will empty 'serialResponse'
       }
       else if (serialResponse.startsWith("echo:busy")) {
         telnetSend("Printer is busy, giving it more time");
