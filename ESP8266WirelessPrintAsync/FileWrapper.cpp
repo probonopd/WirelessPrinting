@@ -81,6 +81,15 @@ uint32_t FileWrapper::size() {
   return 0;
 }
 
+size_t FileWrapper::read(uint8_t *buf, size_t size) {
+  if (sdFile)
+    return sdFile.read(buf, size);
+  else if (fsFile)
+    return fsFile.read(buf, size);
+
+  return 0;
+}
+
 String FileWrapper::readStringUntil(char eol) {
   return sdFile ? sdFile.readStringUntil(eol) : (fsFile ? fsFile.readStringUntil(eol) : "");
 }

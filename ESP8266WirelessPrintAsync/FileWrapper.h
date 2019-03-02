@@ -32,6 +32,7 @@ class FileWrapper : public Stream {
 
     String name();
     uint32_t size();
+    size_t read(uint8_t *buf, size_t size);
     String readStringUntil(char eol);
     void close();
 

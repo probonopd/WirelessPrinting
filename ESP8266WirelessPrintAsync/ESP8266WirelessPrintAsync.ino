@@ -72,6 +72,10 @@ String uploadedFullname;
 size_t uploadedFileSize, filePos;
 uint32_t uploadedFileDate = 1378847754;
 
+// Downloading file information
+size_t downloadBytesLeft;
+FileWrapper downloadFile;
+
 // Temperature for printer status reporting
 #define TEMP_COMMAND      "M105"
 #define AUTOTEMP_COMMAND  "M155 S"
@@ -500,36 +504,6 @@ void setup() {
     request->send(404, "text/html", "<h1>Page not found!</h1>");
   });
 
-  server.on("/api/version", HTTP_GET, [](AsyncWebServerRequest * request) {
-    // http://docs.octoprint.org/en/master/api/version.html
-    request->send(200, "application/json", "{\r\n"
-                                           "  \"api\": \"" API_VERSION "\",\r\n"
-                                           "  \"server\": \"" VERSION "\"\r\n"
-                                           "}");  });
-
-  server.on("/api/connection", HTTP_GET, [](AsyncWebServerRequest * request) {
-    // http://docs.octoprint.org/en/master/api/connection.html#get-connection-settings
-    request->send(200, "application/json", "{\r\n"
-                                           "  \"current\": {\r\n"
-                                           "    \"state\": \"" + getState() + "\",\r\n"
-                                           "    \"port\": \"Serial\",\r\n"
-                                           "    \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"
-                                           "    \"printerProfile\": \"Default\"\r\n"
-                                           "  },\r\n"
-                                           "  \"options\": {\r\n"
-                                           "    \"ports\": \"Serial\",\r\n"
-                                           "    \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"
-                                           "    \"printerProfiles\": \"Default\",\r\n"
-                                           "    \"portPreference\": \"Serial\",\r\n"
-                                           "    \"baudratePreference\": " + serialBauds[serialBaudIndex] + ",\r\n"
-                                           "    \"printerProfilePreference\": \"Default\",\r\n"
-                                           "    \"autoconnect\": true\r\n"
-                                           "  }\r\n"
-                                           "}");
-  });
-
-  // Todo: http://docs.octoprint.org/en/master/api/connection.html#post--api-connection
-
   // Main page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
     String message = "<h1>" + getDeviceName() + "</h1>"
@@ -578,10 +552,48 @@ void setup() {
 
   // Download page
   server.on("/download", HTTP_GET, [](AsyncWebServerRequest * request) {
-    FileWrapper gcodeFile = storageFS.open(uploadedFullname);
-    request->send(gcodeFile, "application/x-gcode", gcodeFile.size());
-    //gcodeFile.close();
+    downloadFile = storageFS.open(uploadedFullname);
+    downloadBytesLeft = uploadedFileSize;
+    request->send("application/x-gcode", uploadedFileSize, [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+      int bytes = min(downloadBytesLeft, (size_t)1024);
+      bytes = downloadFile.read(buffer, bytes);
+      downloadBytesLeft -= bytes;
+      if (bytes <=0)
+        downloadFile.close();
+
+      return bytes;
+    });
   });
+
+  server.on("/api/version", HTTP_GET, [](AsyncWebServerRequest * request) {
+    // http://docs.octoprint.org/en/master/api/version.html
+    request->send(200, "application/json", "{\r\n"
+                                           "  \"api\": \"" API_VERSION "\",\r\n"
+                                           "  \"server\": \"" VERSION "\"\r\n"
+                                           "}");  });
+
+  server.on("/api/connection", HTTP_GET, [](AsyncWebServerRequest * request) {
+    // http://docs.octoprint.org/en/master/api/connection.html#get-connection-settings
+    request->send(200, "application/json", "{\r\n"
+                                           "  \"current\": {\r\n"
+                                           "    \"state\": \"" + getState() + "\",\r\n"
+                                           "    \"port\": \"Serial\",\r\n"
+                                           "    \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"
+                                           "    \"printerProfile\": \"Default\"\r\n"
+                                           "  },\r\n"
+                                           "  \"options\": {\r\n"
+                                           "    \"ports\": \"Serial\",\r\n"
+                                           "    \"baudrate\": " + serialBauds[serialBaudIndex] + ",\r\n"
+                                           "    \"printerProfiles\": \"Default\",\r\n"
+                                           "    \"portPreference\": \"Serial\",\r\n"
+                                           "    \"baudratePreference\": " + serialBauds[serialBaudIndex] + ",\r\n"
+                                           "    \"printerProfilePreference\": \"Default\",\r\n"
+                                           "    \"autoconnect\": true\r\n"
+                                           "  }\r\n"
+                                           "}");
+  });
+
+  // Todo: http://docs.octoprint.org/en/master/api/connection.html#post--api-connection
 
   // File Operations
   // Pending: http://docs.octoprint.org/en/master/api/files.html#retrieve-all-files
