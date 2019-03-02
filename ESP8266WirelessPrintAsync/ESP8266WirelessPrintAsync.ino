@@ -896,7 +896,7 @@ void ReceiveResponses() {
   }
 
   if (!commandQueue.isAckEmpty() && (signed)(serialReceiveTimeoutTimer - millis()) <= 0) {  // Command has been lost by printer, buffer has been freed
-    telnetSend("<#TIMEOUT#");
+    telnetSend("#TIMEOUT#");
     lineStartPos = 0;
     serialResponse = "";
     restartSerialTimeout();
