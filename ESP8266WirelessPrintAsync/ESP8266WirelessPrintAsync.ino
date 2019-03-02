@@ -165,9 +165,8 @@ bool parseTemperatures(const String response) {
     for (int t = 0; t < fwExtruders; t++)
       tempResponse |= parseTemp(response, "T" + String(t), &toolTemperature[t]);
   }
-  if (tempResponse)
-    tempResponse = parseTemp(response, "B", &bedTemperature);
-  else {
+  tempResponse |= parseTemp(response, "B", &bedTemperature);
+  if (!tempResponse) {
     // Parse Prusa heating temperatures
     int e = parsePrusaHeatingExtruder(response);
     tempResponse = e >= 0 && e < MAX_SUPPORTED_EXTRUDERS && parsePrusaHeatingTemp(response, "T", &toolTemperature[e]);
