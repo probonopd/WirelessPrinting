@@ -20,7 +20,7 @@ install:
   - git clone -o 2e6dff3 https://github.com/probonopd/ESPAsyncWebServer.git # https://github.com/me-no-dev/ESPAsyncWebServer/pull/192
   - git clone -o 991f855 https://github.com/me-no-dev/ESPAsyncTCP
   - git clone -o 6734c16 https://github.com/alanswx/ESPAsyncWiFiManager
-  - git clone -o ed98ea4 https://github.com/bblanchon/ArduinoJson
+  - ( git clone -b 5.x https://github.com/bblanchon/ArduinoJson ; cd ArduinoJson ; git reset --hard ed98ea4 )
   - cd -
   
 script:
