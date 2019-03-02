@@ -11,7 +11,7 @@ before_install:
 
 install:
   - arduino-1.8.8/arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json" --save-prefs
-  - arduino-1.8.8/arduino --install-boards esp8266:esp8266
+  - arduino-1.8.8/arduino --install-boards esp8266:esp8266:2.5.0
   - arduino-1.8.8/arduino --board $BD --save-prefs
   - arduino-1.8.8/arduino --pref "compiler.warning_level=all" --save-prefs
   - # For async; unfortunately these libraries are still not the default in arduino/esp8266 yet
@@ -26,7 +26,7 @@ install:
 
 script:
   - VERSION=$(git rev-parse --short HEAD)
-  - sed -i -e 's|XXXVERSIONXXX|'$VERSION'|' $PWD/ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
+  - sed -i -e 's|#define SKETCH_VERSION ".*"|#define SKETCH_VERSION "'$VERSION'"|' $PWD/ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
   - arduino-1.8.8/arduino --pref build.path=. --verify --verbose-build --board $BD $PWD/ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
   - BOARD=$(echo $BD | cut -d ":" -f 3)
   - mv ./ESP8266WirelessPrintAsync.ino.bin "ESP8266WirelessPrintAsync_${BOARD}_${VERSION}.bin"

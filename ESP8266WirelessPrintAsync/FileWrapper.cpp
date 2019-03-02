@@ -1,6 +1,54 @@
 #include "FileWrapper.h"
 #include "StorageFS.h"
 
+size_t FileWrapper::write(uint8_t b) {
+  if (sdFile)
+    return sdFile.write(b);
+  else if (fsFile) {
+    ESP.wdtDisable();
+    size_t wb = fsFile.write(b);
+    ESP.wdtEnable(250);
+    return wb;
+  }
+
+  return 0;
+}
+
+size_t FileWrapper::write(const uint8_t *buf, size_t len) {
+  if (sdFile)
+    return sdFile.write(buf, len);
+  else if (fsFile) {
+    ESP.wdtDisable();
+    size_t wb = fsFile.write(buf, len);
+    ESP.wdtEnable(250);
+    return wb;
+  }
+
+  return 0;
+}
+
+int FileWrapper::available() {
+  return sdFile ? sdFile.available() : (fsFile ? fsFile.available() : false);
+}
+
+int FileWrapper::peek() {
+  if (sdFile)
+    return sdFile.peek();
+  else if (fsFile)
+    return fsFile.peek();
+
+  return -1;
+}
+
+int FileWrapper::read() {
+  if (sdFile)
+    return sdFile.read();
+  else if (fsFile)
+    return fsFile.read();
+
+  return -1;
+}
+
 String FileWrapper::name() {
   if (sdFile) {
     if (cachedName == "") {
@@ -22,8 +70,28 @@ String FileWrapper::name() {
   return i == -1 ? name : name.substring(i + 1);
 }
 
-bool FileWrapper::available() {
-  return sdFile ? sdFile.available() : (fsFile ? fsFile.available() : false);
+uint32_t FileWrapper::size() {
+  if (sdFile)
+    return sdFile.size();
+  else if (fsFile)
+    return fsFile.size();
+  else if (fsDirType == DirEntry)
+    return fsDir.fileSize();
+
+  return 0;
+}
+
+size_t FileWrapper::read(uint8_t *buf, size_t size) {
+  if (sdFile)
+    return sdFile.read(buf, size);
+  else if (fsFile)
+    return fsFile.read(buf, size);
+
+  return 0;
+}
+
+String FileWrapper::readStringUntil(char eol) {
+  return sdFile ? sdFile.readStringUntil(eol) : (fsFile ? fsFile.readStringUntil(eol) : "");
 }
 
 void FileWrapper::close() {
@@ -38,31 +106,6 @@ void FileWrapper::close() {
  else if (fsDirType != Null) {
     fsDir = fs::Dir();
     fsDirType = Null;
-  }
-}
-
-long FileWrapper::size() {
-  if (sdFile)
-    return sdFile.size();
-  else if (fsFile)
-    return fsFile.size();
-  else if (fsDirType == DirEntry)
-    return fsDir.fileSize();
-
-  return 0;
-}
-
-String FileWrapper::readStringUntil(char eol) {
-  return sdFile ? sdFile.readStringUntil(eol) : (fsFile ? fsFile.readStringUntil(eol) : "");
-}
-
-void FileWrapper::write(const uint8_t *buf, size_t len) {
-  if (sdFile)
-    sdFile.write(buf, len);
-  else if (fsFile) {
-    ESP.wdtDisable();
-    fsFile.write(buf, len);
-    ESP.wdtEnable(250);
   }
 }
 
