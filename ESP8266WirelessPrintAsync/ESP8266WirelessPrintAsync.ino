@@ -413,8 +413,7 @@ bool detectPrinter() {
       // Initialize baud and send a request to printezr
       Serial.begin(serialBauds[serialBaudIndex]);
       telnetSend("Connecting at " + String(serialBauds[serialBaudIndex]));
-      commandQueue.push("M115"); // M115 - Firmware Info
-      commandQueue.push("M115"); // M115 - Send it al least twice
+      commandQueue.push("\xFF\xFF\xFF\xFF\xFF\xFF\xFFM115"); // M115 - Firmware Info
       printerDetectionState = 20;
       break;
 
@@ -896,7 +895,10 @@ void ReceiveResponses() {
   }
 
   if (!commandQueue.isAckEmpty() && (signed)(serialReceiveTimeoutTimer - millis()) <= 0) {  // Command has been lost by printer, buffer has been freed
-    telnetSend("#TIMEOUT#");
+    if (printerConnected)
+      telnetSend("#TIMEOUT#");
+    else
+      commandQueue.clear();
     lineStartPos = 0;
     serialResponse = "";
     restartSerialTimeout();
