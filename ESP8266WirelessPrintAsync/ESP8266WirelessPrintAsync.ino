@@ -577,7 +577,7 @@ void setup() {
   });
 
   // Download page
-  server.on("/api/files", HTTP_GET, [](AsyncWebServerRequest * request) {
+  server.on("/download", HTTP_GET, [](AsyncWebServerRequest * request) {
     static FileWrapper gcodeFile;
     gcodeFile = storageFS.open(uploadedFullname);
     request->send(storageFS, uploadedFullname, "application/x-gcode");
