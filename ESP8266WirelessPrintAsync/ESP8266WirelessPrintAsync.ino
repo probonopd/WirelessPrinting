@@ -864,8 +864,6 @@ void ReceiveResponses() {
         printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
       }
       else {
-        restartSerialTimeout();     // Something has been received so clear timeout (printer and communication are live
-
         if (parseTemperatures(serialResponse))
           responseDetail = "autotemp";
         else if (parsePosition(serialResponse))
@@ -893,6 +891,7 @@ void ReceiveResponses() {
         lineStartPos = 0;
         serialResponse = "";
       }
+      restartSerialTimeout();
     }
   }
 
