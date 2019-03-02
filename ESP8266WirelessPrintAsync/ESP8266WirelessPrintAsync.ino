@@ -576,6 +576,13 @@ void setup() {
     request->send(200, "text/html", message);
   });
 
+  // Download page
+  server.on("/download", HTTP_GET, [](AsyncWebServerRequest * request) {
+    FileWrapper gcodeFile = storageFS.open(uploadedFullname);
+    request->send(gcodeFile, "application/x-gcode", gcodeFile.size());
+    gcodeFile.close();
+  });
+
   // File Operations
   // Pending: http://docs.octoprint.org/en/master/api/files.html#retrieve-all-files
   server.on("/api/files", HTTP_GET, [](AsyncWebServerRequest * request) {
@@ -681,6 +688,7 @@ void setup() {
     request->send(200, "application/json", message);
   });
 
+ 
   // Parse POST JSON data, https://github.com/me-no-dev/ESPAsyncWebServer/issues/195
   server.onRequestBody([](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total) {
 
