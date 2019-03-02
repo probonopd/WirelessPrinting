@@ -4,7 +4,7 @@
 #include <FS.h>
 #include <SdFat.h>
 
-class FileWrapper : public Stream {
+class FileWrapper {
   friend class StorageFS;
 
   private:
@@ -17,24 +17,16 @@ class FileWrapper : public Stream {
     FSDirType fsDirType;
 
   public:
-    // Print methods
-    virtual size_t write(uint8_t datum);
-    virtual size_t write(const uint8_t *buf, size_t size);
-
-    // Stream methods
-    virtual int available();
-    virtual int peek();
-    virtual int read();
-
     inline operator bool() {
       return sdFile || fsFile || fsDirType != Null;
     }
 
     String name();
-    uint32_t size();
-    size_t read(uint8_t *buf, size_t size);
-    String readStringUntil(char eol);
+    bool available();
     void close();
+    long size();
+    String readStringUntil(char eol);
+    void write(const uint8_t *buf, size_t len);
 
     inline bool isDirectory() {
       return sdFile ? sdFile.isDirectory() : (fsDirType == DirSource);
