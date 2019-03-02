@@ -576,6 +576,14 @@ void setup() {
     request->send(200, "text/html", message);
   });
 
+  // Download page
+  server.on("/api/files", HTTP_GET, [](AsyncWebServerRequest * request) {
+    static FileWrapper gcodeFile;
+    gcodeFile = storageFS.open(uploadedFullname);
+    request->send(storageFS, uploadedFullname, "application/x-gcode");
+    gcodeFile.close();
+  });
+  
   // File Operations
   // Pending: http://docs.octoprint.org/en/master/api/files.html#retrieve-all-files
   server.on("/api/files", HTTP_GET, [](AsyncWebServerRequest * request) {
