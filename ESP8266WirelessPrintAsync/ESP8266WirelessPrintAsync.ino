@@ -580,7 +580,7 @@ void setup() {
   server.on("/download", HTTP_GET, [](AsyncWebServerRequest * request) {
     FileWrapper gcodeFile = storageFS.open(uploadedFullname);
     request->send(gcodeFile, "application/x-gcode", gcodeFile.size());
-    gcodeFile.close();
+    //gcodeFile.close();
   });
 
   // File Operations
