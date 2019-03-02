@@ -880,6 +880,7 @@ void ReceiveResponses() {
           responseDetail = "ERROR";
         }
         else {
+          serialResponse += ch;
           lineStartPos = serialResponse.length();
           incompleteResponse = true;
           responseDetail = "wait more";
