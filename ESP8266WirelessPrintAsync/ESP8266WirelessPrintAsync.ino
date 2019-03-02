@@ -843,8 +843,8 @@ void SendCommands() {
 }
 
 void ReceiveResponses() {
-  static int lineStartPos;
   static String serialResponse;
+  static int oldLineStartPos, newLineStartPos;
 
   while (Serial.available()) {
     char ch = (char)Serial.read();
@@ -854,7 +854,7 @@ void ReceiveResponses() {
       bool incompleteResponse = false;
       String responseDetail = "";
 
-      if (serialResponse.startsWith("ok", lineStartPos)) {
+      if (serialResponse.startsWith("ok", newLineStartPos)) {
         if (lastCommandSent.startsWith(TEMP_COMMAND))
           parseTemperatures(serialResponse);
         else if (fwAutoreportTempCap && lastCommandSent.startsWith(AUTOTEMP_COMMAND))
@@ -862,7 +862,7 @@ void ReceiveResponses() {
 
         unsigned int cmdLen = commandQueue.popAcknowledge().length();     // Go on with next command
         printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
-        responseDetail = "acknowledged";
+        responseDetail = "ok";
       }
       else {
         if (parseTemperatures(serialResponse))
@@ -880,16 +880,17 @@ void ReceiveResponses() {
           responseDetail = "ERROR";
         }
         else {
-          lineStartPos = serialResponse.length();
+          oldLineStartPos = newLineStartPos;
+          newLineStartPos = serialResponse.length();
           incompleteResponse = true;
           responseDetail = "wait more";
         }
       }
 
-      telnetSend("<" + serialResponse.substring(lineStartPos) + " #" + responseDetail + "#");
+      telnetSend("<" + serialResponse.substring(oldLineStartPos, newLineStartPos) + "#" + responseDetail + "#");
       if (!incompleteResponse) {
         lastReceivedResponse = serialResponse;
-        lineStartPos = 0;
+        oldLineStartPos = newLineStartPos = 0;
         serialResponse = "";
       }
       restartSerialTimeout();
@@ -901,7 +902,7 @@ void ReceiveResponses() {
       telnetSend("#TIMEOUT#");
     else
       commandQueue.clear();
-    lineStartPos = 0;
+    oldLineStartPos = newLineStartPos = 0;
     serialResponse = "";
     restartSerialTimeout();
   }
