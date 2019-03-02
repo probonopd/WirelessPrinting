@@ -880,14 +880,13 @@ void ReceiveResponses() {
           responseDetail = "ERROR";
         }
         else {
-          serialResponse += ch;
           lineStartPos = serialResponse.length();
           incompleteResponse = true;
           responseDetail = "wait more";
         }
       }
 
-      telnetSend("<" + serialResponse + " #" + responseDetail + "#");
+      telnetSend("<" + serialResponse.substring(lineStartPos) + " #" + responseDetail + "#");
       if (!incompleteResponse) {
         lastReceivedResponse = serialResponse;
         lineStartPos = 0;
