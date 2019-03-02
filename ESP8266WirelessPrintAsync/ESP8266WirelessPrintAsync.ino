@@ -136,7 +136,7 @@ bool parsePrusaHeatingTemp(const String response, const String whichTemp, Temper
   int tpos = response.indexOf(whichTemp + ":");
   if (tpos != -1) { // This response contains a temperature
     int spacepos = response.indexOf(" ", tpos);
-    if (spacepos != -1)
+    if (spacepos == -1)
       spacepos = response.length();
     String actual = response.substring(tpos + whichTemp.length() + 1, spacepos);
     if (isFloat(actual)) {
@@ -848,8 +848,9 @@ void ReceiveResponses() {
 
   while (Serial.available()) {
     char ch = (char)Serial.read();
-    serialResponse += ch;
-    if (ch == '\n') {
+    if (ch != '\n')
+      serialResponse += ch;
+    else {
       bool incompleteResponse = false;
       String responseDetail = "";
 
@@ -861,6 +862,7 @@ void ReceiveResponses() {
 
         unsigned int cmdLen = commandQueue.popAcknowledge().length();     // Go on with next command
         printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
+        responseDetail = "acknowledged";
       }
       else {
         if (parseTemperatures(serialResponse))
