@@ -18,10 +18,10 @@ install:
   - mkdir -p $HOME/Arduino/libraries/
   - cd $HOME/Arduino/libraries/
   - git clone https://github.com/greiman/SdFat
-  - git clone https://github.com/me-no-dev/ESPAsyncWebServer
-  - git clone https://github.com/me-no-dev/ESPAsyncTCP
-  - git clone https://github.com/alanswx/ESPAsyncWiFiManager
-  - git clone https://github.com/bblanchon/ArduinoJson
+  - git clone -o 95dedf7 https://github.com/me-no-dev/ESPAsyncWebServer
+  - git clone -o 7e9ed22 https://github.com/me-no-dev/ESPAsyncTCP
+  - git clone -o 1c02154 https://github.com/alanswx/ESPAsyncWiFiManager
+  - ( git clone -b 6.x https://github.com/bblanchon/ArduinoJson ; cd ArduinoJson ; git reset --hard 3df4efd )
   - cd -
 
 script:
