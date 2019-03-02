@@ -843,8 +843,8 @@ void SendCommands() {
 }
 
 void ReceiveResponses() {
+  static int lineStartPos;
   static String serialResponse;
-  static int oldLineStartPos, newLineStartPos;
 
   while (Serial.available()) {
     char ch = (char)Serial.read();
@@ -854,7 +854,7 @@ void ReceiveResponses() {
       bool incompleteResponse = false;
       String responseDetail = "";
 
-      if (serialResponse.startsWith("ok", newLineStartPos)) {
+      if (serialResponse.startsWith("ok", lineStartPos)) {
         if (lastCommandSent.startsWith(TEMP_COMMAND))
           parseTemperatures(serialResponse);
         else if (fwAutoreportTempCap && lastCommandSent.startsWith(AUTOTEMP_COMMAND))
@@ -880,17 +880,18 @@ void ReceiveResponses() {
           responseDetail = "ERROR";
         }
         else {
-          oldLineStartPos = newLineStartPos;
-          newLineStartPos = serialResponse.length();
           incompleteResponse = true;
           responseDetail = "wait more";
         }
       }
 
-      telnetSend("<" + serialResponse.substring(oldLineStartPos, newLineStartPos) + "#" + responseDetail + "#");
-      if (!incompleteResponse) {
+      int responseLength = serialResponse.length();
+      telnetSend("<" + serialResponse.substring(lineStartPos, responseLength) + "#" + responseDetail + "#");
+      if (incompleteResponse)
+        lineStartPos = responseLength;
+      else {
         lastReceivedResponse = serialResponse;
-        oldLineStartPos = newLineStartPos = 0;
+        lineStartPos = 0;
         serialResponse = "";
       }
       restartSerialTimeout();
@@ -902,7 +903,7 @@ void ReceiveResponses() {
       telnetSend("#TIMEOUT#");
     else
       commandQueue.clear();
-    oldLineStartPos = newLineStartPos = 0;
+    lineStartPos = 0;
     serialResponse = "";
     restartSerialTimeout();
   }
