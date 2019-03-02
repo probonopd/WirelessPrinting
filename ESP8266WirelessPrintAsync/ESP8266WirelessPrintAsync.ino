@@ -413,7 +413,7 @@ bool detectPrinter() {
       // Initialize baud and send a request to printezr
       Serial.begin(serialBauds[serialBaudIndex]);
       telnetSend("Connecting at " + String(serialBauds[serialBaudIndex]));
-      commandQueue.push("\xFF\xFF\xFF\xFF\xFF\xFF\xFFM115"); // M115 - Firmware Info
+      commandQueue.push("\xFFM115"); // M115 - Firmware Info
       printerDetectionState = 20;
       break;
 
