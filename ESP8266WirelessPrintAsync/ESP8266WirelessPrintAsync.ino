@@ -72,10 +72,6 @@ String uploadedFullname;
 size_t uploadedFileSize, filePos;
 uint32_t uploadedFileDate = 1378847754;
 
-// Downloading file information
-size_t downloadBytesLeft;
-FileWrapper downloadFile;
-
 // Temperature for printer status reporting
 #define TEMP_COMMAND      "M105"
 #define AUTOTEMP_COMMAND  "M155 S"
@@ -552,17 +548,25 @@ void setup() {
 
   // Download page
   server.on("/download", HTTP_GET, [](AsyncWebServerRequest * request) {
-    downloadFile = storageFS.open(uploadedFullname);
-    downloadBytesLeft = uploadedFileSize;
-    request->send("application/x-gcode", uploadedFileSize, [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
-      int bytes = min(downloadBytesLeft, (size_t)1024);
+    AsyncWebServerResponse *response = request->beginResponse("application/x-gcode", uploadedFileSize, [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+      static size_t downloadBytesLeft;
+      static FileWrapper downloadFile;
+
+      if (!index) {
+        downloadFile = storageFS.open(uploadedFullname);
+        downloadBytesLeft = uploadedFileSize;
+      }
+      size_t bytes = min(downloadBytesLeft, maxLen);
+      bytes = min(bytes, (size_t)2048);
       bytes = downloadFile.read(buffer, bytes);
       downloadBytesLeft -= bytes;
-      if (bytes <=0)
+      if (bytes <= 0)
         downloadFile.close();
 
       return bytes;
     });
+    response->addHeader("Content-Disposition", "attachment; filename=\"" + getUploadedFilename()+ "\"");
+    request->send(response);    
   });
 
   server.on("/api/version", HTTP_GET, [](AsyncWebServerRequest * request) {
