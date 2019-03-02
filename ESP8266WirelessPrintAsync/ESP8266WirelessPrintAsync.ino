@@ -54,12 +54,6 @@ uint32_t printStartTime;
 float printCompletion;
 
 // Serial communication
-#define GotValidResponse() { \
-  lastReceivedResponse = serialResponse; \
-  lineStartPos = 0; \
-  serialResponse = ""; \
-}
-
 String lastCommandSent, lastReceivedResponse;
 uint32_t lastPrintedLine;
 
@@ -136,6 +130,31 @@ bool parseTemp(const String response, const String whichTemp, Temperature *tempe
   return false;
 }
 
+// Parse temperatures from prusa firmare (sent when heating)
+// ok T:32.8 E:0 B:31.8
+bool parsePrusaHeatingTemp(const String response, const String whichTemp, Temperature *temperature) {
+  int tpos = response.indexOf(whichTemp + ":");
+  if (tpos != -1) { // This response contains a temperature
+    int spacepos = response.indexOf(" ", tpos);
+    if (spacepos == -1)
+      spacepos = response.length();
+    String actual = response.substring(tpos + whichTemp.length() + 1, spacepos);
+    if (isFloat(actual)) {
+      temperature->actual = actual;
+
+      return true;
+    }
+  }
+
+  return false;
+}
+
+int8_t parsePrusaHeatingExtruder(const String response) {
+  Temperature tmpTemperature;
+
+  return parsePrusaHeatingTemp(response, "E", &tmpTemperature) ? tmpTemperature.actual.toInt() : -1;
+}
+
 bool parseTemperatures(const String response) {
   bool tempResponse;
 
@@ -147,6 +166,12 @@ bool parseTemperatures(const String response) {
       tempResponse |= parseTemp(response, "T" + String(t), &toolTemperature[t]);
   }
   tempResponse |= parseTemp(response, "B", &bedTemperature);
+  if (!tempResponse) {
+    // Parse Prusa heating temperatures
+    int e = parsePrusaHeatingExtruder(response);
+    tempResponse = e >= 0 && e < MAX_SUPPORTED_EXTRUDERS && parsePrusaHeatingTemp(response, "T", &toolTemperature[e]);
+    tempResponse |= parsePrusaHeatingTemp(response, "B", &bedTemperature);
+    }
 
   return tempResponse;
 }
@@ -387,8 +412,7 @@ bool detectPrinter() {
       // Initialize baud and send a request to printezr
       Serial.begin(serialBauds[serialBaudIndex]);
       telnetSend("Connecting at " + String(serialBauds[serialBaudIndex]));
-      commandQueue.push("M115"); // M115 - Firmware Info
-      commandQueue.push("M115"); // M115 - Send it al least twice
+      commandQueue.push("\xFFM115"); // M115 - Firmware Info
       printerDetectionState = 20;
       break;
 
@@ -812,7 +836,7 @@ void SendCommands() {
       lastCommandSent = command;
       commandQueue.popSend();
 
-      telnetSend("> " + command);
+      telnetSend(">" + command);
     }
   }
 }
@@ -823,61 +847,63 @@ void ReceiveResponses() {
 
   while (Serial.available()) {
     char ch = (char)Serial.read();
-    serialResponse += ch;
-    if (ch == '\n') {
+    if (ch != '\n')
+      serialResponse += ch;
+    else {
+      bool incompleteResponse = false;
+      String responseDetail = "";
+
       if (serialResponse.startsWith("ok", lineStartPos)) {
-        telnetSend("< " + serialResponse + "\r\n  " + millis() + "\r\n  free heap RAM: " + ESP.getFreeHeap() + "\r\n");
         if (lastCommandSent.startsWith(TEMP_COMMAND))
           parseTemperatures(serialResponse);
         else if (fwAutoreportTempCap && lastCommandSent.startsWith(AUTOTEMP_COMMAND))
           autoreportTempEnabled = (lastCommandSent[6] != '0');
-        GotValidResponse();   // Warning, this will empty 'serialResponse'
-        commandAcknowledged();
-      }
-      else if (parseTemperatures(serialResponse)) {
-        telnetSend("AutoReportTemps parsed");
-        restartSerialTimeout();   // When firmware doesn't have 'BUSY_WHILE_HEATING' temperature sent during heating may be used to prevent timeout
-        GotValidResponse();       // Warning, this will empty 'serialResponse'
-      }
-      else if (parsePosition(serialResponse)) {
-        telnetSend("MPosition parsed");
-        restartSerialTimeout();   // Some firmware doesn't send busy while homing but just position. It can be used to prevent timeout
-        GotValidResponse();       // Warning, this will empty 'serialResponse'
-      }
-      else if (serialResponse.startsWith("echo:busy")) {
-        telnetSend("Printer is busy, giving it more time");
-        restartSerialTimeout();
-        GotValidResponse();   // Warning, this will empty 'serialResponse'
-      }
-      else if (serialResponse.startsWith("echo: cold extrusion prevented")) {
-        telnetSend("Printer is cold, can't move");
-        // To do: Pause sending gcode, or do something similar
-        GotValidResponse();   // Warning, this will empty 'serialResponse'
-      }
-      else if (serialResponse.startsWith("Error:")) {
-        telnetSend("Error received: ");
-        telnetSend("<" + String(serialResponse) );
-        cancelPrint = true;
-        GotValidResponse();   // Warning, this will empty 'serialResponse'
+
+        unsigned int cmdLen = commandQueue.popAcknowledge().length();     // Go on with next command
+        printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
+        responseDetail = "ok";
       }
       else {
-        lineStartPos = serialResponse.length();
-        telnetSend("Unhandled line received:");
-        telnetSend("<" + String(serialResponse) );
+        if (parseTemperatures(serialResponse))
+          responseDetail = "autotemp";
+        else if (parsePosition(serialResponse))
+          responseDetail = "position";
+        else if (serialResponse.startsWith("echo:busy"))
+          responseDetail = "busy";
+        else if (serialResponse.startsWith("echo: cold extrusion prevented")) {
+          // To do: Pause sending gcode, or do something similar
+          responseDetail = "cold extrusion";
+        }
+        else if (serialResponse.startsWith("Error:")) {
+          cancelPrint = true;
+          responseDetail = "ERROR";
+        }
+        else {
+          incompleteResponse = true;
+          responseDetail = "wait more";
+        }
       }
+
+      int responseLength = serialResponse.length();
+      telnetSend("<" + serialResponse.substring(lineStartPos, responseLength) + "#" + responseDetail + "#");
+      if (incompleteResponse)
+        lineStartPos = responseLength;
+      else {
+        lastReceivedResponse = serialResponse;
+        lineStartPos = 0;
+        serialResponse = "";
+      }
+      restartSerialTimeout();
     }
   }
 
   if (!commandQueue.isAckEmpty() && (signed)(serialReceiveTimeoutTimer - millis()) <= 0) {  // Command has been lost by printer, buffer has been freed
-    telnetSend("< #TIMEOUT#");
+    if (printerConnected)
+      telnetSend("#TIMEOUT#");
+    else
+      commandQueue.clear();
     lineStartPos = 0;
     serialResponse = "";
-    commandAcknowledged();
+    restartSerialTimeout();
   }
-}
-
-inline void commandAcknowledged() {
-  unsigned int cmdLen = commandQueue.popAcknowledge().length();
-  printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
-  restartSerialTimeout();
 }
