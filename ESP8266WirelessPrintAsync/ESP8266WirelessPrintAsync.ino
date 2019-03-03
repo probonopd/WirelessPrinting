@@ -512,9 +512,12 @@ void setup() {
                      "<label for = \"printImmediately\">Print Immediately</label><br/>\n"
                      "<input type=\"submit\" value=\"Upload\" />\n"
                      "</form>"
+                     "<p><form enctype=\"multipart/form-data\" action=\"/update\" method=\"POST\">\nChoose a firmware file: <input name=\"file\" type=\"file\"/><br/>\n<input type=\"submit\" value=\"Update firmware\" /></p>\n</form>"
                      "<p><script>\nfunction startFunction(command) {\n  var xmlhttp = new XMLHttpRequest();\n  xmlhttp.open(\"POST\", \"/api/job\");\n  xmlhttp.setRequestHeader(\"Content-Type\", \"application/json\");\n  xmlhttp.send(JSON.stringify({command:command}));\n}\n</script>\n<button onclick=\"startFunction(\'cancel\')\">Cancel active print</button>\n<button onclick=\"startFunction(\'start\')\">Print last uploaded file</button></p>\n"
                      "<p><a href=\"/download\">Download</a></p>"
                      "<p><a href=\"/info\">Info</a></p>"
+
+
                      "<p>WirelessPrinting <a href=\"https://github.com/probonopd/WirelessPrinting/commit/" + SKETCH_VERSION + "\">" + SKETCH_VERSION + "</a></p>";
     request->send(200, "text/html", message);
   });
@@ -777,6 +780,35 @@ void setup() {
   server.on("/api/print", HTTP_POST, [](AsyncWebServerRequest * request) {
     request->send(200, "text/plain", "Received");
   }, handleUpload);
+  
+  // Handling ESP firmware file upload
+  server.on("/update", HTTP_POST, []() {
+    server.sendHeader("Connection", "close");
+    server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
+    // ESP.restart();
+  }, []() {
+    HTTPUpload& upload = server.upload();
+    if (upload.status == UPLOAD_FILE_START) {
+      telnetSend("Start update\n");
+      if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { // start with max available size
+        // Update.printError(Serial);
+        telnetSend("Update error: #1\n");
+      }
+    } else if (upload.status == UPLOAD_FILE_WRITE) {
+      // Flash firmware to ESP
+      if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+        // Update.printError(Serial);
+        telnetSend("Update error: #2\n");
+      }
+    } else if (upload.status == UPLOAD_FILE_END) {
+      if (Update.end(true)) { // true to set the size to the current progress
+        telnetSend("Update Succes, rebooting...\n");
+      } else {
+        // Update.printError(Serial);
+        telnetSend("Update error: #3\n");
+      }
+    }
+  });
 
   server.begin();
 
