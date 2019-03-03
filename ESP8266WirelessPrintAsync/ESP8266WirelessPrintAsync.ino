@@ -391,7 +391,7 @@ bool detectPrinter() {
       telnetSend("Connecting at " + String(serialBauds[serialBaudIndex]));
       commandQueue.push("M115"); // M115 - Firmware Info
       printerDetectionState = 20;
-      break;   
+      break;
 
     case 20:
       // Check if there is a printer response
