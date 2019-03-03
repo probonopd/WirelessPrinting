@@ -407,7 +407,6 @@ bool detectPrinter() {
             else
               printerDetectionState = 0;   
           } else
-            printerDetectionState = 10;          
             printerDetectionState = 10;      
         }
         else {
