@@ -40,7 +40,6 @@ const uint32_t serialBauds[] = { 115200, 250000, 500000, 1000000, 57600 };   // 
 String fwMachineType = "Unknown";
 uint8_t fwExtruders = 1;
 bool fwAutoreportTempCap, fwProgressCap, fwBuildPercentCap;
-byte repeatM115times = 1 ; 
 
 // Printer status
 bool printerConnected,
@@ -377,7 +376,7 @@ void mDNSInit() {
 
 bool detectPrinter() {
   static int printerDetectionState;
-  static byte nM115;
+
   switch (printerDetectionState) {
     case 0:
       // Start printer detection
@@ -389,7 +388,7 @@ bool detectPrinter() {
       // Initialize baud and send a request to printezr
       Serial.begin(serialBauds[serialBaudIndex]);
       telnetSend("Connecting at " + String(serialBauds[serialBaudIndex]));
-      commandQueue.push("M115"); // M115 - Firmware Info
+      commandQueue.push("\xFFM115"); // M115 - Firmware Info
       printerDetectionState = 20;
       break;
 
@@ -398,16 +397,11 @@ bool detectPrinter() {
       if (commandQueue.isEmpty()) {
         String value = M115ExtractString(lastReceivedResponse, "MACHINE_TYPE");
         if (value == "") {
-          nM115++;
-          if (nM115>repeatM115times) {
-            nM115 = 0 ;
-            ++serialBaudIndex;
-            if (serialBaudIndex < sizeof(serialBauds) / sizeof(serialBauds[0]))
-              printerDetectionState = 10;
-            else
-              printerDetectionState = 0;   
-          } else
-            printerDetectionState = 10;          
+          ++serialBaudIndex;
+          if (serialBaudIndex < sizeof(serialBauds) / sizeof(serialBauds[0]))
+            printerDetectionState = 10;
+          else
+            printerDetectionState = 0;
         }
         else {
           telnetSend("Connected");
