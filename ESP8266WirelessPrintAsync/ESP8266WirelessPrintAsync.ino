@@ -27,6 +27,7 @@ DNSServer dns;
 #define OTA_UPDATES                     // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load any code on device)
 //#define OTA_PASSWORD ""               // Uncomment to protect OTA updates and assign a password (inside "")
 #define MAX_SUPPORTED_EXTRUDERS 6       // Number of supported extruder
+#define REPEAT_M115_TIMES 1             // M115 retries with same baud (MAX 255)
 
 #define PRINTER_RX_BUFFER_SIZE 0        // This is printer firmware 'RX_BUFFER_SIZE'. If such parameter is unknown please use 0
 #define TEMPERATURE_REPORT_INTERVAL 2   // Ask the printer for its temperatures status every 2 seconds
@@ -40,7 +41,6 @@ const uint32_t serialBauds[] = { 115200, 250000, 500000, 1000000, 57600 };   // 
 String fwMachineType = "Unknown";
 uint8_t fwExtruders = 1;
 bool fwAutoreportTempCap, fwProgressCap, fwBuildPercentCap;
-byte repeatM115times = 1 ; 
 
 // Printer status
 bool printerConnected,
@@ -378,6 +378,7 @@ void mDNSInit() {
 bool detectPrinter() {
   static int printerDetectionState;
   static byte nM115;
+
   switch (printerDetectionState) {
     case 0:
       // Start printer detection
@@ -398,15 +399,15 @@ bool detectPrinter() {
       if (commandQueue.isEmpty()) {
         String value = M115ExtractString(lastReceivedResponse, "MACHINE_TYPE");
         if (value == "") {
-          nM115++;
-          if (nM115>repeatM115times) {
-            nM115 = 0 ;
+          if (nM115++ >= REPEAT_M115_TIMES) {
+            nM115 = 0;
             ++serialBaudIndex;
             if (serialBaudIndex < sizeof(serialBauds) / sizeof(serialBauds[0]))
               printerDetectionState = 10;
             else
               printerDetectionState = 0;   
-          } else
+          } 
+          else
             printerDetectionState = 10;      
         }
         else {
@@ -414,7 +415,6 @@ bool detectPrinter() {
 
           fwMachineType = value;
           value = M115ExtractString(lastReceivedResponse, "EXTRUDER_COUNT");
-
           fwExtruders = value == "" ? 1 : min(value.toInt(), (long)MAX_SUPPORTED_EXTRUDERS);
           fwAutoreportTempCap = M115ExtractBool(lastReceivedResponse, "Cap:AUTOREPORT_TEMP");
           fwProgressCap = M115ExtractBool(lastReceivedResponse, "Cap:PROGRESS");
