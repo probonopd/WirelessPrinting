@@ -836,16 +836,16 @@ void setup() {
 }
 
 void loop() {
-  if (ESPrestartRequired){  // check the flag here to determine if a restart is required
-    Serial.printf("Restarting ESP\n\r");
-    ESPrestartRequired = false;
-    ESP.restart();
-  }
-  
   #ifdef OTA_UPDATES
     //****************
     //* OTA handling *
     //****************
+    if (ESPrestartRequired) {  // check the flag here to determine if a restart is required
+      Serial.printf("Restarting ESP\n\r");
+      ESPrestartRequired = false;
+      ESP.restart();
+    }
+
     ArduinoOTA.handle();
   #endif
 
