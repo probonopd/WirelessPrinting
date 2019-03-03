@@ -31,7 +31,7 @@ DNSServer dns;
 #define PRINTER_RX_BUFFER_SIZE 0        // This is printer firmware 'RX_BUFFER_SIZE'. If such parameter is unknown please use 0
 #define TEMPERATURE_REPORT_INTERVAL 2   // Ask the printer for its temperatures status every 2 seconds
 #define KEEPALIVE_INTERVAL 2500         // Marlin defaults to 2 seconds, get a little of margin
-const uint32_t serialBauds[] = { 1000000, 500000, 250000, 115200, 57600 };   // Marlin valid bauds (removed very low bauds)
+const uint32_t serialBauds[] = { 115200, 250000, 500000, 1000000, 57600 };   // Marlin valid bauds (removed very low bauds; roughly ordered by popularity to speed things up)
 
 #define API_VERSION     "0.1"
 #define VERSION         "1.3.10"
@@ -282,60 +282,36 @@ void handleUpload(AsyncWebServerRequest *request, String filename, size_t index,
     uploadedFileSize = 0;
 }
 
-int apiPrinterCommandHandler(const uint8_t* data) {
-  DynamicJsonBuffer jsonBuffer;
-  JsonObject& root = jsonBuffer.parseObject(data);
-  if (root.success()) {
-    if (root.containsKey("command")) {
-      telnetSend(root["command"]);
-      String command = root["command"].asString();
-      commandQueue.push(command);
-    }
-  }
-  else if (root.containsKey("commands")) {
-    JsonArray& node = root["commands"];
-    for (JsonArray::iterator item = node.begin(); item != node.end(); ++item)
-      commandQueue.push(item->as<char*>());
-  }
-
-  return 204;
-}
-
-// Job commands http://docs.octoprint.org/en/master/api/job.html#issue-a-job-command
-int apiJobHandler(const uint8_t* data) {
-  DynamicJsonBuffer jsonBuffer;
-  JsonObject& root = jsonBuffer.parseObject(data);
-  if (root.success() && root.containsKey("command")) {
-    telnetSend(root["command"]);
-    String command = root["command"].asString();
-    if (command == "cancel") {
+int apiJobHandler(JsonObject root) {
+  const char* command = root["command"];
+  if (command != NULL) {
+    if (strcmp(command, "cancel") == 0) {
       if (!isPrinting)
         return 409;
       cancelPrint = true;
     }
-    else if (command == "start") {
+    else if (strcmp(command, "start") == 0) {
       if (isPrinting || !printerConnected || uploadedFullname == "")
         return 409;
       startPrint = true;
     }
-    else if (command == "restart") {
+    else if (strcmp(command, "restart") == 0) {
       if (!printPause)
         return 409;
       restartPrint = true;
     }
-    else if (command == "pause") {
+    else if (strcmp(command, "pause") == 0) {
       if (!isPrinting)
         return 409;
-      if (!root.containsKey("action"))
+      const char* action = root["action"];
+      if (action == NULL)
         printPause = !printPause;
       else {
-        telnetSend(root["action"]);
-        String action = root["action"].asString();
-        if (action == "pause")
+        if (strcmp(action, "pause") == 0)
           printPause = true;
-        else if (action == "resume")
+        else if (strcmp(action, "resume") == 0)
           printPause = false;
-        else if (action == "toggle")
+        else if (strcmp(action, "toggle") == 0)
           printPause = !printPause;
       }
     }
@@ -432,6 +408,7 @@ bool detectPrinter() {
 
           fwMachineType = value;
           value = M115ExtractString(lastReceivedResponse, "EXTRUDER_COUNT");
+
           fwExtruders = value == "" ? 1 : min(value.toInt(), (long)MAX_SUPPORTED_EXTRUDERS);
           fwAutoreportTempCap = M115ExtractBool(lastReceivedResponse, "Cap:AUTOREPORT_TEMP");
           fwProgressCap = M115ExtractBool(lastReceivedResponse, "Cap:PROGRESS");
@@ -535,6 +512,7 @@ void setup() {
                      "<label for = \"printImmediately\">Print Immediately</label><br/>\n"
                      "<input type=\"submit\" value=\"Upload\" />\n"
                      "</form>"
+                     "<p><script>\nfunction startFunction(command) {\n  var xmlhttp = new XMLHttpRequest();\n  xmlhttp.open(\"POST\", \"/api/job\");\n  xmlhttp.setRequestHeader(\"Content-Type\", \"application/json\");\n  xmlhttp.send(JSON.stringify({command:command}));\n}\n</script>\n<button onclick=\"startFunction(\'cancel\')\">Cancel active print</button>\n<button onclick=\"startFunction(\'start\')\">Print last uploaded file</button></p>\n"
                      "<p><a href=\"/download\">Download</a></p>"
                      "<p><a href=\"/info\">Info</a></p>"
                      "<p>WirelessPrinting <a href=\"https://github.com/probonopd/WirelessPrinting/commit/" + SKETCH_VERSION + "\">" + SKETCH_VERSION + "</a></p>";
@@ -680,6 +658,33 @@ void setup() {
                                            "}");
   });
 
+  server.on("/api/job", HTTP_POST, [](AsyncWebServerRequest *request) {
+    // Job commands http://docs.octoprint.org/en/master/api/job.html#issue-a-job-command
+    request->send(200, "text/plain", "");
+    },
+    [](AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final) {
+      request->send(400, "text/plain", "file not supported");
+    },
+    [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+      static String content;
+
+      if (!index)
+        content = "";
+      for (int i = 0; i < len; ++i)
+        content += (char)data[i];
+      if (content.length() >= total) {
+        DynamicJsonDocument doc(1024);
+        auto error = deserializeJson(doc, content);
+        if (error)
+          request->send(400, "text/plain", error.c_str());
+        else {
+          int responseCode = apiJobHandler(doc.as<JsonObject>());
+          request->send(responseCode, "text/plain", "");
+          content = "";
+        }
+      }
+  });
+  
   server.on("/api/settings", HTTP_GET, [](AsyncWebServerRequest * request) {
     // https://github.com/probonopd/WirelessPrinting/issues/30
     // https://github.com/probonopd/WirelessPrinting/issues/18#issuecomment-321927016
@@ -725,23 +730,39 @@ void setup() {
     request->send(200, "application/json", message);
   });
 
- 
-  // Parse POST JSON data, https://github.com/me-no-dev/ESPAsyncWebServer/issues/195
-  server.onRequestBody([](AsyncWebServerRequest * request, uint8_t *data, size_t len, size_t index, size_t total) {
+  server.on("/api/printer/command", HTTP_POST, [](AsyncWebServerRequest *request) {
+    // http://docs.octoprint.org/en/master/api/printer.html#send-an-arbitrary-command-to-the-printer
+    request->send(200, "text/plain", "");
+    },
+    [](AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final) {
+      request->send(400, "text/plain", "file not supported");
+    },
+    [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+      static String content;
 
-    int returnCode;
-    if (request->url() == "/api/printer/command") {
-      // http://docs.octoprint.org/en/master/api/printer.html#send-an-arbitrary-command-to-the-printer
-      returnCode = apiPrinterCommandHandler(data);
-    }
-    else if (request->url() == "/api/job") {
-      // http://docs.octoprint.org/en/master/api/job.html
-      returnCode = apiJobHandler(data);
-    }
-    else
-      returnCode = 204;
-
-    request->send(returnCode);
+      if (!index)
+        content = "";
+      for (int i = 0; i < len; ++i)
+        content += (char)data[i];
+      if (content.length() >= total) {
+        DynamicJsonDocument doc(1024);
+        auto error = deserializeJson(doc, content);
+        if (error)
+          request->send(400, "text/plain", error.c_str());
+        else {
+          JsonObject root = doc.as<JsonObject>();
+          const char* command = root["command"];
+          if (command != NULL)
+            commandQueue.push(command);
+          else {
+            JsonArray commands = root["commands"].as<JsonArray>();
+            for (JsonVariant command : commands)
+              commandQueue.push(String(command.as<String>()));
+            }
+          request->send(204, "text/plain", "");
+        }
+        content = "";
+      }
   });
 
   // For legacy PrusaControlWireless - deprecated in favor of the OctoPrint API

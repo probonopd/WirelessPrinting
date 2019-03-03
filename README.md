@@ -52,7 +52,6 @@ git clone -o 991f855 https://github.com/me-no-dev/ESPAsyncTCP
 git clone -o 6734c16 https://github.com/alanswx/ESPAsyncWiFiManager
 ( git clone -b 5.x https://github.com/bblanchon/ArduinoJson ; cd ArduinoJson ; git reset --hard ed98ea4 )
 git clone https://github.com/greiman/SdFat # SD long names support
-git clone https://github.com/bertmelis/Ticker-esp32 # for ESP32
 git clone https://github.com/me-no-dev/AsyncTCP # for ESP32
 cd -
 ```
