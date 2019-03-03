@@ -408,6 +408,7 @@ bool detectPrinter() {
               printerDetectionState = 0;   
           } else
             printerDetectionState = 10;          
+            printerDetectionState = 10;      
         }
         else {
           telnetSend("Connected");
@@ -914,7 +915,7 @@ void ReceiveResponses() {
         printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
         responseDetail = "ok";
       }
-      else {
+      else if (printerConnected) {
         if (parseTemperatures(serialResponse))
           responseDetail = "autotemp";
         else if (parsePosition(serialResponse))
@@ -933,6 +934,9 @@ void ReceiveResponses() {
           incompleteResponse = true;
           responseDetail = "wait more";
         }
+      } else {
+          incompleteResponse = true;
+          responseDetail = "discovering";
       }
 
       int responseLength = serialResponse.length();
