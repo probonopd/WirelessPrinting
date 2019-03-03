@@ -37,6 +37,9 @@ const uint32_t serialBauds[] = { 1000000, 500000, 250000, 115200, 57600 };   // 
 #define API_VERSION     "0.1"
 #define VERSION         "1.3.10"
 
+// The sketch on the ESP
+bool ESPrestartRequired = false;  // Set this flag in the callbacks to restart ESP in the main loop
+
 // Information from M115
 String fwMachineType = "Unknown";
 uint8_t fwExtruders = 1;
@@ -513,7 +516,9 @@ void setup() {
                      "<label for = \"printImmediately\">Print Immediately</label><br/>\n"
                      "<input type=\"submit\" value=\"Upload\" />\n"
                      "</form>"
+    #ifdef OTA_UPDATES
                      "<p><form enctype=\"multipart/form-data\" action=\"/update\" method=\"POST\">\nChoose a firmware file: <input name=\"file\" type=\"file\"/><br/>\n<input type=\"submit\" value=\"Update firmware\" /></p>\n</form>"
+    #endif
                      "<p><script>\nfunction startFunction(command) {\n  var xmlhttp = new XMLHttpRequest();\n  xmlhttp.open(\"POST\", \"/api/job\");\n  xmlhttp.setRequestHeader(\"Content-Type\", \"application/json\");\n  xmlhttp.send(JSON.stringify({command:command}));\n}\n</script>\n<button onclick=\"startFunction(\'cancel\')\">Cancel active print</button>\n<button onclick=\"startFunction(\'start\')\">Print last uploaded file</button></p>\n"
                      "<p><a href=\"/download\">Download</a></p>"
                      "<p><a href=\"/info\">Info</a></p>"
@@ -782,6 +787,7 @@ void setup() {
     request->send(200, "text/plain", "Received");
   }, handleUpload);
   
+  #ifdef OTA_UPDATES  
   // Handling ESP firmware file upload
   // https://github.com/me-no-dev/ESPAsyncWebServer/issues/3#issuecomment-354528317
   // https://gist.github.com/JMishou/60cb762047b735685e8a09cd2eb42a60
@@ -791,7 +797,7 @@ void setup() {
     AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", (Update.hasError())?"FAIL":"OK");
     response->addHeader("Connection", "close");
     response->addHeader("Access-Control-Allow-Origin", "*");
-    restartRequired = true;  // Tell the main loop to restart the ESP
+    ESPrestartRequired = true;  // Tell the main loop to restart the ESP
     request->send(response);
   },[](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final){
     //Upload handler chunks in data
@@ -805,7 +811,6 @@ void setup() {
       }
       Update.runAsync(true); // tell the updaterClass to run in async mode
     }
-
     // Write chunked data to the free sketch space
     if(Update.write(data, len) != len){
         Update.printError(Serial);
@@ -820,7 +825,7 @@ void setup() {
         Serial.setDebugOutput(false);
     }
   });
-
+  #endif
   server.begin();
 
   #ifdef OTA_UPDATES
@@ -834,13 +839,18 @@ void setup() {
 }
 
 void loop() {
+  if (ESPrestartRequired){  // check the flag here to determine if a restart is required
+    Serial.printf("Restarting ESP\n\r");
+    ESPrestartRequired = false;
+    ESP.restart();
+  }
+  
   #ifdef OTA_UPDATES
     //****************
     //* OTA handling *
     //****************
     ArduinoOTA.handle();
   #endif
-
 
   //********************
   //* Printer handling *
