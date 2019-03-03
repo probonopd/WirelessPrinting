@@ -37,7 +37,7 @@ const uint32_t serialBauds[] = { 1000000, 500000, 250000, 115200, 57600 };   // 
 #define VERSION         "1.3.10"
 
 // The sketch on the ESP
-bool ESPrestartRequired;  // Set this flag in the callbacks to restart ESP in the main loop
+bool ESPrestartRequired;  // Set this flag in the callbacks to restart ESP
 
 // Information from M115
 String fwMachineType = "Unknown";
