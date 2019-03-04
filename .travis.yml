@@ -11,22 +11,22 @@ before_install:
 
 install:
   - arduino-1.8.8/arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json" --save-prefs
-  - arduino-1.8.8/arduino --install-boards esp8266:esp8266
+  - arduino-1.8.8/arduino --install-boards esp8266:esp8266:2.5.0
   - arduino-1.8.8/arduino --board $BD --save-prefs
   - arduino-1.8.8/arduino --pref "compiler.warning_level=all" --save-prefs
   - # For async; unfortunately these libraries are still not the default in arduino/esp8266 yet
   - mkdir -p $HOME/Arduino/libraries/
   - cd $HOME/Arduino/libraries/
   - git clone https://github.com/greiman/SdFat
-  - git clone https://github.com/me-no-dev/ESPAsyncWebServer
-  - git clone -o 991f855 https://github.com/me-no-dev/ESPAsyncTCP
-  - git clone -o 6734c16 https://github.com/alanswx/ESPAsyncWiFiManager
-  - ( git clone -b 5.x https://github.com/bblanchon/ArduinoJson ; cd ArduinoJson ; git reset --hard ed98ea4 )
+  - git clone -o 95dedf7 https://github.com/me-no-dev/ESPAsyncWebServer
+  - git clone -o 7e9ed22 https://github.com/me-no-dev/ESPAsyncTCP
+  - git clone -o 1c02154 https://github.com/alanswx/ESPAsyncWiFiManager
+  - ( git clone -b 6.x https://github.com/bblanchon/ArduinoJson ; cd ArduinoJson ; git reset --hard 3df4efd )
   - cd -
 
 script:
   - VERSION=$(git rev-parse --short HEAD)
-  - sed -i -e 's|XXXVERSIONXXX|'$VERSION'|' $PWD/ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
+  - sed -i -e 's|#define SKETCH_VERSION ".*"|#define SKETCH_VERSION "'$VERSION'"|' $PWD/ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
   - arduino-1.8.8/arduino --pref build.path=. --verify --verbose-build --board $BD $PWD/ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
   - BOARD=$(echo $BD | cut -d ":" -f 3)
   - mv ./ESP8266WirelessPrintAsync.ino.bin "ESP8266WirelessPrintAsync_${BOARD}_${VERSION}.bin"

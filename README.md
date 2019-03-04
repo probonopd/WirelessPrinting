@@ -1,6 +1,6 @@
 # WirelessPrinting [![Build Status](https://travis-ci.org/probonopd/WirelessPrinting.svg?branch=master)](https://travis-ci.org/probonopd/WirelessPrinting)
 
-![icon](https://cloud.githubusercontent.com/assets/2480569/23587222/bb25f740-01a7-11e7-806f-23c8f77d8b1c.png)
+![](https://user-images.githubusercontent.com/2480569/53683404-5b21ab80-3cf8-11e9-8a6e-647df742612b.jpg)
 
 Print wirelessly from [Cura](https://ultimaker.com/en/products/cura-software), [PrusaControl](http://prusacontrol.org/), or [Slic3r PE](https://github.com/prusa3d/Slic3r/releases) to your 3D printer connected to an [ESP8266](https://espressif.com/en/products/hardware/esp8266ex/overview) module.
 
@@ -52,7 +52,6 @@ git clone -o 991f855 https://github.com/me-no-dev/ESPAsyncTCP
 git clone -o 6734c16 https://github.com/alanswx/ESPAsyncWiFiManager
 ( git clone -b 5.x https://github.com/bblanchon/ArduinoJson ; cd ArduinoJson ; git reset --hard ed98ea4 )
 git clone https://github.com/greiman/SdFat # SD long names support
-git clone https://github.com/bertmelis/Ticker-esp32 # for ESP32
 git clone https://github.com/me-no-dev/AsyncTCP # for ESP32
 cd -
 ```
