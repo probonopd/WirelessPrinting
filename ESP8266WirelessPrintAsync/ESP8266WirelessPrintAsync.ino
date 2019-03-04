@@ -1017,7 +1017,7 @@ static void handle_update_progress_cb(AsyncWebServerRequest *request, String fil
     if (!Update.end(true)){
       Update.printError(Serial);
     } else {
-      restartNow = true;              //Set flag so main loop can issue restart call
+      restartNow = true;              //Set flag to restart
       Serial.println("Update complete");
     }
   }
