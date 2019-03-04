@@ -27,6 +27,13 @@ size_t FileWrapper::write(const uint8_t *buf, size_t len) {
   return 0;
 }
 
+void FileWrapper::flush() {
+  if (sdFile)
+    return sdFile.flush();
+  else if (fsFile)
+    return fsFile.flush();
+}
+
 int FileWrapper::available() {
   return sdFile ? sdFile.available() : (fsFile ? fsFile.available() : false);
 }
@@ -61,13 +68,19 @@ String FileWrapper::name() {
 
     return cachedName;
   }
-  else if (fsDirType != DirEntry)
-    return "";
+  else {
+    #if defined(ESP8266)
+      if (fsDirType != DirEntry)
+        return "";
 
-  String name = fsDir.fileName();
-  int i = name.lastIndexOf("/");
+      String name = fsDir.fileName();
+      int i = name.lastIndexOf("/");
 
-  return i == -1 ? name : name.substring(i + 1);
+      return i == -1 ? name : name.substring(i + 1);
+    #elif defined(ESP32)
+      return fsFile.name();
+    #endif
+  }
 }
 
 uint32_t FileWrapper::size() {
@@ -75,8 +88,10 @@ uint32_t FileWrapper::size() {
     return sdFile.size();
   else if (fsFile)
     return fsFile.size();
+#if defined(ESP8266)
   else if (fsDirType == DirEntry)
     return fsDir.fileSize();
+#endif
 
   return 0;
 }
@@ -103,10 +118,12 @@ void FileWrapper::close() {
     fsFile.close();
     fsFile = fs::File();
   }
- else if (fsDirType != Null) {
+#if defined(ESP8266)
+  else if (fsDirType != Null) {
     fsDir = fs::Dir();
     fsDirType = Null;
   }
+#endif
 }
 
 FileWrapper FileWrapper::openNextFile() {
@@ -114,11 +131,16 @@ FileWrapper FileWrapper::openNextFile() {
 
   if (sdFile)
     fw.sdFile = sdFile.openNextFile();
+#if defined(ESP8266)
   else if (fsDirType == DirSource) {
     if (fsDir.next()) {
       fw.fsDir = fsDir;
       fw.fsDirType = DirEntry;
     }
+#elif defined(ESP32)
+  else if (fsFile)
+    fw.fsFile = sfFile.openNextFile();
+#endif
   }
 
   return fw;

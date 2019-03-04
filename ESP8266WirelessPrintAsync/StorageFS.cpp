@@ -23,12 +23,16 @@ FileWrapper StorageFS::open(const String path, const char *openMode) {
       file.sdFile.rewindDirectory();
   }
   else if (hasSPIFFS) {
-    if (path.endsWith("/")) {
-      file.fsDir = SPIFFS.openDir(path);
-      file.fsDirType = FileWrapper::DirSource;
-    }
-    else
+    #if defined(ESP8266)
+      if (path.endsWith("/")) {
+        file.fsDir = SPIFFS.openDir(path);
+        file.fsDirType = FileWrapper::DirSource;
+      }
+      else
+        file.fsFile = SPIFFS.open(path, openMode);
+    #elif defined(ESP32)
       file.fsFile = SPIFFS.open(path, openMode);
+    #endif
   }
 
   return file;

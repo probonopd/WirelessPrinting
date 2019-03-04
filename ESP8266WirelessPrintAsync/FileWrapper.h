@@ -8,13 +8,15 @@ class FileWrapper : public Stream {
   friend class StorageFS;
 
   private:
-    enum FSDirType { Null, DirSource, DirEntry };
-
     File sdFile;
     String cachedName;
     fs::File fsFile;
-    fs::Dir fsDir;
-    FSDirType fsDirType;
+    #if defined(ESP8266)
+      enum FSDirType { Null, DirSource, DirEntry };
+
+      fs::Dir fsDir;
+      FSDirType fsDirType;
+    #endif
 
   public:
     // Print methods
@@ -22,12 +24,17 @@ class FileWrapper : public Stream {
     virtual size_t write(const uint8_t *buf, size_t size);
 
     // Stream methods
+    virtual void flush();
     virtual int available();
     virtual int peek();
     virtual int read();
 
     inline operator bool() {
-      return sdFile || fsFile || fsDirType != Null;
+      return sdFile || fsFile
+      #if defined(ESP8266)
+        || fsDirType != Null;
+      #endif
+      ;
     }
 
     String name();
@@ -37,7 +44,13 @@ class FileWrapper : public Stream {
     void close();
 
     inline bool isDirectory() {
-      return sdFile ? sdFile.isDirectory() : (fsDirType == DirSource);
+      if (sdFile)
+        return sdFile.isDirectory();
+      #if defined(ESP8266)
+        return fsDirType == DirSource;
+      #else
+        return fsFile ? fsFile.isDirectory() : false;
+      #endif
     }
 
     FileWrapper openNextFile();
