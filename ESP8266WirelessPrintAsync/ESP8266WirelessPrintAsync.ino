@@ -508,12 +508,12 @@ void setup() {
   server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
     String message = "<h1>" + getDeviceName() + "</h1>"
                      "<form enctype=\"multipart/form-data\" action=\"/api/files/local\" method=\"POST\">\n"
-                     "<p>You can also print from the command line using curl:</p>\n"
-                     "<pre>curl -F \"file=@/path/to/some.gcode\" -F \"print=true\" " + IpAddress2String(WiFi.localIP()) + "/api/files/local</pre>\n"
                      "Choose a file to upload: <input name=\"file\" type=\"file\"/><br/>\n"
                      "<input type=\"checkbox\" name=\"print\" id = \"printImmediately\" value=\"true\" checked>\n"
                      "<label for = \"printImmediately\">Print Immediately</label><br/>\n"
                      "<input type=\"submit\" value=\"Upload\" />\n"
+                     "<p>You can also print from the command line using curl:</p>\n"
+                     "<pre>curl -F \"file=@/path/to/some.gcode\" -F \"print=true\" " + IpAddress2String(WiFi.localIP()) + "/api/files/local</pre>\n"
                      "</form>"
                      "<p><script>\nfunction startFunction(command) {\n  var xmlhttp = new XMLHttpRequest();\n  xmlhttp.open(\"POST\", \"/api/job\");\n  xmlhttp.setRequestHeader(\"Content-Type\", \"application/json\");\n  xmlhttp.send(JSON.stringify({command:command}));\n}\n</script>\n<button onclick=\"startFunction(\'cancel\')\">Cancel active print</button>\n<button onclick=\"startFunction(\'start\')\">Print last uploaded file</button></p>\n"
                      "<p><a href=\"/download\">Download</a></p>"
@@ -522,6 +522,9 @@ void setup() {
     request->send(200, "text/html", message);
     #ifdef OTA_UPDATES
                      "<p><form enctype=\"multipart/form-data\" action=\"/update\" method=\"POST\">\nChoose a firmware file: <input name=\"file\" type=\"file\"/><br/>\n<input type=\"submit\" value=\"Update firmware\" /></p>\n</form>"
+                     "<p>You can also update the firmware from the command line using curl:</p>\n"
+                     "<pre>curl -F \"file=@/path/to/firmware.bin\" " + IpAddress2String(WiFi.localIP()) + "/update</pre>\n"
+                     
     #endif
   });
 
