@@ -17,11 +17,11 @@ class StorageFS {
         maxPathLength = 255;
       else {
         hasSPIFFS = SPIFFS.begin();
-        if (hasSPIFFS) {
+        /*if (hasSPIFFS) {
           fs::FSInfo fs_info;
-          maxPathLength = SPIFFS.info(fs_info) ? fs_info.maxPathLength - 1 : 11;
+          maxPathLength = SPIFFS.info(fs_info) ? fs_info.maxPathLength - 1 : 11;*/
           hasSPIFFS = true;
-        }
+        //}
       }
     }
 

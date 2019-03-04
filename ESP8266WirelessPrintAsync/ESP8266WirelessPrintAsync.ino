@@ -36,6 +36,10 @@ const uint32_t serialBauds[] = { 115200, 250000, 500000, 1000000, 57600 };   // 
 #define API_VERSION     "0.1"
 #define VERSION         "1.3.10"
 
+#if defined(ESP32)
+  #define LED_BUILTIN 2
+#endif
+
 // Information from M115
 String fwMachineType = "Unknown";
 uint8_t fwExtruders = 1;

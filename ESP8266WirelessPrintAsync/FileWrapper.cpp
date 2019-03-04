@@ -2,25 +2,22 @@
 #include "StorageFS.h"
 
 size_t FileWrapper::write(uint8_t b) {
-  if (sdFile)
-    return sdFile.write(b);
-  else if (fsFile) {
-    ESP.wdtDisable();
-    size_t wb = fsFile.write(b);
-    ESP.wdtEnable(250);
-    return wb;
-  }
-
-  return 0;
+  uint8_t buf[] = { b };
+  
+  return write(buf, 1);
 }
 
 size_t FileWrapper::write(const uint8_t *buf, size_t len) {
   if (sdFile)
     return sdFile.write(buf, len);
   else if (fsFile) {
-    ESP.wdtDisable();
+    #if defined(ESP8266)
+      ESP.wdtDisable();
+    #endif
     size_t wb = fsFile.write(buf, len);
-    ESP.wdtEnable(250);
+    #if defined(ESP8266)
+      ESP.wdtEnable(250);
+    #endif
     return wb;
   }
 
@@ -137,11 +134,11 @@ FileWrapper FileWrapper::openNextFile() {
       fw.fsDir = fsDir;
       fw.fsDirType = DirEntry;
     }
+  }
 #elif defined(ESP32)
   else if (fsFile)
-    fw.fsFile = sfFile.openNextFile();
+    fw.fsFile = fsFile.openNextFile();
 #endif
-  }
 
   return fw;
 }

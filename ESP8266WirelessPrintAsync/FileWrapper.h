@@ -2,6 +2,9 @@
 
 #define FS_NO_GLOBALS //allow spiffs to coexist with SD card, define BEFORE including FS.h
 #include <FS.h>
+#if defined(ESP32)
+  #include <SPIFFS.h>
+#endif
 #include <SdFat.h>
 
 class FileWrapper : public Stream {
