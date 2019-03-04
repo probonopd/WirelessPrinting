@@ -515,16 +515,14 @@ void setup() {
                      "<label for = \"printImmediately\">Print Immediately</label><br/>\n"
                      "<input type=\"submit\" value=\"Upload\" />\n"
                      "</form>"
-    #ifdef OTA_UPDATES
-                     "<p><form enctype=\"multipart/form-data\" action=\"/update\" method=\"POST\">\nChoose a firmware file: <input name=\"file\" type=\"file\"/><br/>\n<input type=\"submit\" value=\"Update firmware\" /></p>\n</form>"
-    #endif
                      "<p><script>\nfunction startFunction(command) {\n  var xmlhttp = new XMLHttpRequest();\n  xmlhttp.open(\"POST\", \"/api/job\");\n  xmlhttp.setRequestHeader(\"Content-Type\", \"application/json\");\n  xmlhttp.send(JSON.stringify({command:command}));\n}\n</script>\n<button onclick=\"startFunction(\'cancel\')\">Cancel active print</button>\n<button onclick=\"startFunction(\'start\')\">Print last uploaded file</button></p>\n"
                      "<p><a href=\"/download\">Download</a></p>"
                      "<p><a href=\"/info\">Info</a></p>"
-
-
                      "<p>WirelessPrinting <a href=\"https://github.com/probonopd/WirelessPrinting/commit/" + SKETCH_VERSION + "\">" + SKETCH_VERSION + "</a></p>";
     request->send(200, "text/html", message);
+    #ifdef OTA_UPDATES
+                     "<p><form enctype=\"multipart/form-data\" action=\"/update\" method=\"POST\">\nChoose a firmware file: <input name=\"file\" type=\"file\"/><br/>\n<input type=\"submit\" value=\"Update firmware\" /></p>\n</form>"
+    #endif
   });
 
   // Info page
