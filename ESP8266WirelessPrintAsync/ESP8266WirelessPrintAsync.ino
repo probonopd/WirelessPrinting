@@ -784,14 +784,6 @@ void setup() {
     request->send(200, "text/plain", "Received");
   }, handleUpload);
 
-  // Web updates
-  server.on("/update", HTTP_GET, uploadfwRequest);
-  // handler for the /update form POST (once file upload finishes)
-  server.on("/upload", HTTP_POST, [](AsyncWebServerRequest *request){
-      request->send(200);
-    }, handle_update_progress_cb);
-  
-
   server.begin();
 
   #ifdef OTA_UPDATES
@@ -812,13 +804,6 @@ void loop() {
     ArduinoOTA.handle();
   #endif
 
-  //****************
-  //* Web updates *
-  //****************
-  if (restartNow){
-    Serial.println("Restart");
-    ESP.restart();
-  }
 
   //********************
   //* Printer handling *
@@ -974,51 +959,5 @@ void ReceiveResponses() {
     lineStartPos = 0;
     serialResponse = "";
     restartSerialTimeout();
-  }
-}
-
-const char upload_page[] PROGMEM = R"=====(
-<!DOCTYPE HTML>
-<HTML>
-  <HEAD>
-    <TITLE>Firmware upload example</TITLE>
-  </HEAD>
-  <BODY>
-    <H1>Choose .ino.bin file</H1>
-    <form id="uploadform" enctype="multipart/form-data" method="post" action="/upload">
-       <input id="fileupload" name="inobinfile" type="file" />
-       <input type="submit" value="submit" id="submit" />
-    </form>
-  </BODY>
-</HTML>
-)=====";
-
-void uploadfwRequest(AsyncWebServerRequest *request){
-  request->send_P(200, "text/html", upload_page);
-}
-
-static int restartNow = false;
-
-static void handle_update_progress_cb(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
-  uint32_t free_space = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
-  if (!index){
-    Serial.println("Update");
-    Update.runAsync(true);
-    if (!Update.begin(free_space)) {
-      Update.printError(Serial);
-    }
-  }
-
-  if (Update.write(data, len) != len) {
-    Update.printError(Serial);
-  }
-
-  if (final) {
-    if (!Update.end(true)){
-      Update.printError(Serial);
-    } else {
-      restartNow = true;              //Set flag so main loop can issue restart call
-      Serial.println("Update complete");
-    }
   }
 }
