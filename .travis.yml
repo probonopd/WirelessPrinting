@@ -1,36 +1,44 @@
 language: c
-env:
-  - BD=esp8266:esp8266:d1_mini:xtal=80,eesz=4M3M
 
 before_install:
   - "/sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_1.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :1 -ac -screen 0 1280x1024x16"
   - sleep 3
   - export DISPLAY=:1.0
   - wget http://downloads.arduino.cc/arduino-1.8.8-linux64.tar.xz
-  - tar xf arduino-1.8.8-linux64.tar.xz
-
+  - tar xf arduino-*-linux64.tar.xz
+  - ls
+  - export PATH=$(readlink -f arduino-*/):$PATH
+  
 install:
-  - arduino-1.8.8/arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json" --save-prefs
-  - arduino-1.8.8/arduino --install-boards esp8266:esp8266:2.5.0
-  - arduino-1.8.8/arduino --board $BD --save-prefs
-  - arduino-1.8.8/arduino --pref "compiler.warning_level=all" --save-prefs
+  - arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json,https://dl.espressif.com/dl/package_esp32_index.json" --save-prefs
+  - arduino --install-boards esp8266:esp8266:2.5.0
+  - arduino --install-boards esp32:esp32
+  - arduino --pref "compiler.warning_level=all" --save-prefs
   - # For async; unfortunately these libraries are still not the default in arduino/esp8266 yet
   - mkdir -p $HOME/Arduino/libraries/
   - cd $HOME/Arduino/libraries/
   - git clone https://github.com/greiman/SdFat
   - git clone -o 95dedf7 https://github.com/me-no-dev/ESPAsyncWebServer
-  - git clone -o 7e9ed22 https://github.com/me-no-dev/ESPAsyncTCP
+  - git clone -o 7e9ed22 https://github.com/me-no-dev/ESPAsyncTCP # for esp8266
+  - git clone https://github.com/me-no-dev/AsyncTCP # for esp32
   - git clone -o 1c02154 https://github.com/alanswx/ESPAsyncWiFiManager
   - ( git clone -b 6.x https://github.com/bblanchon/ArduinoJson ; cd ArduinoJson ; git reset --hard 3df4efd )
   - cd -
 
 script:
   - VERSION=$(git rev-parse --short HEAD)
+  - cd $HOME
   - sed -i -e 's|#define SKETCH_VERSION ".*"|#define SKETCH_VERSION "'$VERSION'"|' $PWD/ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
-  - arduino-1.8.8/arduino --pref build.path=. --verify --verbose-build --board $BD $PWD/ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
+  - export BD=esp32:esp32:esp32
+  - arduino --pref build.path=. --verify --verbose-build --board $BD $PWD/ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
   - BOARD=$(echo $BD | cut -d ":" -f 3)
   - mv ./ESP8266WirelessPrintAsync.ino.bin "ESP8266WirelessPrintAsync_${BOARD}_${VERSION}.bin"
-
+  - cd $HOME
+  - export BD=esp8266:esp8266:d1_mini:xtal=80,eesz=4M3M
+  - arduino --pref build.path=. --verify --verbose-build --board $BD $PWD/ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
+  - BOARD=$(echo $BD | cut -d ":" -f 3)
+  - mv ./ESP8266WirelessPrintAsync.ino.bin "ESP8266WirelessPrintAsync_${BOARD}_${VERSION}.bin"
+  
 after_success:
   - wget -c https://github.com/probonopd/uploadtool/raw/master/upload.sh
   - bash ./upload.sh *.bin
