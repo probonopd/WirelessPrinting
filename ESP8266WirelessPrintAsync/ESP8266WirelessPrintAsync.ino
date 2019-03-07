@@ -351,7 +351,15 @@ bool M115ExtractBool(const String response, const String field, const bool onErr
 }
 
 inline String getDeviceName() {
-  return fwMachineType + " (" + String(ESP.getChipId(), HEX) + ")";
+  #if defined(ESP8266)
+    return fwMachineType + " (" + String(ESP.getChipId(), HEX) + ")";
+  #elif defined(ESP32)
+    uint64_t chipid = ESP.getEfuseMac();
+
+    return fwMachineType + " (" + String((uint16_t)(chipid >> 32), HEX) + String((uint32_t)chipid, HEX) + ")";
+  #else
+    #error Unimplemented chip!
+  #endif
 }
 
 void mDNSInit() {
@@ -501,8 +509,15 @@ void setup() {
   telnetServer.begin();
   telnetServer.setNoDelay(true);
 
-  if (storageFS.activeSPIFFS())
-    server.addHandler(new SPIFFSEditor());
+  if (storageFS.activeSPIFFS()) {
+    #if defined(ESP8266)
+      server.addHandler(new SPIFFSEditor());
+    #elif defined(ESP32)
+      server.addHandler(new SPIFFSEditor(SPIFFS));
+    #else
+      #error Unsupported SOC
+    #endif
+  }
 
   initUploadedFilename();
 
