@@ -27,15 +27,17 @@ DNSServer dns;
 #define OTA_UPDATES                     // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load any code on device)
 //#define OTA_PASSWORD ""               // Uncomment to protect OTA updates and assign a password (inside "")
 #define MAX_SUPPORTED_EXTRUDERS 6       // Number of supported extruder
-#define REPEAT_M115_TIMES 1             // M115 retries with same baud (MAX 255)
 
 #define PRINTER_RX_BUFFER_SIZE 0        // This is printer firmware 'RX_BUFFER_SIZE'. If such parameter is unknown please use 0
 #define TEMPERATURE_REPORT_INTERVAL 2   // Ask the printer for its temperatures status every 2 seconds
 #define KEEPALIVE_INTERVAL 2500         // Marlin defaults to 2 seconds, get a little of margin
-const uint32_t serialBauds[] = { 115200, 250000, 500000, 1000000, 57600 };   // Marlin valid bauds (removed very low bauds; roughly ordered by popularity to speed things up)
+const uint32_t serialBauds[] = { 1000000, 500000, 250000, 115200, 57600 };   // Marlin valid bauds (removed very low bauds)
 
 #define API_VERSION     "0.1"
 #define VERSION         "1.3.10"
+
+// The sketch on the ESP
+bool ESPrestartRequired;  // Set this flag in the callbacks to restart ESP
 
 // Information from M115
 String fwMachineType = "Unknown";
@@ -377,7 +379,6 @@ void mDNSInit() {
 
 bool detectPrinter() {
   static int printerDetectionState;
-  static byte nM115;
 
   switch (printerDetectionState) {
     case 0:
@@ -390,7 +391,7 @@ bool detectPrinter() {
       // Initialize baud and send a request to printezr
       Serial.begin(serialBauds[serialBaudIndex]);
       telnetSend("Connecting at " + String(serialBauds[serialBaudIndex]));
-      commandQueue.push("M115"); // M115 - Firmware Info
+      commandQueue.push("\xFFM115"); // M115 - Firmware Info
       printerDetectionState = 20;
       break;
 
@@ -399,22 +400,18 @@ bool detectPrinter() {
       if (commandQueue.isEmpty()) {
         String value = M115ExtractString(lastReceivedResponse, "MACHINE_TYPE");
         if (value == "") {
-          if (nM115++ >= REPEAT_M115_TIMES) {
-            nM115 = 0;
-            ++serialBaudIndex;
-            if (serialBaudIndex < sizeof(serialBauds) / sizeof(serialBauds[0]))
-              printerDetectionState = 10;
-            else
-              printerDetectionState = 0;   
-          } 
+          ++serialBaudIndex;
+          if (serialBaudIndex < sizeof(serialBauds) / sizeof(serialBauds[0]))
+            printerDetectionState = 10;
           else
-            printerDetectionState = 10;      
+            printerDetectionState = 0;
         }
         else {
           telnetSend("Connected");
 
           fwMachineType = value;
           value = M115ExtractString(lastReceivedResponse, "EXTRUDER_COUNT");
+
           fwExtruders = value == "" ? 1 : min(value.toInt(), (long)MAX_SUPPORTED_EXTRUDERS);
           fwAutoreportTempCap = M115ExtractBool(lastReceivedResponse, "Cap:AUTOREPORT_TEMP");
           fwProgressCap = M115ExtractBool(lastReceivedResponse, "Cap:PROGRESS");
@@ -518,9 +515,14 @@ void setup() {
                      "<label for = \"printImmediately\">Print Immediately</label><br/>\n"
                      "<input type=\"submit\" value=\"Upload\" />\n"
                      "</form>"
+    #ifdef OTA_UPDATES
+                     "<p><form enctype=\"multipart/form-data\" action=\"/update\" method=\"POST\">\nChoose a firmware file: <input name=\"file\" type=\"file\"/><br/>\n<input type=\"submit\" value=\"Update firmware\" /></p>\n</form>"
+    #endif
                      "<p><script>\nfunction startFunction(command) {\n  var xmlhttp = new XMLHttpRequest();\n  xmlhttp.open(\"POST\", \"/api/job\");\n  xmlhttp.setRequestHeader(\"Content-Type\", \"application/json\");\n  xmlhttp.send(JSON.stringify({command:command}));\n}\n</script>\n<button onclick=\"startFunction(\'cancel\')\">Cancel active print</button>\n<button onclick=\"startFunction(\'start\')\">Print last uploaded file</button></p>\n"
                      "<p><a href=\"/download\">Download</a></p>"
                      "<p><a href=\"/info\">Info</a></p>"
+
+
                      "<p>WirelessPrinting <a href=\"https://github.com/probonopd/WirelessPrinting/commit/" + SKETCH_VERSION + "\">" + SKETCH_VERSION + "</a></p>";
     request->send(200, "text/html", message);
   });
@@ -751,7 +753,7 @@ void setup() {
 
       if (!index)
         content = "";
-      for (int i = 0; i < len; ++i)
+      for (size_t i = 0; i < len; ++i)
         content += (char)data[i];
       if (content.length() >= total) {
         DynamicJsonDocument doc(1024);
@@ -783,15 +785,44 @@ void setup() {
   server.on("/api/print", HTTP_POST, [](AsyncWebServerRequest * request) {
     request->send(200, "text/plain", "Received");
   }, handleUpload);
-
-  // Web updates
-  server.on("/update", HTTP_GET, uploadfwRequest);
-  // handler for the /update form POST (once file upload finishes)
-  server.on("/upload", HTTP_POST, [](AsyncWebServerRequest *request){
-      request->send(200);
-    }, handle_update_progress_cb);
   
-
+  #ifdef OTA_UPDATES  
+  // Handling ESP firmware file upload
+  // https://github.com/me-no-dev/ESPAsyncWebServer/issues/3#issuecomment-354528317
+  // https://gist.github.com/JMishou/60cb762047b735685e8a09cd2eb42a60
+  server.on("/update", HTTP_POST, [](AsyncWebServerRequest *request) {
+    // the request handler is triggered after the upload has finished... 
+    // create the response, add header, and send response
+    AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", (Update.hasError())?"FAIL":"OK");
+    response->addHeader("Connection", "close");
+    response->addHeader("Access-Control-Allow-Origin", "*");
+    ESPrestartRequired = true;  // Tell the main loop to restart the ESP
+    request->send(response);
+  }, [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+    //Upload handler chunks in data
+    if (!index) { // if index == 0 then this is the first frame of data
+      Serial.printf("UploadStart: %s\n", filename.c_str());
+      Serial.setDebugOutput(true);
+      // calculate sketch space required for the update
+      uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
+      if (!Update.begin(maxSketchSpace)) //start with max available size
+        Update.printError(Serial);
+      Update.runAsync(true); // tell the updaterClass to run in async mode
+    }
+    // Write chunked data to the free sketch space
+    if (Update.write(data, len) != len)
+      Update.printError(Serial);
+    
+    if (final) { // if the final flag is set then this is the last frame of data
+      if (Update.end(true)) //true to set the size to the current progress
+        Serial.printf("Update Success: %u B\nRebooting...\n", index+len);
+      else
+        Update.printError(Serial);
+      Serial.setDebugOutput(false);
+    }
+  });
+  #endif
+  
   server.begin();
 
   #ifdef OTA_UPDATES
@@ -809,16 +840,14 @@ void loop() {
     //****************
     //* OTA handling *
     //****************
+    if (ESPrestartRequired) {  // check the flag here to determine if a restart is required
+      Serial.printf("Restarting ESP\n\r");
+      ESPrestartRequired = false;
+      ESP.restart();
+    }
+
     ArduinoOTA.handle();
   #endif
-
-  //****************
-  //* Web updates *
-  //****************
-  if (restartNow){
-    Serial.println("Restart");
-    ESP.restart();
-  }
 
   //********************
   //* Printer handling *
@@ -929,7 +958,7 @@ void ReceiveResponses() {
         printerUsedBuffer = max(printerUsedBuffer - cmdLen, 0u);
         responseDetail = "ok";
       }
-      else if (printerConnected) {
+      else {
         if (parseTemperatures(serialResponse))
           responseDetail = "autotemp";
         else if (parsePosition(serialResponse))
@@ -948,9 +977,6 @@ void ReceiveResponses() {
           incompleteResponse = true;
           responseDetail = "wait more";
         }
-      } else {
-          incompleteResponse = true;
-          responseDetail = "discovering";
       }
 
       int responseLength = serialResponse.length();
@@ -974,51 +1000,5 @@ void ReceiveResponses() {
     lineStartPos = 0;
     serialResponse = "";
     restartSerialTimeout();
-  }
-}
-
-const char upload_page[] PROGMEM = R"=====(
-<!DOCTYPE HTML>
-<HTML>
-  <HEAD>
-    <TITLE>Firmware upload example</TITLE>
-  </HEAD>
-  <BODY>
-    <H1>Choose .ino.bin file</H1>
-    <form id="uploadform" enctype="multipart/form-data" method="post" action="/upload">
-       <input id="fileupload" name="inobinfile" type="file" />
-       <input type="submit" value="submit" id="submit" />
-    </form>
-  </BODY>
-</HTML>
-)=====";
-
-void uploadfwRequest(AsyncWebServerRequest *request){
-  request->send_P(200, "text/html", upload_page);
-}
-
-static int restartNow = false;
-
-static void handle_update_progress_cb(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
-  uint32_t free_space = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
-  if (!index){
-    Serial.println("Update");
-    Update.runAsync(true);
-    if (!Update.begin(free_space)) {
-      Update.printError(Serial);
-    }
-  }
-
-  if (Update.write(data, len) != len) {
-    Update.printError(Serial);
-  }
-
-  if (final) {
-    if (!Update.end(true)){
-      Update.printError(Serial);
-    } else {
-      restartNow = true;              //Set flag so main loop can issue restart call
-      Serial.println("Update complete");
-    }
   }
 }
