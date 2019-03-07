@@ -36,10 +36,6 @@ const uint32_t serialBauds[] = { 115200, 250000, 500000, 1000000, 57600 };   // 
 #define API_VERSION     "0.1"
 #define VERSION         "1.3.10"
 
-#if defined(ESP32)
-  #define LED_BUILTIN 2
-#endif
-
 // Information from M115
 String fwMachineType = "Unknown";
 uint8_t fwExtruders = 1;
@@ -94,7 +90,9 @@ inline String IpAddress2String(const IPAddress& ipAddress) {
 }
 
 inline void setLed(const bool status) {
-  digitalWrite(LED_BUILTIN, status ? LOW : HIGH);   // Note: LOW turn the LED on
+  #if defined(LED_BUILTIN)
+    digitalWrite(LED_BUILTIN, status ? LOW : HIGH);   // Note: LOW turn the LED on
+  #endif
 }
 
 inline void telnetSend(const String line) {
@@ -486,7 +484,9 @@ inline String stringify(bool value) {
 }
 
 void setup() {
-  pinMode(LED_BUILTIN, OUTPUT);     // Initialize the LED_BUILTIN pin as an output
+  #if defined(LED_BUILTIN)
+    pinMode(LED_BUILTIN, OUTPUT);     // Initialize the LED_BUILTIN pin as an output
+  #endif
 
   #ifdef USE_FAST_SD
     storageFS.begin(true);
