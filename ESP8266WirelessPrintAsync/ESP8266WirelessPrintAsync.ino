@@ -801,24 +801,37 @@ void setup() {
   }, [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
     //Upload handler chunks in data
     if (!index) { // if index == 0 then this is the first frame of data
-      Serial.printf("UploadStart: %s\n", filename.c_str());
-      Serial.setDebugOutput(true);
+      //Serial.printf("UploadStart: %s\n", filename.c_str());
+      lcd("Update Start");
+      telnetSend("Update Start");
+      //Serial.setDebugOutput(true);
       // calculate sketch space required for the update
       uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
-      if (!Update.begin(maxSketchSpace)) //start with max available size
-        Update.printError(Serial);
+      if (!Update.begin(maxSketchSpace)){ //start with max available size
+        //Update.printError(Serial);
+        lcd("Update Error0");
+        telnetSend("Update Error0");        
+      }
       Update.runAsync(true); // tell the updaterClass to run in async mode
     }
     // Write chunked data to the free sketch space
-    if (Update.write(data, len) != len)
-      Update.printError(Serial);
-    
+    if (Update.write(data, len) != len) {
+        lcd("Update Error1");
+        telnetSend("Update Error1");       
+    }
+//      Update.printError(Serial);
+        
     if (final) { // if the final flag is set then this is the last frame of data
-      if (Update.end(true)) //true to set the size to the current progress
-        Serial.printf("Update Success: %u B\nRebooting...\n", index+len);
-      else
-        Update.printError(Serial);
-      Serial.setDebugOutput(false);
+      if (Update.end(true)) { //true to set the size to the current progress
+//        Serial.printf("Update Success: %u B\nRebooting...\n", index+len);
+        lcd("Update Success");
+        telnetSend("Update Success");
+      }else{
+//        Update.printError(Serial);
+        lcd("Update Error2");
+        telnetSend("Update Error2");
+      }
+//    Serial.setDebugOutput(false);
     }
   });
   #endif
