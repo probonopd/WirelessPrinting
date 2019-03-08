@@ -68,6 +68,8 @@ wget -c "https://raw.githubusercontent.com/esp8266/Arduino/master/tools/espota.p
 python espota.py -i 192.168.0.27 -p 8266 --auth= -f ESP8266WirelessPrint*.bin
 ```
 
+After the initial flashing, you can upload new versions of this firmware from the web interface without any further tools.
+
 ## Initial WiFi Configuration
 Following the instrucions in https://github.com/alanswx/ESPAsyncWiFiManager/ : 
 
