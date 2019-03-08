@@ -890,7 +890,7 @@ void loop() {
   }
 }
 
-inline uint32_t restartSerialTimeout() {
+inline void restartSerialTimeout() {
   serialReceiveTimeoutTimer = millis() + KEEPALIVE_INTERVAL;
 }
 
