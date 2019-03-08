@@ -2,7 +2,9 @@
 
 #include "FileWrapper.h"
 
-extern SdFat SD;
+#if defined(ESP8266)
+  extern SdFat SD;
+#endif
 
 class StorageFS {
   private:
@@ -12,16 +14,23 @@ class StorageFS {
 
   public:
     inline static void begin(const bool fastSD) {
-      hasSD = SD.begin(SS, fastSD ? SD_SCK_MHZ(50) : SPI_HALF_SPEED); // https://github.com/esp8266/Arduino/issues/1853
+      #if defined(ESP8266)
+        hasSD = SD.begin(SS, fastSD ? SD_SCK_MHZ(50) : SPI_HALF_SPEED); // https://github.com/esp8266/Arduino/issues/1853
+      #elif defined(ESP32)
+        hasSD = SD.begin(SS, SPI, fastSD ? 50000000 : 4000000);
+      #endif
       if (hasSD)
         maxPathLength = 255;
       else {
         hasSPIFFS = SPIFFS.begin();
-        /*if (hasSPIFFS) {
-          fs::FSInfo fs_info;
-          maxPathLength = SPIFFS.info(fs_info) ? fs_info.maxPathLength - 1 : 11;*/
-          hasSPIFFS = true;
-        //}
+        #if defined(ESP8266)
+          if (hasSPIFFS) {
+            fs::FSInfo fs_info;
+            maxPathLength = SPIFFS.info(fs_info) ? fs_info.maxPathLength - 1 : 11;
+          }
+        #elif defined(ESP8266)
+          maxPathLength = 11;
+        #endif
       }
     }
 

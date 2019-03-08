@@ -2,12 +2,11 @@
 
 #define FS_NO_GLOBALS // allow spiffs to coexist with SD card, define BEFORE including FS.h
 #include <FS.h>
-#if defined(ESP32)
+#if defined(ESP8266)
+  #include <SdFat.h>
+#elif defined(ESP32)
   #include <SPIFFS.h>
   #include <SD.h>
-#endif
-#if defined(ESP8266)
-#include <SdFat.h>
 #endif
 
 class FileWrapper : public Stream {
@@ -15,11 +14,11 @@ class FileWrapper : public Stream {
 
   private:
     File sdFile;
-    String cachedName;
     fs::File fsFile;
     #if defined(ESP8266)
       enum FSDirType { Null, DirSource, DirEntry };
 
+      String cachedName;
       fs::Dir fsDir;
       FSDirType fsDirType;
     #endif

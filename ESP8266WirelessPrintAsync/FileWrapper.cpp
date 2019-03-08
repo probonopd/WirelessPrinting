@@ -55,15 +55,19 @@ int FileWrapper::read() {
 
 String FileWrapper::name() {
   if (sdFile) {
-    if (cachedName == "") {
-      const int maxPathLength = StorageFS::getMaxPathLength();
-      char *namePtr = (char *)malloc(maxPathLength + 1);
-      sdFile.getName(namePtr, maxPathLength);
-      cachedName = String(namePtr);
-      free (namePtr);
+    #if defined(ESP8266)
+      if (cachedName == "") {
+        const int maxPathLength = StorageFS::getMaxPathLength();
+        char *namePtr = (char *)malloc(maxPathLength + 1);
+        sdFile.getName(namePtr, maxPathLength);
+        cachedName = String(namePtr);
+        free (namePtr);
       }
 
-    return cachedName;
+      return cachedName;
+    #elif defined(ESP32)
+      return sdFile.name();
+    #endif
   }
   else {
     #if defined(ESP8266)

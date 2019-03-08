@@ -1,6 +1,8 @@
 #include "StorageFS.h"
 
-SdFat SD;
+#if defined(ESP8266)
+  SdFat SD;
+#endif
 StorageFS storageFS;
 
 bool StorageFS::hasSD, 
@@ -15,12 +17,13 @@ FileWrapper StorageFS::open(const String path, const char *openMode) {
     return file;
 
   if (hasSD) {
-    const char *pathStr = path.c_str();
-    const bool isWriteMode = (openMode[0] == 'w');
-
-    file.sdFile = SD.open(pathStr, isWriteMode ? (O_WRITE | O_CREAT | O_TRUNC) : FILE_READ);
-    if (file && file.sdFile.isDirectory())
-      file.sdFile.rewindDirectory();
+    #if defined(ESP8266)
+      file.sdFile = SD.open(path.c_str(), openMode[0] == 'w' ? (O_WRITE | O_CREAT | O_TRUNC) : FILE_READ);
+      if (file && file.sdFile.isDirectory())
+        file.sdFile.rewindDirectory();
+    #elif defined(ESP32)
+      file.sdFile = SD.open(path, openMode);
+    #endif
   }
   else if (hasSPIFFS) {
     #if defined(ESP8266)
