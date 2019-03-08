@@ -1,11 +1,14 @@
 #pragma once
 
-#define FS_NO_GLOBALS //allow spiffs to coexist with SD card, define BEFORE including FS.h
+#define FS_NO_GLOBALS // allow spiffs to coexist with SD card, define BEFORE including FS.h
 #include <FS.h>
 #if defined(ESP32)
   #include <SPIFFS.h>
+  #include <SD.h>
 #endif
+#if defined(ESP8266)
 #include <SdFat.h>
+#endif
 
 class FileWrapper : public Stream {
   friend class StorageFS;
