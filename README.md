@@ -55,9 +55,11 @@ git clone https://github.com/greiman/SdFat # SD long names support
 git clone https://github.com/me-no-dev/AsyncTCP # for ESP32
 cd -
 ```
-### Flashing
+### Flashing from Linux
 
 Can be flashed via USB or (subsequently) over the air. You can use the Arduino IDE if you compiled yourself, or one of the following commands if you just want to flash a precompiled firmware.
+
+#### ESP8266
 
 ```
 # USB
@@ -66,6 +68,17 @@ sudo chmod a+x /dev/ttyUSB0 ; /tmp/.mount_*/usr/bin/hardware/esp8266/esp8266/too
 # Wireless
 wget -c "https://raw.githubusercontent.com/esp8266/Arduino/master/tools/espota.py"
 python espota.py -i 192.168.0.27 -p 8266 --auth= -f ESP8266WirelessPrint*.bin
+```
+
+##### ESP32
+
+```
+# USB
+sudo apt install python-serial
+sudo chmod a+x /dev/ttyUSB0 ; python $HOME/.arduino15/packages/esp32/tools/esptool_py/2.6.0/esptool.py --chip esp32 --port /dev/ttyUSB0 write_flash 0x10000 ESP8266WirelessPrintAsync_esp32_*.bin
+
+# Wireless
+python $HOME/.arduino15/packages/esp32/hardware/esp32/1.0.1/tools/espota.py -i 192.168.0.16 -p 3232 --auth= -f ESP8266WirelessPrintAsync_esp32_*.bin
 ```
 
 After the initial flashing, you can upload new versions of this firmware from the web interface without any further tools.
