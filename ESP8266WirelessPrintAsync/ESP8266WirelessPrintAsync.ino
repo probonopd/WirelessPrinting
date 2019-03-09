@@ -836,15 +836,18 @@ void setup() {
       // calculate sketch space required for the update
 
       #if defined(ESP8266)
-      uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
+      uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;      
+      if (!Update.begin(maxSketchSpace)){ // Start with max available size
       #endif
-      if (!Update.begin(maxSketchSpace)){ //start with max available size
+      #if defined(ESP32)
+      if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { // Start with max available size
+      #endif
         //Update.printError(Serial);
         lcd("Update Error0");
         telnetSend("Update Error0");        
       }
       #if defined(ESP8266)
-      Update.runAsync(true); // tell the updaterClass to run in async mode
+      Update.runAsync(true); // Tell the updaterClass to run in async mode
       #endif
     }
     // Write chunked data to the free sketch space
