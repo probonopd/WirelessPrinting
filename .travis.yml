@@ -33,11 +33,11 @@ script:
   - arduino --pref build.path=. --verify --verbose-build --board $BD ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
   - BOARD=$(echo $BD | cut -d ":" -f 3)
   - mv ./ESP8266WirelessPrintAsync.ino.bin "ESP8266WirelessPrintAsync_${BOARD}_${VERSION}.bin"
-  - cd $HERE
-  - export BD=esp8266:esp8266:d1_mini:xtal=80,eesz=4M3M
-  - arduino --pref build.path=. --verify --verbose-build --board $BD ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
-  - BOARD=$(echo $BD | cut -d ":" -f 3)
-  - mv ./ESP8266WirelessPrintAsync.ino.bin "ESP8266WirelessPrintAsync_${BOARD}_${VERSION}.bin"
+  # cd $HERE
+  # export BD=esp8266:esp8266:d1_mini:xtal=80,eesz=4M3M
+  # arduino --pref build.path=. --verify --verbose-build --board $BD ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
+  # BOARD=$(echo $BD | cut -d ":" -f 3)
+  # mv ./ESP8266WirelessPrintAsync.ino.bin "ESP8266WirelessPrintAsync_${BOARD}_${VERSION}.bin"
   
 after_success:
   - wget -c https://github.com/probonopd/uploadtool/raw/master/upload.sh
