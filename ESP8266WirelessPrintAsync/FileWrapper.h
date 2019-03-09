@@ -6,6 +6,7 @@
   #include <SdFat.h>
 #elif defined(ESP32)
   #include <SPIFFS.h>
+  #define FORMAT_SPIFFS_IF_FAILED true
   #include <SD.h>
 #endif
 

@@ -22,13 +22,14 @@ class StorageFS {
       if (hasSD)
         maxPathLength = 255;
       else {
-        hasSPIFFS = SPIFFS.begin();
         #if defined(ESP8266)
+          hasSPIFFS = SPIFFS.begin();
           if (hasSPIFFS) {
             fs::FSInfo fs_info;
             maxPathLength = SPIFFS.info(fs_info) ? fs_info.maxPathLength - 1 : 11;
           }
-        #elif defined(ESP8266)
+        #elif defined(ESP32)
+          hasSPIFFS = SPIFFS.begin(true);
           maxPathLength = 11;
         #endif
       }
