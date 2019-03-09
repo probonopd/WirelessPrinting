@@ -1,5 +1,10 @@
 language: c
 
+env:
+  matrix:
+    - BD=esp8266:esp8266:d1_mini:xtal=80,eesz=4M3M
+    - BD=esp32:esp32:esp32
+  
 before_install:
   - "/sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_1.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :1 -ac -screen 0 1280x1024x16"
   - sleep 3
@@ -11,8 +16,8 @@ before_install:
   
 install:
   - arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json,https://dl.espressif.com/dl/package_esp32_index.json" --save-prefs
-  - arduino --install-boards esp8266:esp8266:2.5.0
-  - arduino --install-boards esp32:esp32
+  - if [[ "$BD" =~ "esp8266:esp8266:" ]]; then arduino --install-boards esp8266:esp8266:2.5.0 ; fi
+  - if [[ "$BD" =~ "esp32:esp32:" ]]; then arduino --install-boards esp32:esp32 ; fi
   - arduino --pref "compiler.warning_level=all" --save-prefs
   - # For async; unfortunately these libraries are still not the default in arduino/esp8266 yet
   - mkdir -p $HOME/Arduino/libraries/
@@ -29,18 +34,13 @@ script:
   - VERSION=$(git rev-parse --short HEAD)
   - HERE=$(readlink -f .)
   - sed -i -e 's|#define SKETCH_VERSION ".*"|#define SKETCH_VERSION "'$VERSION'"|' $PWD/ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
-  - export BD=esp32:esp32:esp32
   - arduino --pref build.path=. --verify --verbose-build --board $BD ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
   - BOARD=$(echo $BD | cut -d ":" -f 3)
   - mv ./ESP8266WirelessPrintAsync.ino.bin "ESP8266WirelessPrintAsync_${BOARD}_${VERSION}.bin"
-  # cd $HERE
-  # export BD=esp8266:esp8266:d1_mini:xtal=80,eesz=4M3M
-  # arduino --pref build.path=. --verify --verbose-build --board $BD ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
-  # BOARD=$(echo $BD | cut -d ":" -f 3)
-  # mv ./ESP8266WirelessPrintAsync.ino.bin "ESP8266WirelessPrintAsync_${BOARD}_${VERSION}.bin"
   
 after_success:
   - wget -c https://github.com/probonopd/uploadtool/raw/master/upload.sh
+  - rm *.partitions.bin || true
   - bash ./upload.sh *.bin
 
 branches:
