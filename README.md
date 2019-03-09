@@ -50,7 +50,7 @@ cd $HOME/Arduino/libraries/
 git clone https://github.com/me-no-dev/ESPAsyncWebServer
 git clone -o 991f855 https://github.com/me-no-dev/ESPAsyncTCP
 git clone -o 6734c16 https://github.com/alanswx/ESPAsyncWiFiManager
-( git clone -b 5.x https://github.com/bblanchon/ArduinoJson ; cd ArduinoJson ; git reset --hard ed98ea4 )
+( git clone -b 6.x https://github.com/bblanchon/ArduinoJson ; cd ArduinoJson ; git reset --hard 3df4efd )
 git clone https://github.com/greiman/SdFat # SD long names support
 git clone https://github.com/me-no-dev/AsyncTCP # for ESP32
 cd -
@@ -67,6 +67,8 @@ sudo chmod a+x /dev/ttyUSB0 ; /tmp/.mount_*/usr/bin/hardware/esp8266/esp8266/too
 wget -c "https://raw.githubusercontent.com/esp8266/Arduino/master/tools/espota.py"
 python espota.py -i 192.168.0.27 -p 8266 --auth= -f ESP8266WirelessPrint*.bin
 ```
+
+After the initial flashing, you can upload new versions of this firmware from the web interface without any further tools.
 
 ## Initial WiFi Configuration
 Following the instrucions in https://github.com/alanswx/ESPAsyncWiFiManager/ : 
