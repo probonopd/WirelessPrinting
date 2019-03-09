@@ -2,29 +2,33 @@
 #include "StorageFS.h"
 
 size_t FileWrapper::write(uint8_t b) {
-  if (sdFile)
-    return sdFile.write(b);
-  else if (fsFile) {
-    ESP.wdtDisable();
-    size_t wb = fsFile.write(b);
-    ESP.wdtEnable(250);
-    return wb;
-  }
-
-  return 0;
+  uint8_t buf[] = { b };
+  
+  return write(buf, 1);
 }
 
 size_t FileWrapper::write(const uint8_t *buf, size_t len) {
   if (sdFile)
     return sdFile.write(buf, len);
   else if (fsFile) {
-    ESP.wdtDisable();
+    #if defined(ESP8266)
+      ESP.wdtDisable();
+    #endif
     size_t wb = fsFile.write(buf, len);
-    ESP.wdtEnable(250);
+    #if defined(ESP8266)
+      ESP.wdtEnable(250);
+    #endif
     return wb;
   }
 
   return 0;
+}
+
+void FileWrapper::flush() {
+  if (sdFile)
+    return sdFile.flush();
+  else if (fsFile)
+    return fsFile.flush();
 }
 
 int FileWrapper::available() {
@@ -51,23 +55,33 @@ int FileWrapper::read() {
 
 String FileWrapper::name() {
   if (sdFile) {
-    if (cachedName == "") {
-      const int maxPathLength = StorageFS::getMaxPathLength();
-      char *namePtr = (char *)malloc(maxPathLength + 1);
-      sdFile.getName(namePtr, maxPathLength);
-      cachedName = String(namePtr);
-      free (namePtr);
+    #if defined(ESP8266)
+      if (cachedName == "") {
+        const int maxPathLength = StorageFS::getMaxPathLength();
+        char *namePtr = (char *)malloc(maxPathLength + 1);
+        sdFile.getName(namePtr, maxPathLength);
+        cachedName = String(namePtr);
+        free (namePtr);
       }
 
-    return cachedName;
+      return cachedName;
+    #elif defined(ESP32)
+      return sdFile.name();
+    #endif
   }
-  else if (fsDirType != DirEntry)
-    return "";
+  else {
+    #if defined(ESP8266)
+      if (fsDirType != DirEntry)
+        return "";
 
-  String name = fsDir.fileName();
-  int i = name.lastIndexOf("/");
+      String name = fsDir.fileName();
+      int i = name.lastIndexOf("/");
 
-  return i == -1 ? name : name.substring(i + 1);
+      return i == -1 ? name : name.substring(i + 1);
+    #elif defined(ESP32)
+      return fsFile.name();
+    #endif
+  }
 }
 
 uint32_t FileWrapper::size() {
@@ -75,8 +89,10 @@ uint32_t FileWrapper::size() {
     return sdFile.size();
   else if (fsFile)
     return fsFile.size();
+#if defined(ESP8266)
   else if (fsDirType == DirEntry)
     return fsDir.fileSize();
+#endif
 
   return 0;
 }
@@ -103,10 +119,12 @@ void FileWrapper::close() {
     fsFile.close();
     fsFile = fs::File();
   }
- else if (fsDirType != Null) {
+#if defined(ESP8266)
+  else if (fsDirType != Null) {
     fsDir = fs::Dir();
     fsDirType = Null;
   }
+#endif
 }
 
 FileWrapper FileWrapper::openNextFile() {
@@ -114,12 +132,17 @@ FileWrapper FileWrapper::openNextFile() {
 
   if (sdFile)
     fw.sdFile = sdFile.openNextFile();
+#if defined(ESP8266)
   else if (fsDirType == DirSource) {
     if (fsDir.next()) {
       fw.fsDir = fsDir;
       fw.fsDirType = DirEntry;
     }
   }
+#elif defined(ESP32)
+  else if (fsFile)
+    fw.fsFile = fsFile.openNextFile();
+#endif
 
   return fw;
 }

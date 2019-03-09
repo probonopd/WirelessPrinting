@@ -5,6 +5,7 @@
   #include <ESP8266mDNS.h>        // https://github.com/esp8266/Arduino/tree/master/libraries/ESP8266mDNS
 #elif defined(ESP32)
   #include <ESPmDNS.h>
+  #include <Update.h>
 #endif
 #include <ArduinoJson.h>          // https://github.com/bblanchon/ArduinoJson (for implementing a subset of the OctoPrint API)
 #include <DNSServer.h>
@@ -93,7 +94,9 @@ inline String IpAddress2String(const IPAddress& ipAddress) {
 }
 
 inline void setLed(const bool status) {
-  digitalWrite(LED_BUILTIN, status ? LOW : HIGH);   // Note: LOW turn the LED on
+  #if defined(LED_BUILTIN)
+    digitalWrite(LED_BUILTIN, status ? LOW : HIGH);   // Note: LOW turn the LED on
+  #endif
 }
 
 inline void telnetSend(const String line) {
@@ -350,7 +353,15 @@ bool M115ExtractBool(const String response, const String field, const bool onErr
 }
 
 inline String getDeviceName() {
-  return fwMachineType + " (" + String(ESP.getChipId(), HEX) + ")";
+  #if defined(ESP8266)
+    return fwMachineType + " (" + String(ESP.getChipId(), HEX) + ")";
+  #elif defined(ESP32)
+    uint64_t chipid = ESP.getEfuseMac();
+
+    return fwMachineType + " (" + String((uint16_t)(chipid >> 32), HEX) + String((uint32_t)chipid, HEX) + ")";
+  #else
+    #error Unimplemented chip!
+  #endif
 }
 
 void mDNSInit() {
@@ -477,7 +488,9 @@ inline String stringify(bool value) {
 }
 
 void setup() {
-  pinMode(LED_BUILTIN, OUTPUT);     // Initialize the LED_BUILTIN pin as an output
+  #if defined(LED_BUILTIN)
+    pinMode(LED_BUILTIN, OUTPUT);     // Initialize the LED_BUILTIN pin as an output
+  #endif
 
   #ifdef USE_FAST_SD
     storageFS.begin(true);
@@ -500,8 +513,15 @@ void setup() {
   telnetServer.begin();
   telnetServer.setNoDelay(true);
 
-  if (storageFS.activeSPIFFS())
-    server.addHandler(new SPIFFSEditor());
+  if (storageFS.activeSPIFFS()) {
+    #if defined(ESP8266)
+      server.addHandler(new SPIFFSEditor());
+    #elif defined(ESP32)
+      server.addHandler(new SPIFFSEditor(SPIFFS));
+    #else
+      #error Unsupported SOC
+    #endif
+  }
 
   initUploadedFilename();
 
@@ -814,13 +834,21 @@ void setup() {
       telnetSend("Update Start");
       //Serial.setDebugOutput(true);
       // calculate sketch space required for the update
-      uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
-      if (!Update.begin(maxSketchSpace)){ //start with max available size
+
+      #if defined(ESP8266)
+      uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;      
+      if (!Update.begin(maxSketchSpace)){ // Start with max available size
+      #endif
+      #if defined(ESP32)
+      if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { // Start with max available size
+      #endif
         //Update.printError(Serial);
         lcd("Update Error0");
         telnetSend("Update Error0");        
       }
-      Update.runAsync(true); // tell the updaterClass to run in async mode
+      #if defined(ESP8266)
+      Update.runAsync(true); // Tell the updaterClass to run in async mode
+      #endif
     }
     // Write chunked data to the free sketch space
     if (Update.write(data, len) != len) {
@@ -936,7 +964,7 @@ void loop() {
   }
 }
 
-inline uint32_t restartSerialTimeout() {
+inline void restartSerialTimeout() {
   serialReceiveTimeoutTimer = millis() + KEEPALIVE_INTERVAL;
 }
 
