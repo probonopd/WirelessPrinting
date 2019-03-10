@@ -43,6 +43,7 @@ The following build procedure works on Linux:
 
 ```
 sudo su
+sudo apt-get install python-serial # Otherwise cannot build for ESP32
 
 BD=esp8266:esp8266:d1_mini:xtal=80,eesz=4M3M
 # or 
