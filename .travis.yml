@@ -11,7 +11,6 @@ before_install:
   - export DISPLAY=:1.0
   - wget http://downloads.arduino.cc/arduino-1.8.8-linux64.tar.xz
   - tar xf arduino-*-linux64.tar.xz
-  - ls
   - export PATH=$(readlink -f arduino-*/):$PATH
   
 install:
