@@ -16,6 +16,15 @@
 
 #include "CommandQueue.h"
 
+// On ESP8266 use the normal Serial() for now, but name it PrinterSerial for compatibility with ESP32
+// On ESP32, use Serial1 (rather than the normal Serial0 which prints stuff during boot that confuses the printer)
+#ifdef ESP8266
+#define PrinterSerial Serial
+#endif
+#ifdef ESP32
+HardwareSerial PrinterSerial(1);
+#endif
+
 WiFiServer telnetServer(23);
 WiFiClient serverClient;
 
@@ -402,7 +411,12 @@ bool detectPrinter() {
 
     case 10:
       // Initialize baud and send a request to printezr
-      Serial.begin(serialBauds[serialBaudIndex]);
+      #ifdef ESP8266
+      PrinterSerial.begin(serialBauds[serialBaudIndex]); // See note above; we have actually renamed Serial to Serial1
+      #endif
+      #ifdef ESP32
+      PrinterSerial.begin(115200 ,SERIAL_8N1, 32, 33); // gpio32 = rx, gpio33 = tx
+      #endif
       telnetSend("Connecting at " + String(serialBauds[serialBaudIndex]));
       commandQueue.push("M115"); // M115 - Firmware Info
       printerDetectionState = 20;
@@ -829,10 +843,10 @@ void setup() {
   }, [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
     //Upload handler chunks in data
     if (!index) { // if index == 0 then this is the first frame of data
-      //Serial.printf("UploadStart: %s\n", filename.c_str());
+      //PrinterSerial.printf("UploadStart: %s\n", filename.c_str());
       lcd("Update Start");
       telnetSend("Update Start");
-      //Serial.setDebugOutput(true);
+      //PrinterSerial.setDebugOutput(true);
       // calculate sketch space required for the update
 
       #if defined(ESP8266)
@@ -859,7 +873,7 @@ void setup() {
         
     if (final) { // if the final flag is set then this is the last frame of data
       if (Update.end(true)) { //true to set the size to the current progress
-//        Serial.printf("Update Success: %u B\nRebooting...\n", index+len);
+//        PrinterSerial.printf("Update Success: %u B\nRebooting...\n", index+len);
         lcd("Update Success");
         telnetSend("Update Success");
       }else{
@@ -867,7 +881,7 @@ void setup() {
         lcd("Update Error2");
         telnetSend("Update Error2");
       }
-//    Serial.setDebugOutput(false);
+//    PrinterSerial.setDebugOutput(false);
     }
   });
   #endif
@@ -890,7 +904,7 @@ void loop() {
     //* OTA handling *
     //****************
     if (ESPrestartRequired) {  // check the flag here to determine if a restart is required
-      Serial.printf("Restarting ESP\n\r");
+      PrinterSerial.printf("Restarting ESP\n\r");
       ESPrestartRequired = false;
       ESP.restart();
     }
@@ -975,7 +989,7 @@ void SendCommands() {
     if (noResponsePending || printerUsedBuffer < PRINTER_RX_BUFFER_SIZE * 3 / 4) {  // Let's use no more than 75% of printer RX buffer
       if (noResponsePending)
         restartSerialTimeout();   // Receive timeout has to be reset only when sending a command and no pending response is expected
-      Serial.println(command);          // Send to 3D Printer
+      PrinterSerial.println(command);          // Send to 3D Printer
       printerUsedBuffer += command.length();
       lastCommandSent = command;
       commandQueue.popSend();
@@ -989,8 +1003,8 @@ void ReceiveResponses() {
   static int lineStartPos;
   static String serialResponse;
 
-  while (Serial.available()) {
-    char ch = (char)Serial.read();
+  while (PrinterSerial.available()) {
+    char ch = (char)PrinterSerial.read();
     if (ch != '\n')
       serialResponse += ch;
     else {
