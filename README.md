@@ -17,7 +17,7 @@ __UNDER DEVELOPMENT__. See [Issues](https://github.com/probonopd/WirelessPrintin
 | No set-up needed | Set-up needed (full Linux operating system, hundreds of megabytes) | Only quick wireless network setup needed | 
 | No maintenance needed (other than replacing broken SD card slots) | High maintenance needed (OS updates) | Low maintenance needed (Firmware updates for bugfixes and new features) |
 | No extra power consumption | 2.5 W power consumption | Under 1 W power consumption |
-| No webcam | Webcam can be attached | No webcam |
+| No webcam | Webcam can be attached | ESP32 module with built-in camera (may be supported in the future) |
 | No notifications | Notifications, e.g., "print ready" | Notifications possible (send pull requests) |
 | Cumbersome for print farms (sneakernet) | Suitable for print farms (can be managed centrally) | Suitable for print farms (can be managed centrally, OctoPrint compatible protocol subset) |
 
