@@ -5,8 +5,9 @@
 #if defined(ESP8266)
   #include <SdFat.h>
 #elif defined(ESP32)
-  #include <SPIFFS.h>
   #define FORMAT_SPIFFS_IF_FAILED true
+
+  #include <SPIFFS.h>
   #include <SD.h>
 #endif
 

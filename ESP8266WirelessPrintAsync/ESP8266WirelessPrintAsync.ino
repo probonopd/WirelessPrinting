@@ -16,13 +16,12 @@
 
 #include "CommandQueue.h"
 
-// On ESP8266 use the normal Serial() for now, but name it PrinterSerial for compatibility with ESP32
-// On ESP32, use Serial1 (rather than the normal Serial0 which prints stuff during boot that confuses the printer)
-#ifdef ESP8266
-#define PrinterSerial Serial
-#endif
-#ifdef ESP32
-HardwareSerial PrinterSerial(1);
+#if defined(ESP8266)
+  // On ESP8266 use the normal Serial() for now, but name it PrinterSerial for compatibility with ESP32
+  #define PrinterSerial Serial
+#elif defined(ESP32)
+  // On ESP32, use Serial1 (rather than the normal Serial0 which prints stuff during boot that confuses the printer)
+  HardwareSerial PrinterSerial(1);
 #endif
 
 WiFiServer telnetServer(23);
@@ -411,11 +410,10 @@ bool detectPrinter() {
 
     case 10:
       // Initialize baud and send a request to printezr
-      #ifdef ESP8266
-      PrinterSerial.begin(serialBauds[serialBaudIndex]); // See note above; we have actually renamed Serial to Serial1
-      #endif
-      #ifdef ESP32
-      PrinterSerial.begin(115200 ,SERIAL_8N1, 32, 33); // gpio32 = rx, gpio33 = tx
+      #if defined(ESP8266)
+        PrinterSerial.begin(serialBauds[serialBaudIndex]);  // See note above; we have actually renamed Serial to Serial1
+      #elif defined(ESP32)
+        PrinterSerial.begin(115200 ,SERIAL_8N1, 32, 33);    // gpio32 = rx, gpio33 = tx
       #endif
       telnetSend("Connecting at " + String(serialBauds[serialBaudIndex]));
       commandQueue.push("M115"); // M115 - Firmware Info
@@ -850,38 +848,38 @@ void setup() {
       // calculate sketch space required for the update
 
       #if defined(ESP8266)
-      uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;      
-      if (!Update.begin(maxSketchSpace)){ // Start with max available size
-      #endif
-      #if defined(ESP32)
-      if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { // Start with max available size
+        uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;      
+        if (!Update.begin(maxSketchSpace)){ // Start with max available size
+      #elif defined(ESP32)
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { // Start with max available size
       #endif
         //Update.printError(Serial);
         lcd("Update Error0");
         telnetSend("Update Error0");        
       }
       #if defined(ESP8266)
-      Update.runAsync(true); // Tell the updaterClass to run in async mode
+        Update.runAsync(true); // Tell the updaterClass to run in async mode
       #endif
     }
     // Write chunked data to the free sketch space
     if (Update.write(data, len) != len) {
-        lcd("Update Error1");
-        telnetSend("Update Error1");       
+      lcd("Update Error1");
+      telnetSend("Update Error1");       
     }
-//      Update.printError(Serial);
+    //Update.printError(Serial);
         
     if (final) { // if the final flag is set then this is the last frame of data
       if (Update.end(true)) { //true to set the size to the current progress
-//        PrinterSerial.printf("Update Success: %u B\nRebooting...\n", index+len);
+        //PrinterSerial.printf("Update Success: %u B\nRebooting...\n", index+len);
         lcd("Update Success");
         telnetSend("Update Success");
-      }else{
-//        Update.printError(Serial);
+      }
+      else {
+        //Update.printError(Serial);
         lcd("Update Error2");
         telnetSend("Update Error2");
       }
-//    PrinterSerial.setDebugOutput(false);
+      //PrinterSerial.setDebugOutput(false);
     }
   });
   #endif
