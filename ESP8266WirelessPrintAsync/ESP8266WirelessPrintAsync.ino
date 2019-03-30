@@ -13,22 +13,7 @@
 #include <ESPAsyncWebServer.h>    // https://github.com/me-no-dev/ESPAsyncWebServer
 #include <ESPAsyncWiFiManager.h>  // https://github.com/alanswx/ESPAsyncWiFiManager/
 #include <SPIFFSEditor.h>
-
 #include "CommandQueue.h"
-
-#if defined(ESP8266)
-  // On ESP8266 use the normal Serial() for now, but name it PrinterSerial for compatibility with ESP32
-  #define PrinterSerial Serial
-#elif defined(ESP32)
-  // On ESP32, use Serial1 (rather than the normal Serial0 which prints stuff during boot that confuses the printer)
-  HardwareSerial PrinterSerial(1);
-#endif
-
-WiFiServer telnetServer(23);
-WiFiClient serverClient;
-
-AsyncWebServer server(80);
-DNSServer dns;
 
 // Configurable parameters
 #define SKETCH_VERSION "2.x-localbuild" // Gets inserted at build time by .travis.yml
@@ -41,10 +26,24 @@ DNSServer dns;
 #define PRINTER_RX_BUFFER_SIZE 0        // This is printer firmware 'RX_BUFFER_SIZE'. If such parameter is unknown please use 0
 #define TEMPERATURE_REPORT_INTERVAL 2   // Ask the printer for its temperatures status every 2 seconds
 #define KEEPALIVE_INTERVAL 2500         // Marlin defaults to 2 seconds, get a little of margin
-const uint32_t serialBauds[] = { 115200, 250000, 57600 };    // Marlin valid bauds (removed very low bauds; roughly ordered by popularity to speed things up)
 
 #define API_VERSION     "0.1"
 #define VERSION         "1.3.10"
+
+#if defined(ESP8266)
+  // On ESP8266 use the normal Serial() for now, but name it PrinterSerial for compatibility with ESP32
+  #define PrinterSerial Serial
+#elif defined(ESP32)
+  // On ESP32, use Serial1 (rather than the normal Serial0 which prints stuff during boot that confuses the printer)
+  HardwareSerial PrinterSerial(1);
+#endif
+const uint32_t serialBauds[] = { 115200, 250000, 57600 };    // Marlin valid bauds (removed very low bauds; roughly ordered by popularity to speed things up)
+
+WiFiServer telnetServer(23);
+WiFiClient serverClient;
+
+AsyncWebServer server(80);
+DNSServer dns;
 
 // The sketch on the ESP
 bool ESPrestartRequired;  // Set this flag in the callbacks to restart ESP
