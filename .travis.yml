@@ -19,6 +19,7 @@ install:
   - if [[ "$BD" =~ "esp32:esp32:" ]]; then arduino --install-boards esp32:esp32 ; fi
   - arduino --pref "compiler.warning_level=all" --save-prefs
   - # For async; unfortunately these libraries are still not the default in arduino/esp8266 yet
+  - cp -r . $HOME/Arduino/libraries/ # Is this the correct way to "install" a library from the current repository?
   - mkdir -p $HOME/Arduino/libraries/
   - cd $HOME/Arduino/libraries/
   - git clone https://github.com/greiman/SdFat
@@ -33,9 +34,9 @@ script:
   - VERSION=$(git rev-parse --short HEAD)
   - HERE=$(readlink -f .)
   - sed -i -e 's|#define SKETCH_VERSION ".*"|#define SKETCH_VERSION "'$VERSION'"|' $PWD/ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
-  - arduino --pref build.path=. --verify --verbose-build --board $BD ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
+  - arduino --pref build.path=. --verify --verbose-build --board $BD ./examples/starter/starter.ino
   - BOARD=$(echo $BD | cut -d ":" -f 3)
-  - mv ./ESP8266WirelessPrintAsync.ino.bin "ESP8266WirelessPrintAsync_${BOARD}_${VERSION}.bin"
+  - mv ./starter.ino.bin "ESP8266WirelessPrintAsync_${BOARD}_${VERSION}.bin"
   
 after_success:
   - wget -c https://github.com/probonopd/uploadtool/raw/master/upload.sh
