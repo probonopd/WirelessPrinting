@@ -888,10 +888,6 @@ void loop() {
     }
   }
 
-  SendCommands();
-  ReceiveResponses();
-
-
   //*******************
   //* Telnet handling *
   //*******************
@@ -1010,7 +1006,11 @@ void ReceiveResponses() {
     restartSerialTimeout();
   }
 
-#ifdef OTA_UPDATES
-  AsyncElegantOTA.loop();
-#endif
+
+  SendCommands();
+  ReceiveResponses();
+
+  #ifdef OTA_UPDATES
+    AsyncElegantOTA.loop();
+  #endif
 }
