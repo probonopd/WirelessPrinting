@@ -840,85 +840,6 @@ void setup() {
   #endif
 }
 
-void loop() {
-  #ifdef OTA_UPDATES
-    //****************
-    //* OTA handling *
-    //****************
-    if (ESPrestartRequired) {  // check the flag here to determine if a restart is required
-      PrinterSerial.printf("Restarting ESP\n\r");
-      ESPrestartRequired = false;
-      ESP.restart();
-    }
-
-    ArduinoOTA.handle();
-  #endif
-
-  //********************
-  //* Printer handling *
-  //********************
-  if (!printerConnected)
-    printerConnected = detectPrinter();
-  else {
-    #ifndef OTA_UPDATES
-      MDNS.update();    // When OTA is active it's called by 'handle' method
-    #endif
-
-    handlePrint();
-
-    if (cancelPrint && !isPrinting) { // Only when cancelPrint has been processed by 'handlePrint'
-      cancelPrint = false;
-      commandQueue.clear();
-      printerUsedBuffer = 0;
-      // Apparently we need to decide how to handle this
-      // For now using M112 - Emergency Stop
-      // http://marlinfw.org/docs/gcode/M112.html
-      telnetSend("Should cancel print! This is not working yet");
-      commandQueue.push("M112"); // Send to 3D Printer immediately w/o waiting for anything
-      //playSound();
-      //lcd("Print cancelled");
-    }
-
-    if (!autoreportTempEnabled) {
-      unsigned long curMillis = millis();
-      if ((signed)(temperatureTimer - curMillis) <= 0) {
-        commandQueue.push(TEMP_COMMAND);
-        temperatureTimer = curMillis + TEMPERATURE_REPORT_INTERVAL * 1000;
-      }
-    }
-  }
-
-  SendCommands();
-  ReceiveResponses();
-
-
-  //*******************
-  //* Telnet handling *
-  //*******************
-  // look for Client connect trial
-  if (telnetServer.hasClient() && (!serverClient || !serverClient.connected())) {
-    if (serverClient)
-      serverClient.stop();
-
-    serverClient = telnetServer.available();
-    serverClient.flush();  // clear input buffer, else you get strange characters
-  }
-
-  static String telnetCommand;
-  while (serverClient && serverClient.available()) {  // get data from Client
-    {
-    char ch = serverClient.read();
-    if (ch == '\r' || ch == '\n') {
-      if (telnetCommand.length() > 0) {
-        commandQueue.push(telnetCommand);
-        telnetCommand = "";
-      }
-    }
-    else
-      telnetCommand += ch;
-    }
-  }
-}
 
 inline void restartSerialTimeout() {
   serialReceiveTimeoutTimer = millis() + KEEPALIVE_INTERVAL;
@@ -1009,8 +930,89 @@ void ReceiveResponses() {
     serialResponse = "";
     restartSerialTimeout();
   }
+}
 
-#ifdef OTA_UPDATES
-  AsyncElegantOTA.loop();
-#endif
+
+void loop() {
+  #ifdef OTA_UPDATES
+    //****************
+    //* OTA handling *
+    //****************
+    if (ESPrestartRequired) {  // check the flag here to determine if a restart is required
+      PrinterSerial.printf("Restarting ESP\n\r");
+      ESPrestartRequired = false;
+      ESP.restart();
+    }
+
+    ArduinoOTA.handle();
+  #endif
+
+  //********************
+  //* Printer handling *
+  //********************
+  if (!printerConnected)
+    printerConnected = detectPrinter();
+  else {
+    #ifndef OTA_UPDATES
+      MDNS.update();    // When OTA is active it's called by 'handle' method
+    #endif
+
+    handlePrint();
+
+    if (cancelPrint && !isPrinting) { // Only when cancelPrint has been processed by 'handlePrint'
+      cancelPrint = false;
+      commandQueue.clear();
+      printerUsedBuffer = 0;
+      // Apparently we need to decide how to handle this
+      // For now using M112 - Emergency Stop
+      // http://marlinfw.org/docs/gcode/M112.html
+      telnetSend("Should cancel print! This is not working yet");
+      commandQueue.push("M112"); // Send to 3D Printer immediately w/o waiting for anything
+      //playSound();
+      //lcd("Print cancelled");
+    }
+
+    if (!autoreportTempEnabled) {
+      unsigned long curMillis = millis();
+      if ((signed)(temperatureTimer - curMillis) <= 0) {
+        commandQueue.push(TEMP_COMMAND);
+        temperatureTimer = curMillis + TEMPERATURE_REPORT_INTERVAL * 1000;
+      }
+    }
+  }
+
+  SendCommands();
+  ReceiveResponses();
+
+
+  //*******************
+  //* Telnet handling *
+  //*******************
+  // look for Client connect trial
+  if (telnetServer.hasClient() && (!serverClient || !serverClient.connected())) {
+    if (serverClient)
+      serverClient.stop();
+
+    serverClient = telnetServer.available();
+    serverClient.flush();  // clear input buffer, else you get strange characters
+  }
+
+  static String telnetCommand;
+  while (serverClient && serverClient.available()) {  // get data from Client
+    {
+    char ch = serverClient.read();
+    if (ch == '\r' || ch == '\n') {
+      if (telnetCommand.length() > 0) {
+        commandQueue.push(telnetCommand);
+        telnetCommand = "";
+      }
+    }
+    else
+      telnetCommand += ch;
+    }
+  }
+    
+  #ifdef OTA_UPDATES
+    AsyncElegantOTA.loop();
+  #endif
 }
