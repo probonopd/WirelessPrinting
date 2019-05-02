@@ -12,6 +12,7 @@
 #include "StorageFS.h"
 #include <ESPAsyncWebServer.h>    // https://github.com/me-no-dev/ESPAsyncWebServer
 #include <ESPAsyncWiFiManager.h>  // https://github.com/alanswx/ESPAsyncWiFiManager/
+#include <AsyncElegantOTA.h>      // https://github.com/ayushsharma82/AsyncElegantOTA
 #include <SPIFFSEditor.h>
 
 #include "CommandQueue.h"
@@ -518,6 +519,7 @@ void setup() {
 
   // Wait for connection
   setLed(true);
+  AsyncElegantOTA.init(server);
   AsyncWiFiManager wifiManager(&server, &dns);
   // wifiManager.resetSettings();   // Uncomment this to reset the settings on the device, then you will need to reflash with USB and this commented out!
   wifiManager.setDebugOutput(false);  // So that it does not send stuff to the printer that the printer does not understand
@@ -1067,4 +1069,6 @@ void ReceiveResponses() {
     serialResponse = "";
     restartSerialTimeout();
   }
+
+  AsyncElegantOTA.loop();
 }
