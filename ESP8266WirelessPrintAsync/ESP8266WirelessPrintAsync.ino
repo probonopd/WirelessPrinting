@@ -519,7 +519,9 @@ void setup() {
 
   // Wait for connection
   setLed(true);
-  AsyncElegantOTA.init(server);
+  #ifdef OTA_UPDATES
+    AsyncElegantOTA.init(server);
+  #endif
   AsyncWiFiManager wifiManager(&server, &dns);
   // wifiManager.resetSettings();   // Uncomment this to reset the settings on the device, then you will need to reflash with USB and this commented out!
   wifiManager.setDebugOutput(false);  // So that it does not send stuff to the printer that the printer does not understand
@@ -563,11 +565,7 @@ void setup() {
                      "<p><a href=\"/download\">Download " + uploadedName + "</a></p>"
                      "<p><a href=\"/info\">Info</a></p>"
                      "<hr>"
-                     "<p>WirelessPrinting <a href=\"https://github.com/probonopd/WirelessPrinting/commit/" + SKETCH_VERSION + "\">" + SKETCH_VERSION + "</a></p>"
-    #ifdef OTA_UPDATES
-                     "<p><form enctype=\"multipart/form-data\" action=\"/update\" method=\"POST\">\nChoose a firmware file: <input name=\"file\" type=\"file\" accept=\".bin\"/><br/>\n<input type=\"submit\" style=\"color: #f44336;\" value=\"Update firmware\" /></p>\n</form>"
-    #endif
-                     ;
+                     "<p>WirelessPrinting <a href=\"https://github.com/probonopd/WirelessPrinting/commit/" + SKETCH_VERSION + "\">" + SKETCH_VERSION + "</a></p>";
     request->send(200, "text/html", message);
   });
 
@@ -830,64 +828,6 @@ void setup() {
     request->send(200, "text/plain", "Received");
   }, handleUpload);
   
-  #ifdef OTA_UPDATES  
-  // Handling ESP firmware file upload
-  // https://github.com/me-no-dev/ESPAsyncWebServer/issues/3#issuecomment-354528317
-  // https://gist.github.com/JMishou/60cb762047b735685e8a09cd2eb42a60
-  server.on("/update", HTTP_POST, [](AsyncWebServerRequest *request) {
-    // the request handler is triggered after the upload has finished... 
-    // create the response, add header, and send response
-    AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", (Update.hasError())?"FAIL":"OK");
-    response->addHeader("Connection", "close");
-    response->addHeader("Access-Control-Allow-Origin", "*");
-    ESPrestartRequired = true;  // Tell the main loop to restart the ESP
-    request->send(response);
-  }, [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
-    //Upload handler chunks in data
-    if (!index) { // if index == 0 then this is the first frame of data
-      //PrinterSerial.printf("UploadStart: %s\n", filename.c_str());
-      lcd("Update Start");
-      telnetSend("Update Start");
-      //PrinterSerial.setDebugOutput(true);
-      // calculate sketch space required for the update
-
-      #if defined(ESP8266)
-      uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;      
-      if (!Update.begin(maxSketchSpace)){ // Start with max available size
-      #endif
-      #if defined(ESP32)
-      if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { // Start with max available size
-      #endif
-        //Update.printError(Serial);
-        lcd("Update Error0");
-        telnetSend("Update Error0");        
-      }
-      #if defined(ESP8266)
-      Update.runAsync(true); // Tell the updaterClass to run in async mode
-      #endif
-    }
-    // Write chunked data to the free sketch space
-    if (Update.write(data, len) != len) {
-        lcd("Update Error1");
-        telnetSend("Update Error1");       
-    }
-//      Update.printError(Serial);
-        
-    if (final) { // if the final flag is set then this is the last frame of data
-      if (Update.end(true)) { //true to set the size to the current progress
-//        PrinterSerial.printf("Update Success: %u B\nRebooting...\n", index+len);
-        lcd("Update Success");
-        telnetSend("Update Success");
-      }else{
-//        Update.printError(Serial);
-        lcd("Update Error2");
-        telnetSend("Update Error2");
-      }
-//    PrinterSerial.setDebugOutput(false);
-    }
-  });
-  #endif
-  
   server.begin();
 
   #ifdef OTA_UPDATES
@@ -1070,5 +1010,7 @@ void ReceiveResponses() {
     restartSerialTimeout();
   }
 
+#ifdef OTA_UPDATES
   AsyncElegantOTA.loop();
+#endif
 }
