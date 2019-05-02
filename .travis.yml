@@ -25,6 +25,7 @@ install:
   - git clone -o 95dedf7 https://github.com/me-no-dev/ESPAsyncWebServer
   - git clone -o 7e9ed22 https://github.com/me-no-dev/ESPAsyncTCP # for esp8266
   - git clone https://github.com/me-no-dev/AsyncTCP # for esp32
+  - git clone https://github.com/ayushsharma82/AsyncElegantOTA
   - git clone -o 1c02154 https://github.com/alanswx/ESPAsyncWiFiManager
   - ( git clone -b 6.x https://github.com/bblanchon/ArduinoJson ; cd ArduinoJson ; git reset --hard 3df4efd )
   - cd -
