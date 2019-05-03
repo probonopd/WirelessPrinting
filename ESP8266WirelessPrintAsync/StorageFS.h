@@ -17,6 +17,7 @@ class StorageFS {
       #if defined(ESP8266)
         hasSD = SD.begin(SS, fastSD ? SD_SCK_MHZ(50) : SPI_HALF_SPEED); // https://github.com/esp8266/Arduino/issues/1853
       #elif defined(ESP32)
+        void begin(int8_t sck=-1, int8_t miso=-1, int8_t mosi=-1, int8_t ss=-1); // TTGO-T1 V1.3 internal microSD slot
         hasSD = SD.begin(SS, SPI, fastSD ? 50000000 : 4000000);
       #endif
       if (hasSD)
