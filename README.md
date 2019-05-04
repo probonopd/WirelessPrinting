@@ -23,12 +23,12 @@ __UNDER DEVELOPMENT__. See [Issues](https://github.com/probonopd/WirelessPrintin
 
 ## Hardware
 
-WEMOS D1 mini modules can be used. Also, ESP32 modules can be used (status is experimental currently).
+WEMOS D1 mini modules can be used. Also, ESP32 modules can be used (e.g., TTGO-T1 with built-in microSD card slot).
 
 The WEMOS D1 mini module is connected with your 3D printer via the serial connection and to a SD card (acting as a cache during printing). You need to connect
 * TX, RX from your 3D printer to the WEMOS D1 mini module (__AUX-1__ header on RAMPS boards). Note: For ESP32, use GPIO32 = RX, GPIO33 = TX
 * Power and GND from your 3D printer to the WEMOS D1 mini module (attention, the __AUX-1__ header on RAMPS boards has 5V while the ESP8266 needs 3.3V but the WEMOS D1 mini has a voltage regulator)
-* Optional: SD card shield to the WEMOS D1 mini module (a capacitor across the power pins of the SD card; SD shields have this). Using a SanDisk 2 GB card formatted with `mkfs.vfat` on Linux seems to work for me. If no SD card is connected, then the internal SPIFFS memory (3 MB) is used
+* Optional: SD card shield to the WEMOS D1 mini module (a capacitor across the power pins of the SD card; SD shields have this). Using a SanDisk 2 GB card formatted with `mkfs.vfat` on Linux seems to work for me. If no SD card is connected, then the internal SPIFFS memory (3 MB) is used. For TTGO-T1, the built-in microSD card slot is used if a card is inserted.
 * A matching case for a WEMOS D1 mini module and microSD shield can be found at http://www.thingiverse.com/thing:2287618
 
 ## esp8266/Arduino sketch
