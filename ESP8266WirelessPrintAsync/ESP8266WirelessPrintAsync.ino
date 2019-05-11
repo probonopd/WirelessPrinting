@@ -520,7 +520,7 @@ void setup() {
   // Wait for connection
   setLed(true);
   #ifdef OTA_UPDATES
-    AsyncElegantOTA.begin(server);
+    AsyncElegantOTA.begin(&server);
   #endif
   AsyncWiFiManager wifiManager(&server, &dns);
   // wifiManager.resetSettings();   // Uncomment this to reset the settings on the device, then you will need to reflash with USB and this commented out!
