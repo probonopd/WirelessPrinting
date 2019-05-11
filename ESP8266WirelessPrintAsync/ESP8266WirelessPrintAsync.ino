@@ -6,6 +6,7 @@
 #elif defined(ESP32)
   #include <ESPmDNS.h>
   #include <Update.h>
+  #include <Hash.h>
 #endif
 #include <ArduinoJson.h>          // https://github.com/bblanchon/ArduinoJson (for implementing a subset of the OctoPrint API)
 #include <DNSServer.h>
