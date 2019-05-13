@@ -566,7 +566,11 @@ void setup() {
                      "<p><a href=\"/download\">Download " + uploadedName + "</a></p>"
                      "<p><a href=\"/info\">Info</a></p>"
                      "<hr>"
-                     "<p>WirelessPrinting <a href=\"https://github.com/probonopd/WirelessPrinting/commit/" + SKETCH_VERSION + "\">" + SKETCH_VERSION + "</a></p>";
+                     "<p>WirelessPrinting <a href=\"https://github.com/probonopd/WirelessPrinting/commit/" + SKETCH_VERSION + "\">" + SKETCH_VERSION + "</a></p>\n"
+                    #ifdef OTA_UPDATES
+                      "<p>OTA Update Device: <a href=\"/update\">Click Here</a></p>"
+                    #endif
+                     ;
     request->send(200, "text/html", message);
   });
 
