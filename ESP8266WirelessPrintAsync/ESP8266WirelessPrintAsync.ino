@@ -832,7 +832,7 @@ void setup() {
   server.on("/api/print", HTTP_POST, [](AsyncWebServerRequest * request) {
     request->send(200, "text/plain", "Received");
   }, handleUpload);
-  
+
   server.begin();
 
   #ifdef OTA_UPDATES
@@ -844,6 +844,7 @@ void setup() {
     ArduinoOTA.begin();
   #endif
 }
+
 
 
 inline void restartSerialTimeout() {
@@ -1020,4 +1021,5 @@ void loop() {
   #ifdef OTA_UPDATES
     AsyncElegantOTA.loop();
   #endif
+
 }
