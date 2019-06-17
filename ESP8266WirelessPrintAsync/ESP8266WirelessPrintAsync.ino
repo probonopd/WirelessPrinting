@@ -845,8 +845,6 @@ void setup() {
   #endif
 }
 
-
-
 inline void restartSerialTimeout() {
   serialReceiveTimeoutTimer = millis() + KEEPALIVE_INTERVAL;
 }
