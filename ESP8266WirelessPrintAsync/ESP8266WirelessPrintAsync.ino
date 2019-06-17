@@ -945,7 +945,7 @@ void ReceiveResponses() {
   // this resets all the neopixels to an off state
   strip.Begin();
   strip.Show();
-  strip.fill(white, 0, 19);
+  strip.FadeTo(1000, white);
 }
 
 
