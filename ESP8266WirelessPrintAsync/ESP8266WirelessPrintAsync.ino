@@ -22,7 +22,12 @@
 
 const uint16_t PixelCount = 20; // this example assumes 4 pixels, making it smaller will cause a failure
 const uint8_t PixelPin = 2;  // make sure to set this to the correct pin, ignored for Esp8266 (there it is GPIO2 = D4)
+#define colorSaturation 255
+RgbColor red(colorSaturation, 0, 0);
+RgbColor green(0, colorSaturation, 0);
+RgbColor blue(0, 0, colorSaturation);
 RgbColor white(colorSaturation);
+RgbColor black(0);
 NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(PixelCount, PixelPin);
 
 // On ESP8266 use the normal Serial() for now, but name it PrinterSerial for compatibility with ESP32
@@ -948,6 +953,7 @@ void ReceiveResponses() {
   strip.SetPixelColor(1, green);
   strip.SetPixelColor(2, blue);
   strip.SetPixelColor(3, white);
+  pixels.show(); 
 }
 
 
