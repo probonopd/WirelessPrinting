@@ -20,13 +20,10 @@
 
 #include <NeoPixelBus.h>
 
-NeoPixelBus* strip = NULL;
-NeoPixelAnimator* animator = NULL;
 const uint16_t PixelCount = 20; // this example assumes 4 pixels, making it smaller will cause a failure
 const uint8_t PixelPin = 2;  // make sure to set this to the correct pin, ignored for Esp8266 (there it is GPIO2 = D4)
 RgbColor white(colorSaturation);
-strip = new NeoPixelBus(PixelCount, PixelPin);
-animator = new NeoPixelAnimator(strip);
+NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(PixelCount, PixelPin);
 
 // On ESP8266 use the normal Serial() for now, but name it PrinterSerial for compatibility with ESP32
 // On ESP32, use Serial1 (rather than the normal Serial0 which prints stuff during boot that confuses the printer)
@@ -947,7 +944,10 @@ void ReceiveResponses() {
   // this resets all the neopixels to an off state
   strip.Begin();
   strip.Show();
-  animator->FadeTo(10000, white); 
+  strip.SetPixelColor(0, red);
+  strip.SetPixelColor(1, green);
+  strip.SetPixelColor(2, blue);
+  strip.SetPixelColor(3, white);
 }
 
 
