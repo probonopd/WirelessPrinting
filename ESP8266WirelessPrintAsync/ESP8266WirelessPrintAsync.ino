@@ -953,7 +953,7 @@ void ReceiveResponses() {
   strip.SetPixelColor(1, green);
   strip.SetPixelColor(2, blue);
   strip.SetPixelColor(3, white);
-  strip.show(); 
+  strip.Show(); 
 }
 
 
