@@ -30,7 +30,7 @@ RgbColor white(colorSaturation);
 RgbColor black(0);
 
 #if defined(ESP8266)
-  NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(PixelCount); // ESP8266 always uses GPIO2 = D4
+  NeoPixelBus<NeoGrbFeature, NeoEsp8266Uart1Ws2813Method> strip(PixelCount); // ESP8266 always uses GPIO2 = D4
 #elif defined(ESP32)
   NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(PixelCount, PixelPin);
 #endif
