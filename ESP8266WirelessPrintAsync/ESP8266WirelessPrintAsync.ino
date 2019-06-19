@@ -958,6 +958,7 @@ void ReceiveResponses() {
   // strip.SetPixelColor(1, green);
   // strip.SetPixelColor(2, blue);
   // strip.SetPixelColor(3, white);
+  int a;
   for(a=0; a<PixelCount; a++){
     strip.SetPixelColor(a, white);
   }
