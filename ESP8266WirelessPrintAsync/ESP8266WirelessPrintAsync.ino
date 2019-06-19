@@ -521,10 +521,6 @@ inline String stringify(bool value) {
 }
 
 void setup() {
-  // this resets all the neopixels to an off state
-  strip.Begin();
-  strip.Show();
-  
   #if defined(LED_BUILTIN)
     pinMode(LED_BUILTIN, OUTPUT);     // Initialize the LED_BUILTIN pin as an output
   #endif
@@ -955,6 +951,9 @@ void ReceiveResponses() {
     serialResponse = "";
     restartSerialTimeout();
   }
+  // this resets all the neopixels to an off state
+  strip.Begin();
+  strip.Show();
   // strip.SetPixelColor(0, red);
   // strip.SetPixelColor(1, green);
   // strip.SetPixelColor(2, blue);
