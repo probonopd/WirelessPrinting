@@ -954,10 +954,13 @@ void ReceiveResponses() {
   // this resets all the neopixels to an off state
   strip.Begin();
   strip.Show();
-  strip.SetPixelColor(0, red);
-  strip.SetPixelColor(1, green);
-  strip.SetPixelColor(2, blue);
-  strip.SetPixelColor(3, white);
+  // strip.SetPixelColor(0, red);
+  // strip.SetPixelColor(1, green);
+  // strip.SetPixelColor(2, blue);
+  // strip.SetPixelColor(3, white);
+  for(a=0; a<PixelCount; a++){
+    strip.SetPixelColor(a, white);
+  }
   strip.Show(); 
 }
 
