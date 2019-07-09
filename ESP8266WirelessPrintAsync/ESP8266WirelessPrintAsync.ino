@@ -20,6 +20,11 @@
 
 #include <NeoPixelBus.h>
 
+const int transparent_networkport = 2323;
+
+WiFiServer transparentServer(transparent_networkport);
+WiFiClient transparentClient;
+
 const uint16_t PixelCount = 20; // this example assumes 4 pixels, making it smaller will cause a failure
 const uint8_t PixelPin = 2;  // make sure to set this to the correct pin, ignored for ESP8266 (there it is GPIO2 = D4)
 #define colorSaturation 255
@@ -548,6 +553,9 @@ void setup() {
 
   telnetServer.begin();
   telnetServer.setNoDelay(true);
+  
+  transparentServer.begin();
+  transparentServer.setNoDelay(true);
 
   if (storageFS.activeSPIFFS()) {
     #if defined(ESP8266)
@@ -1016,8 +1024,38 @@ void loop() {
 
   SendCommands();
   ReceiveResponses();
+  
+  //*******************
+  //* Transparent serial bridge handling *
+  //*******************
+  //check if there are any new clients
+  if (transparentServer.hasClient()){
+    if (!transparentClient.connected()){
+      if(transparentClient) transparentClient.stop();
+      transparentClient = transparentServer.available();
+    }
+  }
+      
+  //check a client for data
+  if (transparentClient && transparentClient.connected()){
+    if(transparentClient.available()){
+      size_t len = transparentClient.available();
+      uint8_t sbuf[len];
+      transparentClient.readBytes(sbuf, len);
+      Serial.write(sbuf, len);      
+    }
+  }
 
-
+  //check UART for data
+  if(Serial.available()){
+    size_t len = Serial.available();
+    uint8_t sbuf[len];
+    Serial.readBytes(sbuf, len);
+    if (transparentClient && transparentClient.connected()){
+      transparentClient.write(sbuf, len);
+    }
+  }
+  
   //*******************
   //* Telnet handling *
   //*******************
