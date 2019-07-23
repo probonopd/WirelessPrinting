@@ -14,6 +14,7 @@
 #include <ESPAsyncWebServer.h>    // https://github.com/me-no-dev/ESPAsyncWebServer
 #include <ESPAsyncWiFiManager.h>  // https://github.com/alanswx/ESPAsyncWiFiManager/
 #include <AsyncElegantOTA.h>      // https://github.com/ayushsharma82/AsyncElegantOTA
+#include <ESPDash.h>              // https://github.com/ayushsharma82/ESP-DASH
 #include <SPIFFSEditor.h>
 
 #include "CommandQueue.h"
@@ -850,6 +851,12 @@ void setup() {
     request->send(200, "text/plain", "Received");
   }, handleUpload);
 
+  // Initialize ESP-DASH Dashboard
+  ESPDash.init(server);
+  ESPDash.addTemperatureCard("nozzle0", "Nozzle 0 Temp.", 0, 0);
+  ESPDash.addTemperatureCard("nozzle1", "Nozzle 1 Temp.", 0, 0);
+  ESPDash.addTemperatureCard("bed", "Bed Temp.", 0, 0);
+  
   server.begin();
 
   #ifdef OTA_UPDATES
