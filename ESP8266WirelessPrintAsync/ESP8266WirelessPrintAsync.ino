@@ -627,7 +627,7 @@ void setup() {
                  "BUILD_PERCENT: " + stringify(fwBuildPercentCap) + "\n";
     }
     message += "transparent_client_is_connected: " + stringify(transparent_client_is_connected);
-    message += "\n"
+    message += "\n";
     message += "</pre>";
     request->send(200, "text/html", message);
   });
