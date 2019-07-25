@@ -65,6 +65,7 @@ git clone -o 7e9ed22 https://github.com/me-no-dev/ESPAsyncTCP # for esp8266
 git clone https://github.com/me-no-dev/AsyncTCP # for esp32
 git clone -o 1c02154 https://github.com/alanswx/ESPAsyncWiFiManager
 ( git clone -b 6.x https://github.com/bblanchon/ArduinoJson ; cd ArduinoJson ; git reset --hard 3df4efd )
+git clone -o d05d90f https://github.com/ayushsharma82/ESP-DASH
 cd -
 
 git clone https://github.com/probonopd/WirelessPrinting/
