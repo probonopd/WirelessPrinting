@@ -1051,15 +1051,15 @@ void loop() {
       size_t len = transparentClient.available();
       uint8_t sbuf[len];
       transparentClient.readBytes(sbuf, len);
-      Serial.write(sbuf, len);      
+      PrinterSerial.write(sbuf, len);      
     }
   }
 
   //check UART for data
-  if(Serial.available()){
-    size_t len = Serial.available();
+  if(PrinterSerial.available()){
+    size_t len = PrinterSerial.available();
     uint8_t sbuf[len];
-    Serial.readBytes(sbuf, len);
+    PrinterSerial.readBytes(sbuf, len);
     if (transparentClient && transparentClient.connected()){
       transparentClient.write(sbuf, len);
     }
