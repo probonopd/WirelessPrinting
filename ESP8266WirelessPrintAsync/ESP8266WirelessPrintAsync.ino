@@ -1046,7 +1046,7 @@ void loop() {
       
   //check a client for data
   if (transparentClient && transparentClient.connected()){
-    serial_client_is_connected = true;
+    transparent_client_is_connected = true;
     if(transparentClient.available()){
       size_t len = transparentClient.available();
       uint8_t sbuf[len];
