@@ -523,7 +523,7 @@ inline String stringify(bool value) {
 
 void startDashboard(){
   for (int t = 0; t < fwExtruders; ++t) {
-    ESPDash.addTemperatureCard(String("tool"+t), 0, 0); 
+    ESPDash.addTemperatureCard("tool"+t, "Tool "+t, 0, 0); 
   }
 }
 
