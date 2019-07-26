@@ -567,8 +567,8 @@ void setup() {
     request->send(404, "text/html", "<h1>Page not found!</h1>");
   });
 
-  // Main page
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
+  // Debug page
+  server.on("/debug", HTTP_GET, [](AsyncWebServerRequest * request) {
       String uploadedName = uploadedFullname;
   uploadedName.replace("/", "");
     String message = "<h1>" + getDeviceName() + "</h1>"
