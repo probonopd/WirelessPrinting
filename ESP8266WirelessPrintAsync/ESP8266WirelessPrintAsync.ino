@@ -14,6 +14,7 @@
 #include <ESPAsyncWebServer.h>    // https://github.com/me-no-dev/ESPAsyncWebServer
 #include <ESPAsyncWiFiManager.h>  // https://github.com/alanswx/ESPAsyncWiFiManager/
 #include <AsyncElegantOTA.h>      // https://github.com/ayushsharma82/AsyncElegantOTA
+#include <ESPDash.h>              // https://github.com/ayushsharma82/ESP-DASH
 #include <SPIFFSEditor.h>
 
 #include "CommandQueue.h"
@@ -520,6 +521,12 @@ inline String stringify(bool value) {
   return value ? "true" : "false";
 }
 
+void startDashboard(){
+  for (int t = 0; t < fwExtruders; ++t) {
+    ESPDash.addTemperatureCard("tool"+t, "Tool "+t, 0, 0); 
+  }
+}
+
 void setup() {
   #if defined(LED_BUILTIN)
     pinMode(LED_BUILTIN, OUTPUT);     // Initialize the LED_BUILTIN pin as an output
@@ -566,8 +573,8 @@ void setup() {
     request->send(404, "text/html", "<h1>Page not found!</h1>");
   });
 
-  // Main page
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
+  // Debug page
+  server.on("/debug", HTTP_GET, [](AsyncWebServerRequest * request) {
       String uploadedName = uploadedFullname;
   uploadedName.replace("/", "");
     String message = "<h1>" + getDeviceName() + "</h1>"
@@ -850,6 +857,10 @@ void setup() {
     request->send(200, "text/plain", "Received");
   }, handleUpload);
 
+  // Initialize ESP-DASH Dashboard
+  ESPDash.init(server);
+  startDashboard();
+  
   server.begin();
 
   #ifdef OTA_UPDATES

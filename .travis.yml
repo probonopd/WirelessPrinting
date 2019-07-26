@@ -29,6 +29,7 @@ install:
   - git clone -o 1c02154 https://github.com/alanswx/ESPAsyncWiFiManager
   - ( git clone -b 6.x https://github.com/bblanchon/ArduinoJson ; cd ArduinoJson ; git reset --hard 3df4efd )
   - git clone -o 9619fef https://github.com/Makuna/NeoPixelBus # https://github.com/Makuna/NeoPixelBus/issues/275
+  - git clone -o d05d90f https://github.com/ayushsharma82/ESP-DASH
   - if [[ "$BD" =~ "esp32:esp32:" ]]; then git clone https://github.com/bbx10/Hash_tng ; fi
   - cd -
 
