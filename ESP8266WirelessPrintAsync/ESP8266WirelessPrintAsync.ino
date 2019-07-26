@@ -521,6 +521,12 @@ inline String stringify(bool value) {
   return value ? "true" : "false";
 }
 
+void startDashboard(){
+  for (int t = 0; t < fwExtruders; ++t) {
+    ESPDash.addTemperatureCard(String("tool"+t), 0, 0); 
+  }
+}
+
 void setup() {
   #if defined(LED_BUILTIN)
     pinMode(LED_BUILTIN, OUTPUT);     // Initialize the LED_BUILTIN pin as an output
@@ -853,9 +859,7 @@ void setup() {
 
   // Initialize ESP-DASH Dashboard
   ESPDash.init(server);
-  ESPDash.addTemperatureCard("nozzle0", "Nozzle 0 Temp.", 0, 0);
-  ESPDash.addTemperatureCard("nozzle1", "Nozzle 1 Temp.", 0, 0);
-  ESPDash.addTemperatureCard("bed", "Bed Temp.", 0, 0);
+  startDashboard();
   
   server.begin();
 
