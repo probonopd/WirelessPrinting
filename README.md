@@ -46,11 +46,11 @@ The following build procedure works on Linux:
 git clone https://github.com/probonopd/WirelessPrinting
 cd WirelessPrinting
 wget -c https://downloads.egenix.com/python/install-pyrun
-bash install-pyrun --python=3.5 appdir/usr/
-appdir/usr/bin/pip3 install -U platformio==4.2.1
+bash install-pyrun --python=3.5 pyrun/
+pyrun/bin/pip3 install -U platformio==4.2.1
 
 # Build the firmware (it downloads the needed libraries)
-appdir/usr/bin/platformio run
+pyrun/bin/platformio run
 ls -lh ./build_output/firmware/*.bin
 ```
 
