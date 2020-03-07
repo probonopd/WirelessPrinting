@@ -42,42 +42,18 @@ Pre-built binaries are available for download on [GitHub Releases](https://githu
 The following build procedure works on Linux:
 
 ```
-sudo su
-sudo apt-get install python-serial # Otherwise cannot build for ESP32
+# Get PlatformIO (the toolchain we use for compiling)
+git clone https://github.com/probonopd/WirelessPrinting
+cd WirelessPrinting
+wget -c https://downloads.egenix.com/python/install-pyrun
+bash install-pyrun --python=3.5 appdir/usr/
+appdir/usr/bin/pip3 install -U platformio==4.2.1
 
-BD=esp8266:esp8266:d1_mini:xtal=80,eesz=4M3M
-# or 
-BD=esp32:esp32:esp32
-
-wget http://downloads.arduino.cc/arduino-1.8.8-linux64.tar.xz
-tar xf arduino-*-linux64.tar.xz
-export PATH=$(readlink -f arduino-*/):$PATH
-
-arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json,https://dl.espressif.com/dl/package_esp32_index.json" --save-prefs
-if [[ "$BD" =~ "esp8266:esp8266:" ]]; then arduino --install-boards esp8266:esp8266:2.5.0 ; fi
-if [[ "$BD" =~ "esp32:esp32:" ]]; then arduino --install-boards esp32:esp32 ; fi
-arduino --pref "compiler.warning_level=all" --save-prefs
-mkdir -p $HOME/Arduino/libraries/
-cd $HOME/Arduino/libraries/
-git clone https://github.com/greiman/SdFat
-git clone -o 95dedf7 https://github.com/me-no-dev/ESPAsyncWebServer
-git clone -o 7e9ed22 https://github.com/me-no-dev/ESPAsyncTCP # for esp8266
-git clone https://github.com/me-no-dev/AsyncTCP # for esp32
-git clone -o 1c02154 https://github.com/alanswx/ESPAsyncWiFiManager
-( git clone -b 6.x https://github.com/bblanchon/ArduinoJson ; cd ArduinoJson ; git reset --hard 3df4efd )
-cd -
-
-git clone https://github.com/probonopd/WirelessPrinting/
-cd WirelessPrinting/
-
-VERSION=$(git rev-parse --short HEAD)
-HERE=$(readlink -f .)
-sed -i -e 's|#define SKETCH_VERSION ".*"|#define SKETCH_VERSION "'$VERSION'"|' $PWD/ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
-arduino --pref build.path=. --verify --verbose-build --board $BD ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
-BOARD=$(echo $BD | cut -d ":" -f 3)
-mv ./ESP8266WirelessPrintAsync.ino.bin "ESP8266WirelessPrintAsync_${BOARD}_${VERSION}.bin"
-
+# Build the firmware (it downloads the needed libraries)
+appdir/usr/bin/platformio run
+ls -lh ./build_output/firmware/*.bin
 ```
+
 ### Flashing from Linux
 
 Can be flashed via USB or (subsequently) over the air. You can use the Arduino IDE if you compiled yourself, or one of the following commands if you just want to flash a precompiled firmware.
