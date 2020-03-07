@@ -1,6 +1,7 @@
 language: c
 
 install:
+  - sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-minimal python3-pip python3-setuptools
   - pip3 install platformio==4.2.1
 
 script:
