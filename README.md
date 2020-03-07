@@ -45,6 +45,7 @@ The following build procedure works on Linux:
 # Get PlatformIO (the toolchain we use for compiling)
 git clone https://github.com/probonopd/WirelessPrinting
 cd WirelessPrinting
+sed -i -e 's|#define SKETCH_VERSION ".*"|#define SKETCH_VERSION "'`git rev-parse --short HEAD`'"|' $PWD/ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
 wget -c https://downloads.egenix.com/python/install-pyrun
 bash install-pyrun --python=3.5 pyrun/
 pyrun/bin/pip3 install -U platformio==4.2.1
