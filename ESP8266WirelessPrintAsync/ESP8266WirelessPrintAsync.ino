@@ -694,7 +694,8 @@ void setup() {
     
     startPrint = printerConnected && !isPrinting && uploadedFullname != "";
 
-    request->send(200, "application/json", "{\r\n"
+    // OctoPrint sends 201 here; https://github.com/fieldOfView/Cura-OctoPrintPlugin/issues/155#issuecomment-596110996
+    request->send(201, "application/json", "{\r\n"
                                            "  \"files\": {\r\n"
                                            "    \"local\": {\r\n"
                                            "      \"name\": \"" + getUploadedFilename() + "\",\r\n"
