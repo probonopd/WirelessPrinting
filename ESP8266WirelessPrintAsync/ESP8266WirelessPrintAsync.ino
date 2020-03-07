@@ -643,6 +643,11 @@ void setup() {
     request->send(response);    
   });
 
+  server.on("/api/login", HTTP_GET, [](AsyncWebServerRequest * request) {
+    // https://docs.octoprint.org/en/master/api/general.html#post--api-login
+    // https://github.com/fieldOfView/Cura-OctoPrintPlugin/issues/155#issuecomment-596109663
+    request->send(200, "application/json", "{}");  });
+
   server.on("/api/version", HTTP_GET, [](AsyncWebServerRequest * request) {
     // http://docs.octoprint.org/en/master/api/version.html
     request->send(200, "application/json", "{\r\n"
