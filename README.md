@@ -56,7 +56,9 @@ ls -lh ./build_output/firmware/*.bin
 
 ### Flashing from Linux
 
-Can be flashed via USB or (subsequently) over the air. You can use the Arduino IDE if you compiled yourself, or one of the following commands if you just want to flash a precompiled firmware.
+Can be flashed via USB or (subsequently) over the air. You can use PlatformIO to upload to either OTA and flash via any known flash method. See e.g., https://docs.platformio.org/en/latest/platforms/espressif8266.html#over-the-air-ota-update, https://docs.platformio.org/en/latest/platforms/espressif32.html#packages.
+
+If you are not using PlatformIO (e.g., because you are just interested in uploading our pre-built firmware as quickly as possible) you may use the following instructions.
 
 #### ESP8266
 
