@@ -688,8 +688,11 @@ void setup() {
     lcd("Received");
     playSound();
 
-    if (request->hasParam("print", true))
-      startPrint = printerConnected && !isPrinting && uploadedFullname != "";
+    // We are not using
+    // if (request->hasParam("print", true))
+    // due to https://github.com/fieldOfView/Cura-OctoPrintPlugin/issues/156
+    
+    startPrint = printerConnected && !isPrinting && uploadedFullname != "";
 
     request->send(200, "application/json", "{\r\n"
                                            "  \"files\": {\r\n"
