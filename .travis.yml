@@ -12,8 +12,9 @@ script:
   - BOARD=$(echo $BD | cut -d ":" -f 3)
   - |2
     pushd .pio/build
-    for board in */; do
-        pushd "$board"
+    for board_dir in */; do
+        pushd "$board_dir"
+        board=$(echo "$board_dir" | tr -d '/')
         rename "s|firmware|ESP8266WirelessPrintAsync_${board}_${VERSION}|" firmware.*
         popd
     done
