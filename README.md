@@ -51,7 +51,7 @@ pyrun/bin/pip3 install -U platformio==4.2.1
 
 # Build the firmware (it downloads the needed libraries)
 pyrun/bin/platformio run
-ls -lh ./build_output/firmware/*.bin
+find . -name "*firmware.bin"
 ```
 
 ### Flashing from Linux
