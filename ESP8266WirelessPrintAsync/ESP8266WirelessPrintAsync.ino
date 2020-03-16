@@ -20,6 +20,13 @@
 
 #include <NeoPixelBus.h>
 
+const int transparent_networkport = 2323;
+
+WiFiServer transparentServer(transparent_networkport);
+WiFiClient transparentClient;
+
+bool transparent_client_is_connected = false;
+
 const uint16_t PixelCount = 20; // this example assumes 4 pixels, making it smaller will cause a failure
 const uint8_t PixelPin = 2;  // make sure to set this to the correct pin, ignored for ESP8266 (there it is GPIO2 = D4)
 #define colorSaturation 255
@@ -548,6 +555,9 @@ void setup() {
 
   telnetServer.begin();
   telnetServer.setNoDelay(true);
+  
+  transparentServer.begin();
+  transparentServer.setNoDelay(true);
 
   if (storageFS.activeSPIFFS()) {
     #if defined(ESP8266)
@@ -616,6 +626,8 @@ void setup() {
                  "PROGRESS: " + stringify(fwProgressCap) + "\n"
                  "BUILD_PERCENT: " + stringify(fwBuildPercentCap) + "\n";
     }
+    message += "transparent_client_is_connected: " + stringify(transparent_client_is_connected);
+    message += "\n";
     message += "</pre>";
     request->send(200, "text/html", message);
   });
@@ -976,86 +988,122 @@ void ReceiveResponses() {
 
 
 void loop() {
-  #ifdef OTA_UPDATES
-    //****************
-    //* OTA handling *
-    //****************
-    if (ESPrestartRequired) {  // check the flag here to determine if a restart is required
-      PrinterSerial.printf("Restarting ESP\n\r");
-      ESPrestartRequired = false;
-      ESP.restart();
-    }
+  if(transparent_client_is_connected == false){
 
-    ArduinoOTA.handle();
-  #endif
+    #ifdef OTA_UPDATES
+      //****************
+      //* OTA handling *
+      //****************
+      if (ESPrestartRequired) {  // check the flag here to determine if a restart is required
+        PrinterSerial.printf("Restarting ESP\n\r");
+        ESPrestartRequired = false;
+        ESP.restart();
+      }
 
-  //********************
-  //* Printer handling *
-  //********************
-  if (!printerConnected)
-    printerConnected = detectPrinter();
-  else {
-    #ifndef OTA_UPDATES
-      MDNS.update();    // When OTA is active it's called by 'handle' method
+      ArduinoOTA.handle();
     #endif
 
-    handlePrint();
+    //********************
+    //* Printer handling *
+    //********************
+    if (!printerConnected)
+      printerConnected = detectPrinter();
+    else {
+      #ifndef OTA_UPDATES
+        MDNS.update();    // When OTA is active it's called by 'handle' method
+      #endif
 
-    if (cancelPrint && !isPrinting) { // Only when cancelPrint has been processed by 'handlePrint'
-      cancelPrint = false;
-      commandQueue.clear();
-      printerUsedBuffer = 0;
-      // Apparently we need to decide how to handle this
-      // For now using M112 - Emergency Stop
-      // http://marlinfw.org/docs/gcode/M112.html
-      telnetSend("Should cancel print! This is not working yet");
-      commandQueue.push("M112"); // Send to 3D Printer immediately w/o waiting for anything
-      //playSound();
-      //lcd("Print cancelled");
-    }
+      handlePrint();
 
-    if (!autoreportTempEnabled) {
-      unsigned long curMillis = millis();
-      if ((signed)(temperatureTimer - curMillis) <= 0) {
-        commandQueue.push(TEMP_COMMAND);
-        temperatureTimer = curMillis + TEMPERATURE_REPORT_INTERVAL * 1000;
+      if (cancelPrint && !isPrinting) { // Only when cancelPrint has been processed by 'handlePrint'
+        cancelPrint = false;
+        commandQueue.clear();
+        printerUsedBuffer = 0;
+        // Apparently we need to decide how to handle this
+        // For now using M112 - Emergency Stop
+        // http://marlinfw.org/docs/gcode/M112.html
+        telnetSend("Should cancel print! This is not working yet");
+        commandQueue.push("M112"); // Send to 3D Printer immediately w/o waiting for anything
+        //playSound();
+        //lcd("Print cancelled");
+      }
+
+      if (!autoreportTempEnabled) {
+        unsigned long curMillis = millis();
+        if ((signed)(temperatureTimer - curMillis) <= 0) {
+          commandQueue.push(TEMP_COMMAND);
+          temperatureTimer = curMillis + TEMPERATURE_REPORT_INTERVAL * 1000;
+        }
       }
     }
+
+    SendCommands();
+    ReceiveResponses();
+  }
+  
+  //*******************
+  //* Transparent serial bridge handling *
+  //*******************
+  //check if there are any new clients
+  if (transparentServer.hasClient()){
+    if (!transparentClient.connected()){
+      transparent_client_is_connected = false;
+      if(transparentClient) transparentClient.stop();
+      transparentClient = transparentServer.available();
+    }
+  }
+      
+  //check a client for data
+  if (transparentClient && transparentClient.connected()){
+    transparent_client_is_connected = true;
+    if(transparentClient.available()){
+      size_t len = transparentClient.available();
+      uint8_t sbuf[len];
+      transparentClient.readBytes(sbuf, len);
+      PrinterSerial.write(sbuf, len);      
+    }
   }
 
-  SendCommands();
-  ReceiveResponses();
-
-
-  //*******************
-  //* Telnet handling *
-  //*******************
-  // look for Client connect trial
-  if (telnetServer.hasClient() && (!serverClient || !serverClient.connected())) {
-    if (serverClient)
-      serverClient.stop();
-
-    serverClient = telnetServer.available();
-    serverClient.flush();  // clear input buffer, else you get strange characters
+  //check UART for data
+  if(PrinterSerial.available()){
+    size_t len = PrinterSerial.available();
+    uint8_t sbuf[len];
+    PrinterSerial.readBytes(sbuf, len);
+    if (transparentClient && transparentClient.connected()){
+      transparentClient.write(sbuf, len);
+    }
   }
+  
+  if(transparent_client_is_connected == false){
+    //*******************
+    //* Telnet handling *
+    //*******************
+    // look for Client connect trial
+    if (telnetServer.hasClient() && (!serverClient || !serverClient.connected())) {
+      if (serverClient)
+        serverClient.stop();
 
-  static String telnetCommand;
-  while (serverClient && serverClient.available()) {  // get data from Client
-    {
-    char ch = serverClient.read();
-    if (ch == '\r' || ch == '\n') {
-      if (telnetCommand.length() > 0) {
-        commandQueue.push(telnetCommand);
-        telnetCommand = "";
+      serverClient = telnetServer.available();
+      serverClient.flush();  // clear input buffer, else you get strange characters
+    }
+
+    static String telnetCommand;
+    while (serverClient && serverClient.available()) {  // get data from Client
+      {
+      char ch = serverClient.read();
+      if (ch == '\r' || ch == '\n') {
+        if (telnetCommand.length() > 0) {
+          commandQueue.push(telnetCommand);
+          telnetCommand = "";
+        }
+      }
+      else
+        telnetCommand += ch;
       }
     }
-    else
-      telnetCommand += ch;
-    }
-  }
-    
-  #ifdef OTA_UPDATES
-    AsyncElegantOTA.loop();
-  #endif
 
+    #ifdef OTA_UPDATES
+      AsyncElegantOTA.loop();
+    #endif
+  }
 }
