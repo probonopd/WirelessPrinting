@@ -434,7 +434,7 @@ bool detectPrinter() {
       PrinterSerial.begin(serialBauds[serialBaudIndex]); // See note above; we have actually renamed Serial to Serial1
       #endif
       #ifdef ESP32
-      PrinterSerial.begin(115200 ,SERIAL_8N1, 32, 33); // gpio32 = rx, gpio33 = tx
+      PrinterSerial.begin(serialBauds[serialBaudIndex], SERIAL_8N1, 32, 33); // gpio32 = rx, gpio33 = tx
       #endif
       telnetSend("Connecting at " + String(serialBauds[serialBaudIndex]));
       commandQueue.push("M115"); // M115 - Firmware Info
@@ -974,7 +974,6 @@ void ReceiveResponses() {
   strip.Show(); 
 }
 
-
 void loop() {
   #ifdef OTA_UPDATES
     //****************
@@ -1026,7 +1025,6 @@ void loop() {
   SendCommands();
   ReceiveResponses();
 
-
   //*******************
   //* Telnet handling *
   //*******************
@@ -1057,5 +1055,4 @@ void loop() {
   #ifdef OTA_UPDATES
     AsyncElegantOTA.loop();
   #endif
-
 }
