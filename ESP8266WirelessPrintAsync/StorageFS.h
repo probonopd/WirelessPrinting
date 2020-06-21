@@ -3,9 +3,8 @@
 
 #if defined(ESP8266)
   #include <SDFS.h>
-  #include <LittleFS.h>
+  #include <Arduino.h>
   #define SD SDFS
-  #define SPIFFS LittleFS
 #endif
 
 #if defined(ESP32)
@@ -34,10 +33,10 @@ class StorageFS {
         maxPathLength = 255;
       else {
         #if defined(ESP8266)
-          hasSPIFFS = LittleFS.begin();
+          hasSPIFFS = SPIFFS.begin();
           if (hasSPIFFS) {
             fs::FSInfo fs_info;
-            maxPathLength = LittleFS.info(fs_info) ? fs_info.maxPathLength - 1 : 11;
+            maxPathLength = SPIFFS.info(fs_info) ? fs_info.maxPathLength - 1 : 11;
           }
         #elif defined(ESP32)
           hasSPIFFS = SPIFFS.begin(true);

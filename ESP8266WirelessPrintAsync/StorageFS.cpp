@@ -25,10 +25,10 @@ File StorageFS::open(const String path, const char *openMode) {
   else if (hasSPIFFS) {
     #if defined(ESP8266)
       if (path.endsWith("/")) {
-        file = LittleFS.open(path, "r");
+        file = SPIFFS.open(path, "r");
       }
       else
-        file = LittleFS.open(path, openMode);
+        file = SPIFFS.open(path, openMode);
     #elif defined(ESP32)
       file = SPIFFS.open(path, openMode);
     #endif
