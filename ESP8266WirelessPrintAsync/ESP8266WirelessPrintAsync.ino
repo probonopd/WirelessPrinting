@@ -1027,15 +1027,15 @@ void loop() {
       // For now using M112 - Emergency Stop
       // http://marlinfw.org/docs/gcode/M112.html
       telnetSend("Should cancel print! This is not working yet");
-      //commandQueue.push("M112"); // Send to 3D Printer immediately w/o waiting for anything
+      commandQueue.push("M112"); // Send to 3D Printer immediately w/o waiting for anything
 
       // My proposal (I am currently using this method on an 
       // Ender 3 Pro Marlin 2.0.7.2 with success):
-      commandQueue.push("M410"); // Quickstop
-      commandQueue.push("G27 P0"); // Park the nozzle
-      commandQueue.push("M104 S0"); // Set hotend temperature to 0º
-      commandQueue.push("M140 S0"); // Set bed temperature to 0º
-      commandQueue.push("M18"); // Disable steppers
+      //commandQueue.push("M410"); // Quickstop
+      //commandQueue.push("G27 P0"); // Park the nozzle
+      //commandQueue.push("M104 S0"); // Set hotend temperature to 0º
+      //commandQueue.push("M140 S0"); // Set bed temperature to 0º
+      //commandQueue.push("M18"); // Disable steppers
       //playSound();
       //lcd("Print cancelled");
     }
