@@ -61,7 +61,8 @@ DNSServer dns;
 #define PRINTER_RX_BUFFER_SIZE 0        // This is printer firmware 'RX_BUFFER_SIZE'. If such parameter is unknown please use 0
 #define TEMPERATURE_REPORT_INTERVAL 2   // Ask the printer for its temperatures status every 2 seconds
 #define KEEPALIVE_INTERVAL 2500         // Marlin defaults to 2 seconds, get a little of margin
-const uint32_t serialBauds[] = { 115200, 250000, 57600 };    // Marlin valid bauds (removed very low bauds; roughly ordered by popularity to speed things up)
+// I added 921600 because I was using that from my ESP3D
+const uint32_t serialBauds[] = { 115200, 250000, 57600, 921600 }; // Marlin valid bauds (removed very low bauds; roughly ordered by popularity to speed things up)
 
 #define API_VERSION     "0.1"
 #define VERSION         "1.3.10"
@@ -292,20 +293,38 @@ void handlePrint() {
   }
 }
 
+int receivecount = 0;
+String lastUploadedFullname;
 void handleUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
   static FileWrapper file;
 
   if (!index) {
-    lcd("Receiving...");
-
-    if (uploadedFullname != "")
-      storageFS.remove(uploadedFullname);     // Remove previous file
     int pos = filename.lastIndexOf("/");
     uploadedFullname = pos == -1 ? "/" + filename : filename.substring(pos);
     if (uploadedFullname.length() > storageFS.getMaxPathLength())
       uploadedFullname = "/cached.gco";   // TODO maybe a different solution
-    file = storageFS.open(uploadedFullname, "w"); // create or truncate file
+
+    if (lastUploadedFullname != uploadedFullname) {
+      receivecount = 0;
+      // Uncomment next code if you want to remove the last file
+      /*if (lastUploadedFullname != "") {
+        storageFS.remove(lastUploadedFullname);
+      }*/
+    } else
+    if (receivecount >= 3) {
+      receivecount = 0;
+    }
+
+    receivecount++;
+    if (receivecount <= 1) {
+      file = storageFS.open(uploadedFullname, "w"); // create or truncate file
+      lastUploadedFullname = uploadedFullname;
+      lcd("Receiving: "+uploadedFullname);
+    }
   }
+
+  if (receivecount > 1)
+    return;
 
   file.write(data, len);
 
@@ -1008,7 +1027,15 @@ void loop() {
       // For now using M112 - Emergency Stop
       // http://marlinfw.org/docs/gcode/M112.html
       telnetSend("Should cancel print! This is not working yet");
-      commandQueue.push("M112"); // Send to 3D Printer immediately w/o waiting for anything
+      //commandQueue.push("M112"); // Send to 3D Printer immediately w/o waiting for anything
+
+      // My proposal (I am currently using this method on an 
+      // Ender 3 Pro Marlin 2.0.7.2 with success):
+      commandQueue.push("M410"); // Quickstop
+      commandQueue.push("G27 P0"); // Park the nozzle
+      commandQueue.push("M104 S0"); // Set hotend temperature to 0º
+      commandQueue.push("M140 S0"); // Set bed temperature to 0º
+      commandQueue.push("M18"); // Disable steppers
       //playSound();
       //lcd("Print cancelled");
     }
