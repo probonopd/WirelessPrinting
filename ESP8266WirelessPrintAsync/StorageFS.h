@@ -58,6 +58,7 @@ class StorageFS {
 
     static FileWrapper open(const String path, const char *openMode = "r");
     static void remove(const String filename);
+    static void rename(const String filename, const String newfilename);
 };
 
 extern StorageFS storageFS;

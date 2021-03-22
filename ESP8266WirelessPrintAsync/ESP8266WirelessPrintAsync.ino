@@ -18,6 +18,7 @@
 
 #include "CommandQueue.h"
 
+/*
 #include <NeoPixelBus.h>
 
 const uint16_t PixelCount = 20; // this example assumes 4 pixels, making it smaller will cause a failure
@@ -34,6 +35,7 @@ RgbColor black(0);
 #elif defined(ESP32)
   NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(PixelCount, PixelPin);
 #endif
+*/
 
 // On ESP8266 use the normal Serial() for now, but name it PrinterSerial for compatibility with ESP32
 // On ESP32, use Serial1 (rather than the normal Serial0 which prints stuff during boot that confuses the printer)
@@ -61,7 +63,9 @@ DNSServer dns;
 #define PRINTER_RX_BUFFER_SIZE 0        // This is printer firmware 'RX_BUFFER_SIZE'. If such parameter is unknown please use 0
 #define TEMPERATURE_REPORT_INTERVAL 2   // Ask the printer for its temperatures status every 2 seconds
 #define KEEPALIVE_INTERVAL 2500         // Marlin defaults to 2 seconds, get a little of margin
-const uint32_t serialBauds[] = { 115200, 250000, 57600 };    // Marlin valid bauds (removed very low bauds; roughly ordered by popularity to speed things up)
+// I added 921600 because I was using that from my ESP3D
+//const uint32_t serialBauds[] = { 115200, 250000, 57600, 921600 }; // Marlin valid bauds (removed very low bauds; roughly ordered by popularity to speed things up)
+const uint32_t serialBauds[] = { 57600, 115200, 250000, 500000, 921600 };
 
 #define API_VERSION     "0.1"
 #define VERSION         "1.3.10"
@@ -133,7 +137,7 @@ inline void telnetSend(const String line) {
 }
 
 bool isFloat(const String value) {
-  for (int i = 0; i < value.length(); ++i) {
+  for (uint i = 0; i < value.length(); ++i) {
     char ch = value[i];
     if (ch != ' ' && ch != '.' && ch != '-' && !isDigit(ch))
       return false;
@@ -292,29 +296,71 @@ void handlePrint() {
   }
 }
 
+void saveUploadedFullname() {
+  FileWrapper uploadedfile = storageFS.open("/uploaded.txt", "w");
+  for (uint i=0; i<uploadedFullname.length(); i++)
+    uploadedfile.write(uploadedFullname.c_str()[i]);
+  uploadedfile.close();
+}
+
+bool loadUploadedFullname() {
+  FileWrapper uploadedfile = storageFS.open("/uploaded.txt", "r");
+  if (uploadedfile) {
+    uploadedFullname = uploadedfile.readString();
+    uploadedfile.close();
+    return true;
+  }
+
+  return false;
+}
+
+
+uint8_t receivecount = 0;
+String lastUploadedFullname;
+String tempFilename;
+size_t tmpFileSize;
 void handleUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
   static FileWrapper file;
 
   if (!index) {
-    lcd("Receiving...");
-
-    if (uploadedFullname != "")
-      storageFS.remove(uploadedFullname);     // Remove previous file
     int pos = filename.lastIndexOf("/");
     uploadedFullname = pos == -1 ? "/" + filename : filename.substring(pos);
     if (uploadedFullname.length() > storageFS.getMaxPathLength())
-      uploadedFullname = "/cached.gco";   // TODO maybe a different solution
-    file = storageFS.open(uploadedFullname, "w"); // create or truncate file
+      uploadedFullname = "/cached.gcode";   // TODO maybe a different solution
+
+    if (lastUploadedFullname != uploadedFullname) {
+      // Uncomment next code if you want to remove the last file
+      /*if (lastUploadedFullname != "") {
+        storageFS.remove(lastUploadedFullname);
+      }*/
+    }
+
+    receivecount++;
+    receivecount = receivecount % 4; // We can receive 4 temporary files
+    tempFilename = String("/tmp")+receivecount;
+    file = storageFS.open(tempFilename, "w"); // create or truncate file
+    lcd("Receiving: "+uploadedFullname);
+    lastUploadedFullname = uploadedFullname;
   }
 
   file.write(data, len);
 
   if (final) { // upload finished
     file.close();
-    uploadedFileSize = index + len;
+    tmpFileSize = index + len;
+    // Early solution: A small size can tell us that there are not a gcode file
+    // Why: Cura send us two additional files with "true" or "false" inside.
+    // The word "true" and "false" have less than 5 characters so we can be sure that
+    // a file bigger than that is the real one.
+    if (tmpFileSize > 5) {
+      storageFS.remove(uploadedFullname);
+      storageFS.rename(tempFilename, uploadedFullname);
+      uploadedFileSize = tmpFileSize;
+      saveUploadedFullname();
+    }
   }
   else
-    uploadedFileSize = 0;
+    tmpFileSize = 0;
 }
 
 int apiJobHandler(JsonObject root) {
@@ -360,12 +406,12 @@ String M115ExtractString(const String response, const String field) {
   if (spos != -1) {
     spos += field.length() + 1;
     int epos = response.indexOf(':', spos);
-    if (epos == -1)
+    if (epos == -1) {
       epos = response.indexOf('\n', spos);
-    if (epos == -1)
-      return response.substring(spos);
+      return response.substring(spos, epos-1);
+    }
     else {
-      while (epos >= spos && response[epos] != ' ' && response[epos] != '\n')
+      while ((epos > spos) && (response[epos] != ' ') && (response[epos] != '\n'))
         --epos;
       return response.substring(spos, epos);
     }
@@ -376,7 +422,9 @@ String M115ExtractString(const String response, const String field) {
 
 bool M115ExtractBool(const String response, const String field, const bool onErrorValue = false) {
   String result = M115ExtractString(response, field);
-
+  /*telnetSend("field: "+field);
+  telnetSend("response: "+response);
+  telnetSend("Result: "+result);*/
   return result == "" ? onErrorValue : (result == "1" ? true : false);
 }
 
@@ -392,6 +440,7 @@ inline String getDeviceName() {
   #endif
 }
 
+// NOTE: There are errors somewhere because the service just claim "race-condition"
 void mDNSInit() {
   #ifdef OTA_UPDATES
     MDNS.setInstanceName(getDeviceName().c_str());    // Can't call MDNS.init because it has been already done by 'ArduinoOTA.begin', here I just change instance name
@@ -401,8 +450,8 @@ void mDNSInit() {
   #endif
 
   // For Cura WirelessPrint - deprecated in favor of the OctoPrint API
-  MDNS.addService("wirelessprint", "tcp", 80);
-  MDNS.addServiceTxt("wirelessprint", "tcp", "version", SKETCH_VERSION);
+  //MDNS.addService("wirelessprint", "tcp", 80);
+  //MDNS.addServiceTxt("wirelessprint", "tcp", "version", SKETCH_VERSION);
 
   // OctoPrint API
   // Unfortunately, Slic3r doesn't seem to recognize it
@@ -431,7 +480,9 @@ bool detectPrinter() {
     case 10:
       // Initialize baud and send a request to printezr
       #ifdef ESP8266
+      PrinterSerial.end();
       PrinterSerial.begin(serialBauds[serialBaudIndex]); // See note above; we have actually renamed Serial to Serial1
+      //delay(1000);
       #endif
       #ifdef ESP32
       PrinterSerial.begin(serialBauds[serialBaudIndex], SERIAL_8N1, 32, 33); // gpio32 = rx, gpio33 = tx
@@ -466,6 +517,8 @@ bool detectPrinter() {
           fwAutoreportTempCap = M115ExtractBool(lastReceivedResponse, "Cap:AUTOREPORT_TEMP");
           fwProgressCap = M115ExtractBool(lastReceivedResponse, "Cap:PROGRESS");
           fwBuildPercentCap = M115ExtractBool(lastReceivedResponse, "Cap:BUILD_PERCENT");
+          //M115ExtractBool(lastReceivedResponse, "Cap:SDCARD");
+          //M115ExtractBool(lastReceivedResponse, "Cap:ARCS");
 
           mDNSInit();
 
@@ -486,22 +539,89 @@ bool detectPrinter() {
   return false;
 }
 
-void initUploadedFilename() {
+
+
+bool isGcode(String filename) {
+  int spos = filename.indexOf(".gcode");
+  return spos != -1;
+}
+
+
+static String list = "";
+inline String listGcodeFiles(uint16_t sel = 0) {
+  list = "<ul>";
+  FileWrapper file;
   FileWrapper dir = storageFS.open("/");
   if (dir) {
-    FileWrapper file = dir.openNextFile();
-    while (file && file.isDirectory()) {
+    uint16_t id = 0;
+    file = dir.openNextFile();
+    while (file) {
+      if (isGcode(file.name()) && !file.isDirectory() ) 
+      {
+        id++;
+        if (sel == id) {
+          list = file.name();
+          file.close();
+          dir.close();
+          return list;
+        }
+        if (id < 30)
+          list += "<li><a href=\"/?sel="+String(id)+"\">"+ file.name() +"</a> <button onclick=\"if (confirm('Delete this?')) { window.location.href='/?del="+String(id)+"'; };\">DEL</button></li>";
+        else
+        {
+          list += "...";
+          file.close();
+          break;
+        }
+      }
       file.close();
       file = dir.openNextFile();
     }
-    if (file) {
-      uploadedFullname = "/" + file.name();
-      uploadedFileSize = file.size();
-      file.close();
-    }
     dir.close();
   }
+
+  list += "</ul>";
+  if (sel > 0) list = "";
+  return list;
+} 
+
+
+void initUploadedFilename(uint16_t sel = 0) {
+  FileWrapper file;
+
+  if (sel > 0) {
+      uploadedFullname = "/" + listGcodeFiles(sel);
+      saveUploadedFullname();   
+      file = storageFS.open(uploadedFullname);
+  }
+  else
+  {
+    if (loadUploadedFullname())
+      file = storageFS.open(uploadedFullname);
+    else
+    {
+      FileWrapper dir = storageFS.open("/");
+      if (dir) {
+        file = dir.openNextFile();
+        while (file && (!isGcode(file.name())|| file.isDirectory()) )
+        {
+          file.close();
+          file = dir.openNextFile();
+        }
+        dir.close();
+      }
+    }
+  }
+
+  if (file) {
+    uploadedFullname = "/" + file.name();
+    uploadedFileSize = file.size();
+    file.close();
+  } 
 }
+
+
+
 
 inline String getState() {
   if (!printerConnected)
@@ -519,6 +639,7 @@ inline String getState() {
 inline String stringify(bool value) {
   return value ? "true" : "false";
 }
+
 
 void setup() {
   #if defined(LED_BUILTIN)
@@ -568,7 +689,19 @@ void setup() {
 
   // Main page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
+      uint16_t del = request->arg(String("del")).toInt();
+      if (del > 0) {
+        storageFS.remove("/"+listGcodeFiles(del));
+        storageFS.remove("/uploaded.txt");
+        initUploadedFilename();
+      }
+
+      uint16_t sel = request->arg(String("sel")).toInt();
+      if (sel > 0) 
+        initUploadedFilename(sel);
+
       String uploadedName = uploadedFullname;
+
   uploadedName.replace("/", "");
     String message = "<h1>" + getDeviceName() + "</h1>"
                      "<form enctype=\"multipart/form-data\" action=\"/api/files/local\" method=\"POST\">\n"
@@ -582,7 +715,7 @@ void setup() {
                      "<p><script>\nfunction startFunction(command) {\n  var xmlhttp = new XMLHttpRequest();\n  xmlhttp.open(\"POST\", \"/api/job\");\n  xmlhttp.setRequestHeader(\"Content-Type\", \"application/json\");\n  xmlhttp.send(JSON.stringify({command:command}));\n}\n</script>\n<button onclick=\"startFunction(\'cancel\')\">Cancel active print</button>\n<button onclick=\"startFunction(\'start\')\">Print " + uploadedName + "</button></p>\n"
                      "<p><a href=\"/download\">Download " + uploadedName + "</a></p>"
                      "<p><a href=\"/info\">Info</a></p>"
-                     "<hr>"
+                     "<hr>"+listGcodeFiles()+"<hr>"
                      "<p>WirelessPrinting <a href=\"https://github.com/probonopd/WirelessPrinting/commit/" + SKETCH_VERSION + "\">" + SKETCH_VERSION + "</a></p>\n"
                     #ifdef OTA_UPDATES
                       "<p>OTA Update Device: <a href=\"/update\">Click Here</a></p>"
@@ -754,7 +887,7 @@ void setup() {
 
       if (!index)
         content = "";
-      for (int i = 0; i < len; ++i)
+      for (uint i = 0; i < len; ++i)
         content += (char)data[i];
       if (content.length() >= total) {
         DynamicJsonDocument doc(1024);
@@ -892,15 +1025,17 @@ void SendCommands() {
   }
 }
 
+
 void ReceiveResponses() {
-  static int lineStartPos;
-  static String serialResponse;
+static String serialResponse = "";
+static int lineStartPos = 0;
 
   while (PrinterSerial.available()) {
     char ch = (char)PrinterSerial.read();
-    if (ch != '\n')
-      serialResponse += ch;
-    else {
+    if (ch == '\r') continue;
+    serialResponse += String(ch);
+    if (ch == '\n') 
+    { // new line
       bool incompleteResponse = false;
       String responseDetail = "";
 
@@ -939,7 +1074,7 @@ void ReceiveResponses() {
       }
 
       int responseLength = serialResponse.length();
-      telnetSend("<" + serialResponse.substring(lineStartPos, responseLength) + "#" + responseDetail + "#");
+      telnetSend("<" + serialResponse.substring(lineStartPos, responseLength - 1) + "#" + responseDetail + "#");
       if (incompleteResponse)
         lineStartPos = responseLength;
       else {
@@ -960,6 +1095,7 @@ void ReceiveResponses() {
     serialResponse = "";
     restartSerialTimeout();
   }
+  /*
   // this resets all the neopixels to an off state
   strip.Begin();
   strip.Show();
@@ -972,6 +1108,7 @@ void ReceiveResponses() {
     strip.SetPixelColor(a, white);
   }
   strip.Show(); 
+  */
 }
 
 void loop() {
@@ -1008,9 +1145,18 @@ void loop() {
       // For now using M112 - Emergency Stop
       // http://marlinfw.org/docs/gcode/M112.html
       telnetSend("Should cancel print! This is not working yet");
-      commandQueue.push("M112"); // Send to 3D Printer immediately w/o waiting for anything
+      //commandQueue.push("M112"); // Send to 3D Printer immediately w/o waiting for anything
+
+      // My proposal (I am currently using this method on an 
+      // Ender 3 Pro Marlin 2.0.7.2 with success):
+      commandQueue.push("M410"); // Quickstop
+      //commandQueue.push("G10"); // Retract filament
+      commandQueue.push("M104 S0"); // Set hotend temperature to 0º
+      commandQueue.push("M140 S0"); // Set bed temperature to 0º
+      commandQueue.push("G27 P0"); // Park the nozzle
+      commandQueue.push("M18"); // Disable steppers
       //playSound();
-      //lcd("Print cancelled");
+      //lcd("Print aborted");
     }
 
     if (!autoreportTempEnabled) {

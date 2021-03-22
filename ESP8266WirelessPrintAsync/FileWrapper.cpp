@@ -146,3 +146,4 @@ FileWrapper FileWrapper::openNextFile() {
 
   return fw;
 }
+

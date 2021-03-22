@@ -47,3 +47,11 @@ void StorageFS::remove(const String filename) {
   else if (hasSPIFFS)
     SPIFFS.remove(filename);
 }
+
+
+void StorageFS::rename(const String filename, const String newfilename) {
+  if (hasSD)
+    SD.rename(filename.c_str(), newfilename.c_str());
+  else if (hasSPIFFS)
+    SPIFFS.rename(filename, newfilename);
+}
