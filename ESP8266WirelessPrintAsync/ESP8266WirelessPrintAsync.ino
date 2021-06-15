@@ -58,7 +58,7 @@ DNSServer dns;
 #define OTA_UPDATES                     // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load any code on device)
 //#define OTA_PASSWORD ""               // Uncomment to protect OTA updates and assign a password (inside "")
 #define MAX_SUPPORTED_EXTRUDERS 6       // Number of supported extruder
-#define REPEAT_M115_TIMES 1             // M115 retries with same baud (MAX 255)
+#define REPEAT_M115_TIMES 2             // M115 retries with same baud (MAX 255)
 
 #define PRINTER_RX_BUFFER_SIZE 0        // This is printer firmware 'RX_BUFFER_SIZE'. If such parameter is unknown please use 0
 #define TEMPERATURE_REPORT_INTERVAL 2   // Ask the printer for its temperatures status every 2 seconds
@@ -69,7 +69,7 @@ const uint32_t serialBauds[] = { 57600, 115200, 250000, 500000, 921600 };
 #define VERSION         "1.3.10"
 
 // The sketch on the ESP
-bool ESPrestartRequired;  // Set this flag in the callbacks to restart ESP
+bool ESPrestartRequired = false;  // Set this flag in the callbacks to restart ESP
 
 // Information from M115
 String fwMachineType = "Unknown";
@@ -324,7 +324,7 @@ void handleUpload(AsyncWebServerRequest *request, String filename, size_t index,
     int pos = filename.lastIndexOf("/");
     uploadedFullname = pos == -1 ? "/" + filename : filename.substring(pos);
     if (uploadedFullname.length() > storageFS.getMaxPathLength())
-      uploadedFullname = "/cached.gcode";   // TODO maybe a different solution
+      uploadedFullname = "/received.gcode";   // TODO maybe a different solution
 
     if (lastUploadedFullname != uploadedFullname) {
       // Uncomment next code if you want to remove the last file
@@ -341,8 +341,8 @@ void handleUpload(AsyncWebServerRequest *request, String filename, size_t index,
     lastUploadedFullname = uploadedFullname;
   }
 
-  if (receivecount > 1)
-    return;
+  //if (receivecount > 1)
+  //  return;
 
   file.write(data, len);
 
@@ -549,30 +549,44 @@ bool isGcode(String filename) {
 
 
 static String list = "";
-inline String listGcodeFiles(uint16_t sel = 0) {
+#define ITEMS_PER_PAGE 10
+inline String listGcodeFiles(String sel = "", uint8 page = 0) {
+  MD5Builder md5;
+  String hash = "";
   list = "<ul>";
   FileWrapper file;
   FileWrapper dir = storageFS.open("/");
+  uint16_t n = 0;
   if (dir) {
-    uint16_t id = 0;
     file = dir.openNextFile();
     while (file) {
-      if (isGcode(file.name()) && !file.isDirectory() ) 
+      if (isGcode(file.name()) && !file.isDirectory())
       {
-        id++;
-        if (sel == id) {
-          list = file.name();
-          file.close();
-          dir.close();
-          return list;
-        }
-        if (id < 30)
-          list += "<li><a href=\"/?sel="+String(id)+"\">"+ file.name() +"</a> <button onclick=\"if (confirm('Delete this?')) { window.location.href='/?del="+String(id)+"'; };\">DEL</button></li>";
-        else
-        {
-          list += "...";
-          file.close();
-          break;
+        n++;
+        if (n >= page*ITEMS_PER_PAGE)
+        { 
+          md5.begin();
+          md5.add(file.name());
+          md5.calculate();
+          hash = md5.toString();
+          if (sel.length() > 0)
+          {
+            if (strcmp(sel.c_str(), hash.c_str()) == 0) {
+              list = file.name();
+              file.close();
+              dir.close();
+              return list;
+            }
+          }
+          else if (n < ((page+1)*ITEMS_PER_PAGE))
+          {
+            list += "<li>"
+                      +String(n)+" - "
+                      "<button onclick=\"if (confirm('Delete &laquo;"+file.name()+"&raquo;?')) { window.location.href='/?del="+hash+"&p="+String(page)+"'; };\">DEL</button>"
+                      "<a href=\"/?sel="+hash+"&p="+String(page)+"\">"+file.name()+"</a> "
+                      " "+String(file.size())+" bytes."
+                    "</li>";
+          }
         }
       }
       file.close();
@@ -580,17 +594,26 @@ inline String listGcodeFiles(uint16_t sel = 0) {
     }
     dir.close();
   }
+  if (sel.length() > 0)
+  {
+    list = "";
+    return list;
+  }
 
+  uint8 pages = n / ITEMS_PER_PAGE;
+  for (page = 0; page<=pages; page++) {
+    list += " <a href=\"/?&p="+String(page)+"\">"+String(page)+"</a> |";
+  }
   list += "</ul>";
-  if (sel > 0) list = "";
+  list += "Total: "+String(n)+" files";
   return list;
-} 
+}
 
 
-void initUploadedFilename(uint16_t sel = 0) {
+void initUploadedFilename(String sel = "") {
   FileWrapper file;
 
-  if (sel > 0) {
+  if (sel.length() > 0) {
       uploadedFullname = "/" + listGcodeFiles(sel);
       saveUploadedFullname();   
       file = storageFS.open(uploadedFullname);
@@ -690,15 +713,17 @@ void setup() {
 
   // Main page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
-      uint16_t del = request->arg(String("del")).toInt();
-      if (del > 0) {
-        storageFS.remove("/"+listGcodeFiles(del));
+      uint8 page = request->arg(String("p")).toInt();
+
+      String del = request->arg(String("del"));
+      if (del.length() > 0) {
+        storageFS.remove("/"+listGcodeFiles(del, page));
         storageFS.remove("/uploaded.txt");
         initUploadedFilename();
       }
 
-      uint16_t sel = request->arg(String("sel")).toInt();
-      if (sel > 0) 
+      String sel = request->arg(String("sel"));
+      if (sel.length() > 0) 
         initUploadedFilename(sel);
 
       String uploadedName = uploadedFullname;
@@ -716,7 +741,7 @@ void setup() {
                      "<p><script>\nfunction startFunction(command) {\n  var xmlhttp = new XMLHttpRequest();\n  xmlhttp.open(\"POST\", \"/api/job\");\n  xmlhttp.setRequestHeader(\"Content-Type\", \"application/json\");\n  xmlhttp.send(JSON.stringify({command:command}));\n}\n</script>\n<button onclick=\"startFunction(\'cancel\')\">Cancel active print</button>\n<button onclick=\"startFunction(\'start\')\">Print " + uploadedName + "</button></p>\n"
                      "<p><a href=\"/download\">Download " + uploadedName + "</a></p>"
                      "<p><a href=\"/info\">Info</a></p>"
-                     "<hr>"+listGcodeFiles()+"<hr>"
+                     "<hr>"+listGcodeFiles("", page)+"<hr>"
                      "<p>WirelessPrinting <a href=\"https://github.com/probonopd/WirelessPrinting/commit/" + SKETCH_VERSION + "\">" + SKETCH_VERSION + "</a></p>\n"
                     #ifdef OTA_UPDATES
                       "<p>OTA Update Device: <a href=\"/update\">Click Here</a></p>"
