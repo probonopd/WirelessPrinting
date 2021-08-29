@@ -1,4 +1,4 @@
-# WirelessPrinting ![[Build Status](https://github.com/probonopd/WirelessPrinting/actions/workflows/platformio.yml)](https://github.com/probonopd/WirelessPrinting/actions/workflows/platformio.yml/badge.svg)
+# WirelessPrinting [![Build Status](https://github.com/probonopd/WirelessPrinting/actions/workflows/platformio.yml/badge.svg)](https://github.com/probonopd/WirelessPrinting/actions/workflows/platformio.yml)
 
 ![](https://user-images.githubusercontent.com/2480569/53683404-5b21ab80-3cf8-11e9-8a6e-647df742612b.jpg)
 
