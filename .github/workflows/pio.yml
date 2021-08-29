@@ -31,5 +31,5 @@ jobs:
         popd
     - uses: actions/upload-artifact@v2
       with:
-        name: *WirelessPrint*.bin
+        name: "*WirelessPrint*.bin"
         path: .pio/build/*/
