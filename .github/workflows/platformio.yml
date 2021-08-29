@@ -15,7 +15,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -U platformio==4.2.1
-        pip install -U --upgrade platformio # Needed?
+        # pip install -U --upgrade platformio # Needed? if we use this, then compilation fails for some boards!
     - name: Run PlatformIO
       run: |
         VERSION=$(git rev-parse --short HEAD)
