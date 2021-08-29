@@ -1,6 +1,7 @@
 name: PlatformIO
 
 on:
+  push:
   pull_request:
 
 jobs:
