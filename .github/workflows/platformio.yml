@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  pio:
+  PlatformIO:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
@@ -15,6 +15,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -U platformio==4.2.1
+        pip install -U --upgrade platformio # Needed?
     - name: Run PlatformIO
       run: |
         VERSION=$(git rev-parse --short HEAD)
