@@ -29,6 +29,3 @@ jobs:
           popd
         done
         popd
-    - uses: actions/upload-artifact@v2
-      with:
-        path: .pio/build/*/
