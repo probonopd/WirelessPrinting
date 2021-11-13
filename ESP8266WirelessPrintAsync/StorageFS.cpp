@@ -1,8 +1,5 @@
 #include "StorageFS.h"
 
-#if defined(ESP8266)
-  SdFat SD;
-#endif
 StorageFS storageFS;
 
 bool StorageFS::hasSD, 
@@ -10,31 +7,30 @@ bool StorageFS::hasSD,
 unsigned int StorageFS::maxPathLength;
 
 
-FileWrapper StorageFS::open(const String path, const char *openMode) {
-  FileWrapper file;
+File StorageFS::open(const String path, const char *openMode) {
+  File file;
 
   if (openMode == NULL || openMode[0] == '\0')
     return file;
 
   if (hasSD) {
     #if defined(ESP8266)
-      file.sdFile = SD.open(path.c_str(), openMode[0] == 'w' ? (O_WRITE | O_CREAT | O_TRUNC) : FILE_READ);
-      if (file && file.sdFile.isDirectory())
-        file.sdFile.rewindDirectory();
+      file = SD.open(path.c_str(), openMode);
+      if (file && file.isDirectory())
+        file.rewindDirectory();
     #elif defined(ESP32)
-      file.sdFile = SD.open(path, openMode);
+      file = SD.open(path, openMode);
     #endif
   }
   else if (hasSPIFFS) {
     #if defined(ESP8266)
       if (path.endsWith("/")) {
-        file.fsDir = SPIFFS.openDir(path);
-        file.fsDirType = FileWrapper::DirSource;
+        file = SPIFFS.open(path, "r");
       }
       else
-        file.fsFile = SPIFFS.open(path, openMode);
+        file = SPIFFS.open(path, openMode);
     #elif defined(ESP32)
-      file.fsFile = SPIFFS.open(path, openMode);
+      file = SPIFFS.open(path, openMode);
     #endif
   }
 

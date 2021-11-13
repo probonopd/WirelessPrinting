@@ -1,9 +1,16 @@
 #pragma once
 
-#include "FileWrapper.h"
 
 #if defined(ESP8266)
-  extern SdFat SD;
+  #include <SDFS.h>
+  #include <Arduino.h>
+  #define SD SDFS
+#endif
+
+#if defined(ESP32)
+  #include <SD.h>
+  #include <SPIFFS.h>
+  #include <SPI.h>
 #endif
 
 class StorageFS {
@@ -13,12 +20,14 @@ class StorageFS {
     static unsigned int maxPathLength;
 
   public:
-    inline static void begin(const bool fastSD) {
+    inline static void begin(const bool fastSD, int sdpin=SS) {
       #if defined(ESP8266)
-        hasSD = SD.begin(SS, fastSD ? SD_SCK_MHZ(50) : SPI_HALF_SPEED); // https://github.com/esp8266/Arduino/issues/1853
+        SDFSConfig cfg(sdpin, fastSD ? SD_SCK_MHZ(50) : SPI_HALF_SPEED );
+        SDFS.setConfig(cfg);
+        hasSD = SDFS.begin(); // https://github.com/esp8266/Arduino/issues/1853
       #elif defined(ESP32)
         SPI.begin(14, 2, 15, 13); // TTGO-T1 V1.3 internal microSD slot
-        hasSD = SD.begin(SS, SPI, fastSD ? 50000000 : 4000000);
+        hasSD = SD.begin(sdpin, SPI, fastSD ? 50000000 : 4000000);
       #endif
       if (hasSD)
         maxPathLength = 255;
@@ -56,7 +65,7 @@ class StorageFS {
       return maxPathLength;
     }
 
-    static FileWrapper open(const String path, const char *openMode = "r");
+    static File open(const String path, const char *openMode = "r");
     static void remove(const String filename);
 };
 

@@ -231,7 +231,7 @@ inline String getUploadedFilename() {
 }
 
 void handlePrint() {
-  static FileWrapper gcodeFile;
+  static File gcodeFile;
   static float prevM73Completion, prevM532Completion;
 
   if (isPrinting) {
@@ -293,7 +293,7 @@ void handlePrint() {
 }
 
 void handleUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
-  static FileWrapper file;
+  static File file;
 
   if (!index) {
     lcd("Receiving...");
@@ -487,15 +487,15 @@ bool detectPrinter() {
 }
 
 void initUploadedFilename() {
-  FileWrapper dir = storageFS.open("/");
+  File dir = storageFS.open("/");
   if (dir) {
-    FileWrapper file = dir.openNextFile();
+    File file = dir.openNextFile();
     while (file && file.isDirectory()) {
       file.close();
       file = dir.openNextFile();
     }
     if (file) {
-      uploadedFullname = "/" + file.name();
+      uploadedFullname = "/" + String(file.name()) ;
       uploadedFileSize = file.size();
       file.close();
     }
@@ -624,7 +624,7 @@ void setup() {
   server.on("/download", HTTP_GET, [](AsyncWebServerRequest * request) {
     AsyncWebServerResponse *response = request->beginResponse("application/x-gcode", uploadedFileSize, [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
       static size_t downloadBytesLeft;
-      static FileWrapper downloadFile;
+      static File downloadFile;
 
       if (!index) {
         downloadFile = storageFS.open(uploadedFullname);
