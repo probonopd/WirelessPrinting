@@ -549,22 +549,32 @@ bool isGcode(String filename) {
 
 
 static String list = "";
-#define ITEMS_PER_PAGE 10
-inline String listGcodeFiles(String sel = "", uint8 page = 0) {
+#define ITEMS_PER_PAGE 10 // Compromiso en limites de memoria
+inline String listGcodeFiles(String sel = "", uint8 page = 0, String search = "") {
   MD5Builder md5;
   String hash = "";
   list = "<ul>";
   FileWrapper file;
   FileWrapper dir = storageFS.open("/");
   uint16_t n = 0;
+  uint16_t found_n = 0;
+  
+  String filename;
+  search.toLowerCase();
+  bool found;
+  
   if (dir) {
     file = dir.openNextFile();
     while (file) {
       if (isGcode(file.name()) && !file.isDirectory())
       {
         n++;
-        if (n >= page*ITEMS_PER_PAGE)
-        { 
+        filename = String(file.name());
+        filename.toLowerCase();
+        found = (search.length() > 0) && (filename.indexOf(search) != -1);
+        if (found) { found_n++; }
+        if ((n >= page*ITEMS_PER_PAGE) || found)
+        {
           md5.begin();
           md5.add(file.name());
           md5.calculate();
@@ -578,12 +588,16 @@ inline String listGcodeFiles(String sel = "", uint8 page = 0) {
               return list;
             }
           }
-          else if (n < ((page+1)*ITEMS_PER_PAGE))
+          else
+          if ((search.length() > 0) && !found) {
+          }
+          else
+          if ((n < ((page+1)*ITEMS_PER_PAGE)) || (found && found_n <= ITEMS_PER_PAGE) )
           {
             list += "<li>"
                       +String(n)+" - "
                       "<button onclick=\"if (confirm('Delete &laquo;"+file.name()+"&raquo;?')) { window.location.href='/?del="+hash+"&p="+String(page)+"'; };\">DEL</button>"
-                      "<a href=\"/?sel="+hash+"&p="+String(page)+"\">"+file.name()+"</a> "
+                      " <a href=\"/?sel="+hash+"&p="+String(page)+"\">"+file.name()+"</a> "
                       " "+String(file.size())+" bytes."
                     "</li>";
           }
@@ -600,12 +614,17 @@ inline String listGcodeFiles(String sel = "", uint8 page = 0) {
     return list;
   }
 
+  list += "</ul>";
   uint8 pages = n / ITEMS_PER_PAGE;
+  list += "<div class=\"pages\">";
   for (page = 0; page<=pages; page++) {
     list += " <a href=\"/?&p="+String(page)+"\">"+String(page)+"</a> |";
   }
-  list += "</ul>";
+  list += "</div>";
   list += "Total: "+String(n)+" files";
+  if (search.length() > 0) {
+    list += " - Found: "+String(found_n);
+  }
   return list;
 }
 
@@ -727,26 +746,40 @@ void setup() {
         initUploadedFilename(sel);
 
       String uploadedName = uploadedFullname;
+      String search = request->arg(String("search"));
 
   uploadedName.replace("/", "");
-    String message = "<h1>" + getDeviceName() + "</h1>"
-                     "<form enctype=\"multipart/form-data\" action=\"/api/files/local\" method=\"POST\">\n"
-                     "<p>You can also print from the command line using curl:</p>\n"
-                     "<pre>curl -F \"file=@/path/to/some.gcode\" -F \"print=true\" " + IpAddress2String(WiFi.localIP()) + "/api/files/local</pre>\n"
-                     "Choose a file to upload: <input name=\"file\" type=\"file\" accept=\".gcode,.GCODE,.gco,.GCO\"/><br/>\n"
-                     "<input type=\"checkbox\" name=\"print\" id = \"printImmediately\" value=\"true\" checked>\n"
-                     "<label for = \"printImmediately\">Print Immediately</label><br/>\n"
-                     "<input type=\"submit\" value=\"Upload\" />\n"
-                     "</form>"
-                     "<p><script>\nfunction startFunction(command) {\n  var xmlhttp = new XMLHttpRequest();\n  xmlhttp.open(\"POST\", \"/api/job\");\n  xmlhttp.setRequestHeader(\"Content-Type\", \"application/json\");\n  xmlhttp.send(JSON.stringify({command:command}));\n}\n</script>\n<button onclick=\"startFunction(\'cancel\')\">Cancel active print</button>\n<button onclick=\"startFunction(\'start\')\">Print " + uploadedName + "</button></p>\n"
-                     "<p><a href=\"/download\">Download " + uploadedName + "</a></p>"
-                     "<p><a href=\"/info\">Info</a></p>"
-                     "<hr>"+listGcodeFiles("", page)+"<hr>"
-                     "<p>WirelessPrinting <a href=\"https://github.com/probonopd/WirelessPrinting/commit/" + SKETCH_VERSION + "\">" + SKETCH_VERSION + "</a></p>\n"
+  String message =  
+                    "<style>\n"
+                    "body {margin: 0px;padding: 15px;font-size: 1.3em;}\n"
+                    "button {background: #000;color: #fff;font-size: 1.3em;}\n"
+                    "input {font-size: 1.3em;}\n"
+                    "form {border: solid 1px;padding: 5px;font-size: 1.3em;}\n"
+                    "hr {border: dashed 1px #8d8d8d;}\n"
+                    ".pages {background: #eee;padding: 5px;font-size: 1.4em;}\n"
+                    "</style>\n"
+                    "<h1><a href=\"/\">" + getDeviceName() + "</a></h1>"
+                    "<form enctype=\"multipart/form-data\" action=\"/api/files/local\" method=\"POST\">\n"
+                    "<p>You can also print from the command line using curl:</p>\n"
+                    "<pre>curl -F \"file=@/path/to/some.gcode\" -F \"print=true\" " + IpAddress2String(WiFi.localIP()) + "/api/files/local</pre>\n"
+                    "Choose a file to upload: <input name=\"file\" type=\"file\" accept=\".gcode\"/><br/>\n"
+                    "<input type=\"checkbox\" name=\"print\" id = \"printImmediately\" value=\"true\" checked>\n"
+                    "<label for = \"printImmediately\">Print Immediately</label><br/>\n"
+                    "<input type=\"submit\" value=\"Upload\" />\n"
+                    "</form>"
+                    "<form action=\"/\" method=\"GET\">\n"
+                    "<input type=\"text\" name=\"search\" value=\""+ search +"\"></input>\n"
+                    "<button type=\"submit\" name=\"submit\">Search</button>\n"
+                    "</form>\n"
+                    "<p><script>\nfunction startFunction(command) {\n  var xmlhttp = new XMLHttpRequest();\n  xmlhttp.open(\"POST\", \"/api/job\");\n  xmlhttp.setRequestHeader(\"Content-Type\", \"application/json\");\n  xmlhttp.send(JSON.stringify({command:command}));\n}\n</script>\n<button onclick=\"startFunction(\'cancel\')\">Cancel active print</button>\n<button onclick=\"startFunction(\'start\')\">Print " + uploadedName + "</button></p>\n"
+                    "<p><a href=\"/download\">Download " + uploadedName + "</a></p>"
+                    "<p><a href=\"/info\">Info</a></p>"
+                    "<hr>"+listGcodeFiles("", page, search)+"<hr>"
+                    "<p>WirelessPrinting <a href=\"https://github.com/Anyeos/WirelessPrinting/commit/" + SKETCH_VERSION + "\">" + SKETCH_VERSION + "</a></p>\n"
                     #ifdef OTA_UPDATES
-                      "<p>OTA Update Device: <a href=\"/update\">Click Here</a></p>"
+                    "<p>OTA Update Device: <a href=\"/update\">Click Here</a></p>"
                     #endif
-                     ;
+                    ;
     request->send(200, "text/html", message);
   });
 
