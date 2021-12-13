@@ -1,25 +1,13 @@
-# WirelessPrinting [![Build Status](https://travis-ci.org/probonopd/WirelessPrinting.svg?branch=master)](https://travis-ci.org/probonopd/WirelessPrinting)
+# Improved Wireless Printing #
+
+It is an improved version of [WirelesssPrinting](https://github.com/probonopd/WirelessPrinting) that supports a few more features from web browser (browse files, search, delete...) a little better UI too, specially from mobile phone browsers. And support for recent versions of Cura (correct handling of data and file reception).
+It supports an updated version of software and build tools.
+
 
 ![](https://user-images.githubusercontent.com/2480569/53683404-5b21ab80-3cf8-11e9-8a6e-647df742612b.jpg)
 
 Print wirelessly from [Cura](https://ultimaker.com/en/products/cura-software), [PrusaControl](http://prusacontrol.org/), or [Slic3r PE](https://github.com/prusa3d/Slic3r/releases) to your 3D printer connected to an [ESP8266](https://espressif.com/en/products/hardware/esp8266ex/overview) module.
 
-__UNDER DEVELOPMENT__. See [Issues](https://github.com/probonopd/WirelessPrinting/issues). Pull requests welcome! 
-
-## Comparison with other printer hosts
-
-| Printer SD card slot | OctoPrint | WirelessPrint |
-| --- | --- | --- |
-| Instant | Booting can take minutes | Booting takes seconds |
-| Need to plug SD card into computer and then into printer for each print | Ethernet and wireless | Wireless |
-| No cost (comes with many printers) | High cost (Raspberry Pi, Power supply, SD card) | Inexpensive | 
-| No clutter on desktop | Clutter on desktop (Raspberry Pi, cable) | No clutter (can be placed inside printer electronics box) |
-| No set-up needed | Set-up needed (full Linux operating system, hundreds of megabytes) | Only quick wireless network setup needed | 
-| No maintenance needed (other than replacing broken SD card slots) | High maintenance needed (OS updates) | Low maintenance needed (Firmware updates for bugfixes and new features) |
-| No extra power consumption | 2.5 W power consumption | Under 1 W power consumption |
-| No webcam | Webcam can be attached | ESP32 module with built-in camera (may be supported in the future) |
-| No notifications | Notifications, e.g., "print ready" | Notifications possible (send pull requests) |
-| Cumbersome for print farms (sneakernet) | Suitable for print farms (can be managed centrally) | Suitable for print farms (can be managed centrally, OctoPrint compatible protocol subset) |
 
 ## Hardware
 
@@ -29,7 +17,8 @@ The WEMOS D1 mini module is connected with your 3D printer via the serial connec
 * TX, RX from your 3D printer to the WEMOS D1 mini module (__AUX-1__ header on RAMPS boards). Note: For ESP32, use GPIO32 = RX, GPIO33 = TX
 * Power and GND from your 3D printer to the WEMOS D1 mini module (attention, the __AUX-1__ header on RAMPS boards has 5V while the ESP8266 needs 3.3V but the WEMOS D1 mini has a voltage regulator)
 * Optional: SD card shield to the WEMOS D1 mini module (a capacitor across the power pins of the SD card; SD shields have this). Using a SanDisk 2 GB card formatted with `mkfs.vfat` on Linux seems to work for me. If no SD card is connected, then the internal SPIFFS memory (3 MB) is used. For TTGO-T1, the built-in microSD card slot is used if a card is inserted.
-* A matching case for a WEMOS D1 mini module and microSD shield can be found at http://www.thingiverse.com/thing:2287618
+* A matching case for a WEMOS D1 mini module and microSD shield can be found at http://www.thingiverse.com/thing:2287618![fd0e3fa2-01a0-11e7-9d83-dc4e7d031f30](https://user-images.githubusercontent.com/5976100/145873713-a56a46ad-dfa9-407b-82d8-e580a70e9884.png)
+
 
 ## esp8266/Arduino sketch
 
@@ -123,3 +112,4 @@ Ycan also print from the command line using curl:
 ```
 curl -F "file=@/path/to/some.gcode" -F "print=true" http://the-ip-address/print
 ```
+
