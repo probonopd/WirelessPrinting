@@ -874,7 +874,7 @@ void setup() {
 
   #ifdef OTA_UPDATES
     // OTA setup
-    ArduinoOTA.setHostname(getDeviceName().c_str());
+    ArduinoOTA.setHostname(getDeviceId().c_str());
     #ifdef OTA_PASSWORD
       ArduinoOTA.setPassword(OTA_PASSWORD);
     #endif
