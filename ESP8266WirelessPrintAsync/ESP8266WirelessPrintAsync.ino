@@ -394,9 +394,9 @@ inline String getDeviceName() {
 
 void mDNSInit() {
   #ifdef OTA_UPDATES
-    MDNS.setInstanceName(getDeviceName().c_str());    // Can't call MDNS.init because it has been already done by 'ArduinoOTA.begin', here I just change instance name
+    MDNS.setInstanceName((String("WirelessPrinting_") + String(ESP.getChipId(), HEX)).c_str());    // Can't call MDNS.init because it has been already done by 'ArduinoOTA.begin', here I just change instance name
   #else
-    if (!MDNS.begin(getDeviceName().c_str()))
+    if (!MDNS.begin((String("WirelessPrinting_") + String(ESP.getChipId(), HEX)).c_str()))
       return;
   #endif
 
