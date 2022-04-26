@@ -1,5 +1,6 @@
 // Required: https://github.com/greiman/SdFat
 
+#include <Arduino.h>
 #include <ArduinoOTA.h>
 #if defined(ESP8266)
   #include <ESP8266mDNS.h>        // https://github.com/esp8266/Arduino/tree/master/libraries/ESP8266mDNS
