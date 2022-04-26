@@ -18,6 +18,8 @@ jobs:
         pip install -U platformio==5.2.5
     - name: Run PlatformIO
       run: |
+        set -x
+        set -e
         VERSION=$(git rev-parse --short HEAD)
         HERE=$(readlink -f .)
         sed -i -e 's|#define SKETCH_VERSION ".*"|#define SKETCH_VERSION "'$VERSION'"|' $PWD/ESP8266WirelessPrintAsync/ESP8266WirelessPrintAsync.ino
@@ -27,7 +29,22 @@ jobs:
         for board_dir in */; do
           pushd "$board_dir"
           board=$(echo "$board_dir" | tr -d '/')
-          rename "s|firmware|ESP8266WirelessPrintAsync_${board}_${VERSION}|" firmware.*
+          rename "s|firmware|WirelessPrinting_${board}_${VERSION}|" firmware.*
           popd
         done
         popd
+        mkdir WirelessPrinting
+        find . -type f -name 'WirelessPrinting_*.bin' -exec cp ./WirelessPrinting
+        ( cd ./WirelessPrinting ; zip -r ../WirelessPrinting_$GITHUB_RUN_NUMBER_$(date +%Y-%m-%d)-$(git rev-parse --short HEAD).zip * )
+        echo "artifactName=WirelessPrinting_$GITHUB_RUN_NUMBER_$(date +%Y-%m-%d)-$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+    - uses: actions/upload-artifact@v3
+      with:
+        name: ${{ env.artifactName }} # Exported above
+        path: ./WirelessPrinting/*
+    - name: Upload to GitHub Releases (only when building from main branch)
+      if: ${{ github.ref == 'refs/heads/main' }}
+      run: |
+           set -ex
+           wget -c https://github.com/probonopd/uploadtool/raw/master/upload.sh
+           bash ./upload.sh ./WirelessPrinting*.zip
+           
