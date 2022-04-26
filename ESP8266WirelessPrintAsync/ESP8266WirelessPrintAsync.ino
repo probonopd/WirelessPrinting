@@ -21,6 +21,7 @@
 
 #include <NeoPixelBus.h>
 
+
 const uint16_t PixelCount = 20; // this example assumes 4 pixels, making it smaller will cause a failure
 const uint8_t PixelPin = 2;  // make sure to set this to the correct pin, ignored for ESP8266 (there it is GPIO2 = D4)
 #define colorSaturation 255
@@ -386,8 +387,18 @@ inline String getDeviceName() {
     return fwMachineType + " (" + String(ESP.getChipId(), HEX) + ")";
   #elif defined(ESP32)
     uint64_t chipid = ESP.getEfuseMac();
-
     return fwMachineType + " (" + String((uint16_t)(chipid >> 32), HEX) + String((uint32_t)chipid, HEX) + ")";
+  #else
+    #error Unimplemented chip!
+  #endif
+}
+
+inline String getDeviceId() {
+  #if defined(ESP8266)
+    return String(ESP.getChipId(), HEX);
+  #elif defined(ESP32)
+    uint64_t chipid = ESP.getEfuseMac();
+    return String((uint16_t)(chipid >> 32), HEX) + String((uint32_t)chipid, HEX);
   #else
     #error Unimplemented chip!
   #endif
@@ -395,9 +406,9 @@ inline String getDeviceName() {
 
 void mDNSInit() {
   #ifdef OTA_UPDATES
-    MDNS.setInstanceName(getDeviceName().c_str());    // Can't call MDNS.init because it has been already done by 'ArduinoOTA.begin', here I just change instance name
+    MDNS.setInstanceName(getDeviceId().c_str());    // Can't call MDNS.init because it has been already done by 'ArduinoOTA.begin', here I just change instance name
   #else
-    if (!MDNS.begin(getDeviceName().c_str()))
+    if (!MDNS.begin(getDeviceId().c_str()))
       return;
   #endif
 
@@ -864,7 +875,7 @@ void setup() {
 
   #ifdef OTA_UPDATES
     // OTA setup
-    ArduinoOTA.setHostname(getDeviceName().c_str());
+    ArduinoOTA.setHostname(getDeviceId().c_str());
     #ifdef OTA_PASSWORD
       ArduinoOTA.setPassword(OTA_PASSWORD);
     #endif
