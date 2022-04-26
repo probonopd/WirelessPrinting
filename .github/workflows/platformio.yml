@@ -34,7 +34,7 @@ jobs:
         done
         popd
         mkdir WirelessPrinting
-        find . -type f -name 'WirelessPrinting_*.bin' -exec cp ./WirelessPrinting
+        find . -type f -name 'WirelessPrinting_*.bin' -exec cp {} ./WirelessPrinting/ \;
         ( cd ./WirelessPrinting ; zip -r ../WirelessPrinting_$GITHUB_RUN_NUMBER_$(date +%Y-%m-%d)-$(git rev-parse --short HEAD).zip * )
         echo "artifactName=WirelessPrinting_$GITHUB_RUN_NUMBER_$(date +%Y-%m-%d)-$(git rev-parse --short HEAD)" >> $GITHUB_ENV
     - uses: actions/upload-artifact@v3
