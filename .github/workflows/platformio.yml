@@ -13,9 +13,9 @@ jobs:
       uses: actions/setup-python@v1
     - name: Install dependencies
       run: |
+        sudo apt-get install rename
         python -m pip install --upgrade pip
-        pip install -U platformio==5.1.1
-        # pip install -U --upgrade platformio # Needed? if we use this, then compilation fails for some boards!
+        pip install -U platformio==5.2.5
     - name: Run PlatformIO
       run: |
         VERSION=$(git rev-parse --short HEAD)
