@@ -21,6 +21,14 @@
 
 #include <NeoPixelBus.h>
 
+// Workaround for:
+// 'class EspClass' has no member named 'getChipId'
+// https://www.esp8266.com/viewtopic.php?p=20148#p20148
+extern "C" {
+#include "user_interface.h"
+#include "Esp.h"
+}
+
 const uint16_t PixelCount = 20; // this example assumes 4 pixels, making it smaller will cause a failure
 const uint8_t PixelPin = 2;  // make sure to set this to the correct pin, ignored for ESP8266 (there it is GPIO2 = D4)
 #define colorSaturation 255
