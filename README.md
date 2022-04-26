@@ -85,7 +85,7 @@ python $HOME/.arduino15/packages/esp32/hardware/esp32/1.0.1/tools/espota.py -i 1
 After the initial flashing, you can upload new versions of this firmware from the web interface without any further tools.
 
 ## Initial WiFi Configuration
-Following the instrucions in https://github.com/alanswx/ESPAsyncWiFiManager/ : 
+Following the instructions in https://github.com/alanswx/ESPAsyncWiFiManager/ : 
 
 The first time the sketch is uploaded the ESP will enter in Access Point mode, so you have to open the wifi manager of your system and connect to wifi "AutoConnectAP", then open your browser and type http://192.168.4.1/, there you will see a menu, select "Configure WiFi", press scan and wait until the device scans available networks and select yours, enter the the password and click save. It will try to connect to your network, if it's successfull you will see a message on your 3D printer (or in a serial monitor if conected to your computer) with the new device IP, write down this IP if you wish to connect via browser. 
 
@@ -99,18 +99,16 @@ Cura 2.6 and later come with a bundled plugin which discovers OctoPrint instance
 - Click "Connect", then click "Close"
 From this point on, the print monitor should be functional and you should see a "Print with OctoPrint" button on the bottom of the sidebar. Use this button to print wirelessly.
 
-## Wireless printing with PrusaControl
+## Wireless printing with PrusaSlicer
 
-Currently a custom fork, [PrusaControlWireless](https://github.com/probonopd/PrusaControl/tree/WirelessPrinting), is required. This may change in the future.
-
-## Wireless printing with Slic3r PE
-
-Slic3r PE 1.36.0 and later discovers OctoPrint instances using Zeroconf and enables printing directly to them. No further software needs to be installed. To use it,
+Slic3r PE 1.36.0 discovers OctoPrint instances using Zeroconf and enables printing directly to them. No further software needs to be installed. To use it,
 - In Slic3r PE, add the corresponding profile for your printer
 - Select the "Printer Settings" tab
 - Under "OctoPrint upload", enter the IP address of your WirelessPrinting device (in the future, it may be discoverable by Bonjour)
 - Click "Test"
 From this point on, you should see a "Send to printer" button on the "Plater" tab. Use this button to print wirelessly.
+
+Later PrusaSlicer versions may require you to enter the IP address manually (bug?).
 
 ## Wireless printing using a browser or the command line
 
