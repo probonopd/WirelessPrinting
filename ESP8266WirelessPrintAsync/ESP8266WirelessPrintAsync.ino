@@ -46,8 +46,9 @@ RgbColor black(0);
 HardwareSerial PrinterSerial(1);
 #endif
 
+//#define TELNET_CUSTOM_FORMAT // WirelessPrinting custom format to telnet output
 WiFiServer telnetServer(23);
-WiFiClient serverClient;
+WiFiClient telnetClient;
 
 AsyncWebServer server(80);
 DNSServer dns;
@@ -130,8 +131,8 @@ inline void setLed(const bool status) {
 }
 
 inline void telnetSend(const String line) {
-  if (serverClient && serverClient.connected())     // send data to telnet client if connected
-    serverClient.println(line);
+  if (telnetClient && telnetClient.connected())     // send data to telnet client if connected
+    telnetClient.println(line);
 }
 
 bool isFloat(const String value) {
@@ -1089,7 +1090,7 @@ void ReceiveResponses() {
 static String serialResponse = "";
 static int lineStartPos = 0;
 
-  while (PrinterSerial.available()) {
+  while (PrinterSerial.available() > 0) {
     char ch = (char)PrinterSerial.read();
     if (ch == '\r') continue;
     serialResponse += String(ch);
@@ -1133,7 +1134,11 @@ static int lineStartPos = 0;
       }
 
       int responseLength = serialResponse.length();
+#ifdef TELNET_CUSTOM_FORMAT
       telnetSend("<" + serialResponse.substring(lineStartPos, responseLength - 1) + "#" + responseDetail + "#");
+#else
+      telnetSend(serialResponse.substring(lineStartPos, responseLength - 1));
+#endif
       if (incompleteResponse)
         lineStartPos = responseLength;
       else {
@@ -1170,6 +1175,7 @@ static int lineStartPos = 0;
   */
 }
 
+static String clientCommand;
 void loop() {
   #ifdef OTA_UPDATES
     //****************
@@ -1234,26 +1240,27 @@ void loop() {
   //* Telnet handling *
   //*******************
   // look for Client connect trial
-  if (telnetServer.hasClient() && (!serverClient || !serverClient.connected())) {
-    if (serverClient)
-      serverClient.stop();
+  if (telnetServer.hasClient() && (!telnetClient || !telnetClient.connected())) {
+    if (telnetClient)
+      telnetClient.stop();
 
-    serverClient = telnetServer.available();
-    serverClient.flush();  // clear input buffer, else you get strange characters
+    telnetClient = telnetServer.available();
+    telnetClient.flush();  // clear input buffer, else you get strange characters
   }
 
-  static String telnetCommand;
-  while (serverClient && serverClient.available()) {  // get data from Client
-    {
-    char ch = serverClient.read();
+  while (telnetClient && telnetClient.available() > 0) {  // get data from Client
+    char ch = telnetClient.read();
     if (ch == '\r' || ch == '\n') {
-      if (telnetCommand.length() > 0) {
-        commandQueue.push(telnetCommand);
-        telnetCommand = "";
+      if (clientCommand.length() > 0) {
+        commandQueue.push(clientCommand);
+        //telnetSend("Received: "+clientCommand);
+        clientCommand = "";
       }
     }
     else
-      telnetCommand += ch;
+    {
+      //telnetSend("receiving: "+String(ch));
+      clientCommand += String(ch);
     }
   }
     
