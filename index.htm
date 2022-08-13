@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<meta content='width=device-width' name='viewport'>
+	<meta name="theme-color" content="#222222">
+	<!-- <link rel="shortcut icon" href="./images/WirelessPrinting.png"> -->
+	<title>WirelessPrinter</title>
+	<script type="module" src="https://unpkg.com/esp-web-tools@8.0.6/dist/web/install-button.js"></script>
+	<!-- There is a bug in esp-web-tools > 9.0.0 - use 8.0.6 for now   -->
+	<style>
+		/* ---- clean css ---- */
+
+		*,
+		body,
+		div,
+		dl,
+		dt,
+		dd,
+		ul,
+		ol,
+		li,
+		h1,
+		h2,
+		h3,
+		h4,
+		h5,
+		h6,
+		pre,
+		form,
+		fieldset,
+		input,
+		textarea,
+		p,
+		th,
+		td,
+		blockquote {
+			margin: 0px;
+			padding: 0px;
+			box-sizing: border-box;
+		}
+
+		fieldset,
+		img {
+			border: 0;
+		}
+
+		/* ---- page css ---- */
+
+		html {
+			margin: 0;
+			padding: 0;
+			height: 100%;
+		}
+
+		body {
+			margin: 0px;
+			padding: 0px;
+			height: 100%;
+			font-family: Helvetica, Verdana, sans-serif;
+			text-align: center;
+			background-color: rgb(245, 245, 245);
+			color: rgb(31, 31, 31);
+		}
+
+		option {
+			background-color: var(--c-3);
+			color: var(--c-f);
+		}
+
+		.btn:hover {
+			background-color: rgb(65, 177, 251);
+		}
+
+		.btn,
+		.menu {
+			outline: none;
+			-webkit-transition: all .15s ease-in-out;
+			transition: all .15s ease-in-out;
+			cursor: pointer;
+			padding: 10px;
+			margin: 15px;
+			width: 250px;
+			font-family: Verdana, Helvetica, sans-serif;
+			font-size: 19px;
+			background-color: #333;
+			color: white;
+			border: 2px solid white;
+			border-radius: 25px;
+		}
+
+		select {
+			-webkit-appearance: none;
+			-moz-appearance: none;
+			appearance: none;
+			background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' fill='white'><polygon points='0,0 100,0 50,50'/></svg>") no-repeat;
+			background-size: 12px;
+			background-position: 205px 17px;
+			padding-left: 22px !important;
+			background-repeat: no-repeat;
+			outline: none;
+		}
+
+		img {
+			width: 80%;
+			max-width: 400px;
+			margin: 3vh 0 5px 0;
+			animation: fi 1s;
+		}
+
+		@keyframes fi {
+			from {
+				opacity: 0;
+			}
+
+			to {
+				opacity: 1;
+			}
+		}
+
+		.main {
+			animation: fi 1s .7s both;
+		}
+
+		a {
+			color: rgba(0, 91, 150, 1);
+			cursor: pointer;
+			text-decoration: none;
+			transition: color .2s;
+		}
+
+		a:hover {
+			color: rgb(100, 151, 177);
+		}
+
+		ol {
+			margin: auto;
+			text-align: left;
+			display: inline-block;
+		}
+
+		li::marker {
+			color: rgb(100, 151, 177);
+			font-weight: bold;
+		}
+
+		li {
+			margin: 10px 20px;
+		}
+
+		.footer {
+			position: fixed;
+			bottom: 10px;
+			width: 100%;
+			text-align: center;
+			font-size: 15px;
+			color: rgb(107, 107, 107);
+		}
+
+		.container {
+			width: 80%;
+			max-width: 510px;
+			margin: auto;
+			border-radius: 5px;
+			box-sizing: border-box;
+			background-color: rgb(226, 226, 226);
+			overflow: hidden;
+			padding: 20px 0;
+			box-shadow: inset 0px 0px 15px rgba(0, 0, 0, .1);
+			border: 1px solid rgba(0, 0, 0, .15);
+		}
+
+		.inst-button {
+			padding: 5px 0;
+		}
+
+		#logo {
+			background: rgb(228, 228, 228);
+			padding-bottom: 20px;
+			margin-bottom: 40px;
+		}
+
+		h2 {
+			margin-bottom: 10px;
+			font-weight: normal;
+		}
+	</style>
+</head>
+
+<body onload="checkSupported()">
+	<div id="logo">
+		<img src="./WirelessPrinting.png" alt="ESP-Wireless-Printing" />
+	</div>
+	<div class="main">
+		<h2> Welcome to the ESP Wireless Printing web installer. </h2>
+
+		<div id="flasher">
+
+			<ol>
+				<li>Wire up your board according to the instuctions <a href="https://github.com/probonopd/WirelessPrinting#hardware" target="_blank">here</a></li>
+				<li>Plug in your ESP to a USB port. </li>
+				<li>Select your board type. </li>
+				<li>Hit "Install" and select the correct COM port. </li>
+			</ol>
+			<br>
+			<br>
+			<div class="container">
+				<select id="device" class="menu" onchange="setManifest()">
+					<optgroup label="Chose board.">
+						<option data-manifest="webflasher/bin_files/WemosD1/manifestD1.json">Wemos D1 mini
+						</option>
+						<option data-manifest="webflasher/bin_files/ESP32/manifestESP32.json">ESP32
+						</option>
+						<option data-manifest="webflasher/bin_files/NodeMCU/manifestNodeMCU.json">ESP8266 NodeMCU
+						</option>
+					</optgroup>
+				</select><br><br>
+				<esp-web-install-button id="inst" manifest="webflasher/bin_files/WemosD1/manifestD1.json">
+					<button class="btn" slot="activate">Install</button>
+				</esp-web-install-button>
+			</div>
+		</div>
+	</div>
+
+	<div class="footer">
+		Powered by <a href="https://esphome.github.io/esp-web-tools/" target="_blank">ESP Web Tools</a>
+	</div>
+
+	<script>
+		function setManifest() {
+
+			var sel = document.getElementById('device');
+			var opt = sel.options[sel.selectedIndex];
+			var m = opt.dataset.manifest;
+
+			document.getElementById('inst').setAttribute('manifest', m);
+			// console.log(m);
+		}
+
+		function checkSupported() {
+			if (document.getElementById('inst').hasAttribute('install-unsupported')) unsupported();
+			else setManifest();
+		}
+
+		function unsupported() {
+			document.getElementById('flasher').innerHTML = "Sorry, your browser is not supported!<br>Please try on Desktop Chrome or Edge.<br>"
+		}
+	</script>
+</body>
+
+</html>

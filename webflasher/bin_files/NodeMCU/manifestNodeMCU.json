@@ -1,0 +1,14 @@
+{
+    "name": "Wreless-Printing-Node-MCU",
+    "improv": false,
+    "new_install_prompt_erase": true,
+    "builds": [
+      {
+        "chipFamily": "ESP8266",
+        "parts": [                
+          { "path": "ESP8266WirelessPrintAsync_nodemcuv2_acaed49.bin", "offset": 0 }
+        ]
+      }
+    ]
+  }
+  
