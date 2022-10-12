@@ -1,0 +1,14 @@
+{
+    "name": "Wreless-Printing-Wemos-D1",
+    "improv": false,
+    "new_install_prompt_erase": true,
+    "builds": [
+      {
+        "chipFamily": "ESP8266",
+        "parts": [                
+          { "path": "ESP8266WirelessPrintAsync_d1_mini_acaed49.bin", "offset": 0 }
+        ]
+      }
+    ]
+  }
+  

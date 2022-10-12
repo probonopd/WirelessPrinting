@@ -1,0 +1,17 @@
+{
+    "name": "WrelessPrinting-ESP32",
+    "improv": false,
+    "new_install_prompt_erase": true,
+    "builds": [
+      {
+        "chipFamily": "ESP32",
+        "parts": [ 
+          { "path": "bootloader_dio_80m.bin", "offset": 4096 },
+          { "path": "partitions.bin", "offset": 32768 },
+          { "path": "boot_app0.bin", "offset": 57344 },                     
+          { "path": "ESP8266WirelessPrintAsync_esp32dev_acaed49.bin", "offset": 65536 }
+        ]
+      }
+    ]
+  }
+  
