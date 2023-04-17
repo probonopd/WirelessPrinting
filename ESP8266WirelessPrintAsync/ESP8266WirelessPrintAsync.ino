@@ -14,12 +14,22 @@
 #include "StorageFS.h"
 #include <ESPAsyncWebServer.h>    // https://github.com/me-no-dev/ESPAsyncWebServer
 #include <ESPAsyncWiFiManager.h>  // https://github.com/alanswx/ESPAsyncWiFiManager/
-#include <AsyncElegantOTA.h>      // https://github.com/ayushsharma82/AsyncElegantOTA
+// #include <AsyncElegantOTA.h>      // https://github.com/ayushsharma82/AsyncElegantOTA
 #include <SPIFFSEditor.h>
 
 #include "CommandQueue.h"
 
 #include <NeoPixelBus.h>
+
+#define USB_HOST
+#if defined(USB_HOST)
+#include "usb/cdc_acm_host.h"
+#include "usb/vcp_ch34x.hpp"
+#include "usb/vcp_cp210x.hpp"
+#include "usb/vcp_ftdi.hpp"
+#include "usb/vcp.hpp"
+#include "usb/usb_host.h"
+#endif // defined(USB_HOST)
 
 
 const uint16_t PixelCount = 20; // this example assumes 4 pixels, making it smaller will cause a failure
@@ -55,7 +65,7 @@ DNSServer dns;
 // Configurable parameters
 #define SKETCH_VERSION "2.x-localbuild" // Gets inserted at build time by .travis.yml
 #define USE_FAST_SD                     // Use Default fast SD clock, comment if your SD is an old or slow one.
-#define OTA_UPDATES                     // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load any code on device)
+//#define OTA_UPDATES                     // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load any code on device)
 //#define OTA_PASSWORD ""               // Uncomment to protect OTA updates and assign a password (inside "")
 #define MAX_SUPPORTED_EXTRUDERS 6       // Number of supported extruder
 #define REPEAT_M115_TIMES 1             // M115 retries with same baud (MAX 255)
@@ -1007,7 +1017,7 @@ void loop() {
     printerConnected = detectPrinter();
   else {
     #ifndef OTA_UPDATES
-      MDNS.update();    // When OTA is active it's called by 'handle' method
+     // MDNS.update();    // When OTA is active it's called by 'handle' method
     #endif
 
     handlePrint();

@@ -121,3 +121,6 @@ Ycan also print from the command line using curl:
 ```
 curl -F "file=@/path/to/some.gcode" -F "print=true" http://the-ip-address/print
 ```
+
+
+Edits: .pio/libdeps/s2_mini/NeoPixelBus/src/internal/colors/NeoGammaDynamicTableMethod.h Serial -> Serial1
