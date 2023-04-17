@@ -124,3 +124,6 @@ curl -F "file=@/path/to/some.gcode" -F "print=true" http://the-ip-address/print
 
 
 Edits: .pio/libdeps/s2_mini/NeoPixelBus/src/internal/colors/NeoGammaDynamicTableMethod.h Serial -> Serial1
+
+Edited /home/semartin/.platformio/packages/framework-arduinoespressif32/cores/esp32/main.cpp commenting out Serial.begin()
+Edited .pio/libdeps/s2_mini/ESPAsyncWifiManager/ESPAsyncWiFiManager.cpp Serial -> Serial1

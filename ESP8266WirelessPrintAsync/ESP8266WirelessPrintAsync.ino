@@ -1,5 +1,6 @@
 // Required: https://github.com/greiman/SdFat
 
+#include <esp_log.h>
 #include <Arduino.h>
 #include <ArduinoOTA.h>
 #if defined(ESP8266)
@@ -543,6 +544,8 @@ inline String stringify(bool value) {
 }
 
 void setup() {
+  log_i("Begin setup\n");
+
   #if defined(LED_BUILTIN)
     pinMode(LED_BUILTIN, OUTPUT);     // Initialize the LED_BUILTIN pin as an output
   #endif
@@ -564,9 +567,10 @@ void setup() {
   #endif
   AsyncWiFiManager wifiManager(&server, &dns);
   // wifiManager.resetSettings();   // Uncomment this to reset the settings on the device, then you will need to reflash with USB and this commented out!
-  wifiManager.setDebugOutput(false);  // So that it does not send stuff to the printer that the printer does not understand
+  wifiManager.setDebugOutput(false); 
   wifiManager.autoConnect("AutoConnectAP");
   setLed(false);
+
 
   telnetServer.begin();
   telnetServer.setNoDelay(true);
@@ -891,6 +895,7 @@ void setup() {
     #endif
     ArduinoOTA.begin();
   #endif
+  log_i("setup complete");
 }
 
 inline void restartSerialTimeout() {
@@ -997,6 +1002,7 @@ void ReceiveResponses() {
 }
 
 void loop() {
+/*
   #ifdef OTA_UPDATES
     //****************
     //* OTA handling *
@@ -1043,10 +1049,9 @@ void loop() {
       }
     }
   }
-
   SendCommands();
   ReceiveResponses();
-
+*/
   //*******************
   //* Telnet handling *
   //*******************
