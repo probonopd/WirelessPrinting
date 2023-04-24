@@ -127,3 +127,4 @@ Edits: .pio/libdeps/s2_mini/NeoPixelBus/src/internal/colors/NeoGammaDynamicTable
 
 Edited /home/semartin/.platformio/packages/framework-arduinoespressif32/cores/esp32/main.cpp commenting out Serial.begin()
 Edited .pio/libdeps/s2_mini/ESPAsyncWifiManager/ESPAsyncWiFiManager.cpp Serial -> Serial1
+Note: switch to C++17 to prevent issues when referencing static constexprs in VCP pid stuff - https://stackoverflow.com/questions/65999130/static-constexpr-undefined-reference-error-on-clang

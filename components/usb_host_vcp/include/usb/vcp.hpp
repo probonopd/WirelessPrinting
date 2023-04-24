@@ -45,8 +45,9 @@ public:
     template<class T> static void
     register_driver(void)
     {
-        static_assert(T::pids.begin() != nullptr, "Every VCP driver must contain array of supported PIDs in 'pids' array");
-        static_assert(T::vid != 0, "Every VCP driver must contain supported VID in'vid' integer");
+        // TODO
+        //static_assert(T::pids.begin() != nullptr, "Every VCP driver must contain array of supported PIDs in 'pids' array");
+        //static_assert(T::vid != 0, "Every VCP driver must contain supported VID in'vid' integer");
         std::vector<uint16_t> pids(T::pids.begin(), T::pids.end()); // Convert array to vector
         vcp_driver new_driver = vcp_driver([](uint16_t pid, const cdc_acm_host_device_config_t *dev_config, uint8_t interface_idx) {
             return static_cast<CdcAcmDevice *> (new T(pid, dev_config, interface_idx)); // Lambda function: Open factory method

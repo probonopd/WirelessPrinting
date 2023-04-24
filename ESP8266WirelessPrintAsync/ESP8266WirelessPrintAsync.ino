@@ -1,5 +1,6 @@
 // Required: https://github.com/greiman/SdFat
-
+#include "USBSerial.h"
+#include "GCode.h"
 #include <esp_log.h>
 #include <Arduino.h>
 #include <ArduinoOTA.h>
@@ -22,15 +23,15 @@
 
 #include <NeoPixelBus.h>
 
-#define USB_HOST
-#if defined(USB_HOST)
+#if defined(USB_HOST_SERIAL)
 #include "usb/cdc_acm_host.h"
 #include "usb/vcp_ch34x.hpp"
 #include "usb/vcp_cp210x.hpp"
 #include "usb/vcp_ftdi.hpp"
 #include "usb/vcp.hpp"
 #include "usb/usb_host.h"
-#endif // defined(USB_HOST)
+#define SERIAL_RESPONSE_SZ 256
+#endif // defined(USB_HOST_SERIAL)
 
 
 const uint16_t PixelCount = 20; // this example assumes 4 pixels, making it smaller will cause a failure
@@ -68,9 +69,7 @@ DNSServer dns;
 #define USE_FAST_SD                     // Use Default fast SD clock, comment if your SD is an old or slow one.
 //#define OTA_UPDATES                     // Enable OTA firmware updates, comment if you don't want it (OTA may lead to security issues because someone may load any code on device)
 //#define OTA_PASSWORD ""               // Uncomment to protect OTA updates and assign a password (inside "")
-#define MAX_SUPPORTED_EXTRUDERS 6       // Number of supported extruder
 #define REPEAT_M115_TIMES 1             // M115 retries with same baud (MAX 255)
-
 #define PRINTER_RX_BUFFER_SIZE 0        // This is printer firmware 'RX_BUFFER_SIZE'. If such parameter is unknown please use 0
 #define TEMPERATURE_REPORT_INTERVAL 2   // Ask the printer for its temperatures status every 2 seconds
 #define KEEPALIVE_INTERVAL 2500         // Marlin defaults to 2 seconds, get a little of margin
@@ -100,7 +99,8 @@ uint32_t printStartTime;
 float printCompletion;
 
 // Serial communication
-String lastCommandSent, lastReceivedResponse;
+String lastCommandSent;
+char lastReceivedResponse[SERIAL_RESPONSE_SZ];
 uint32_t lastPrintedLine;
 
 uint8_t serialBaudIndex;
@@ -116,15 +116,46 @@ uint32_t uploadedFileDate = 1378847754;
 #define TEMP_COMMAND      "M105"
 #define AUTOTEMP_COMMAND  "M155 S"
 
+uint32_t temperatureTimer;
 struct Temperature {
   String actual, target;
 };
-
-uint32_t temperatureTimer;
-
 Temperature toolTemperature[MAX_SUPPORTED_EXTRUDERS];
 Temperature bedTemperature;
 
+bool parseTemperatures(const char* r) {
+  float actual, target;
+  for (int t = 0; t < fwExtruders; t++) {
+    String whichTemp = "T";
+    if (fwExtruders != 1) {
+      whichTemp += String(t);
+    }
+    if (parseTemp(r, whichTemp.c_str(), &actual, &target)) {
+      toolTemperature[t].actual = String(actual);
+      toolTemperature[t].target = String(target);
+    } else {
+      return false;
+    }
+  }
+
+  if (parseTemp(r, "B", &actual, &target)) {
+    bedTemperature.actual = String(actual);
+    bedTemperature.target = String(target);
+  } else {
+    return false;
+  }
+
+  /*
+  TODO
+  if (!tempResponse) {
+    // Parse Prusa heating temperatures
+    int e = parsePrusaHeatingExtruder(response);
+    tempResponse = e >= 0 && e < MAX_SUPPORTED_EXTRUDERS && parsePrusaHeatingTemp(response, "T", &toolTemperature[e]);
+    tempResponse |= parsePrusaHeatingTemp(response, "B", &bedTemperature);
+  }
+  */
+  return true;
+}
 
 // https://forum.arduino.cc/index.php?topic=228884.msg2670971#msg2670971
 inline String IpAddress2String(const IPAddress& ipAddress) {
@@ -153,82 +184,6 @@ bool isFloat(const String value) {
   }
 
   return true;
-}
-
-// Parse temperatures from printer responses like
-// ok T:32.8 /0.0 B:31.8 /0.0 T0:32.8 /0.0 @:0 B@:0
-bool parseTemp(const String response, const String whichTemp, Temperature *temperature) {
-  int tpos = response.indexOf(whichTemp + ":");
-  if (tpos != -1) { // This response contains a temperature
-    int slashpos = response.indexOf(" /", tpos);
-    int spacepos = response.indexOf(" ", slashpos + 1);
-    // if match mask T:xxx.xx /xxx.xx
-    if (slashpos != -1 && spacepos != -1) {
-      String actual = response.substring(tpos + whichTemp.length() + 1, slashpos);
-      String target = response.substring(slashpos + 2, spacepos);
-      if (isFloat(actual) && isFloat(target)) {
-        temperature->actual = actual;
-        temperature->target = target;
-
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
-// Parse temperatures from prusa firmare (sent when heating)
-// ok T:32.8 E:0 B:31.8
-bool parsePrusaHeatingTemp(const String response, const String whichTemp, Temperature *temperature) {
-  int tpos = response.indexOf(whichTemp + ":");
-  if (tpos != -1) { // This response contains a temperature
-    int spacepos = response.indexOf(" ", tpos);
-    if (spacepos == -1)
-      spacepos = response.length();
-    String actual = response.substring(tpos + whichTemp.length() + 1, spacepos);
-    if (isFloat(actual)) {
-      temperature->actual = actual;
-
-      return true;
-    }
-  }
-
-  return false;
-}
-
-int8_t parsePrusaHeatingExtruder(const String response) {
-  Temperature tmpTemperature;
-
-  return parsePrusaHeatingTemp(response, "E", &tmpTemperature) ? tmpTemperature.actual.toInt() : -1;
-}
-
-bool parseTemperatures(const String response) {
-  bool tempResponse;
-
-  if (fwExtruders == 1)
-    tempResponse = parseTemp(response, "T", &toolTemperature[0]);
-  else {
-    tempResponse = false;
-    for (int t = 0; t < fwExtruders; t++)
-      tempResponse |= parseTemp(response, "T" + String(t), &toolTemperature[t]);
-  }
-  tempResponse |= parseTemp(response, "B", &bedTemperature);
-  if (!tempResponse) {
-    // Parse Prusa heating temperatures
-    int e = parsePrusaHeatingExtruder(response);
-    tempResponse = e >= 0 && e < MAX_SUPPORTED_EXTRUDERS && parsePrusaHeatingTemp(response, "T", &toolTemperature[e]);
-    tempResponse |= parsePrusaHeatingTemp(response, "B", &bedTemperature);
-    }
-
-  return tempResponse;
-}
-
-// Parse position responses from printer like
-// X:-33.00 Y:-10.00 Z:5.00 E:37.95 Count X:-3300 Y:-1000 Z:2000
-inline bool parsePosition(const String response) {
-  return response.indexOf("X:") != -1 && response.indexOf("Y:") != -1 &&
-         response.indexOf("Z:") != -1 && response.indexOf("E:") != -1;
 }
 
 inline void lcd(const String text) {
@@ -290,9 +245,11 @@ void handlePrint() {
     prevM73Completion = prevM532Completion = 0.0;
 
     gcodeFile = storageFS.open(uploadedFullname);
-    if (!gcodeFile)
+    if (!gcodeFile) {
+      log_e("Can't open file %s", uploadedFullname.c_str());
       lcd("Can't open file");
-    else {
+    } else {
+      log_i("Printing %s", uploadedFullname.c_str());
       lcd("Printing...");
       playSound();
       printStartTime = millis();
@@ -330,27 +287,35 @@ void handleUpload(AsyncWebServerRequest *request, String filename, size_t index,
     uploadedFileSize = 0;
 }
 
-int apiJobHandler(JsonObject root) {
+int apiJobHandler(JsonObject root, char* detail) {
   const char* command = root["command"];
   if (command != NULL) {
     if (strcmp(command, "cancel") == 0) {
-      if (!isPrinting)
+      if (!isPrinting) {
+        sprintf(detail, "not printing");
         return 409;
+      }
       cancelPrint = true;
     }
     else if (strcmp(command, "start") == 0) {
-      if (isPrinting || !printerConnected || uploadedFullname == "")
+      if (isPrinting || !printerConnected || uploadedFullname == "") {
+        sprintf(detail, "printing=%d connected=%d uploaded=\"%s\"", isPrinting, printerConnected, uploadedFullname.c_str()); // TODO prevent buffer overflow
         return 409;
+      }
       startPrint = true;
     }
     else if (strcmp(command, "restart") == 0) {
-      if (!printPause)
+      if (!printPause) {
+        sprintf(detail, "not paused");
         return 409;
+      }
       restartPrint = true;
     }
     else if (strcmp(command, "pause") == 0) {
-      if (!isPrinting)
+      if (!isPrinting) {
+        sprintf(detail, "not printing");
         return 409;
+      }
       const char* action = root["action"];
       if (action == NULL)
         printPause = !printPause;
@@ -364,33 +329,8 @@ int apiJobHandler(JsonObject root) {
       }
     }
   }
-
+  sprintf(detail, "ok");
   return 204;
-}
-
-String M115ExtractString(const String response, const String field) {
-  int spos = response.indexOf(field + ":");
-  if (spos != -1) {
-    spos += field.length() + 1;
-    int epos = response.indexOf(':', spos);
-    if (epos == -1)
-      epos = response.indexOf('\n', spos);
-    if (epos == -1)
-      return response.substring(spos);
-    else {
-      while (epos >= spos && response[epos] != ' ' && response[epos] != '\n')
-        --epos;
-      return response.substring(spos, epos);
-    }
-  }
-
-  return "";
-}
-
-bool M115ExtractBool(const String response, const String field, const bool onErrorValue = false) {
-  String result = M115ExtractString(response, field);
-
-  return result == "" ? onErrorValue : (result == "1" ? true : false);
 }
 
 inline String getDeviceName() {
@@ -447,12 +387,14 @@ bool detectPrinter() {
   switch (printerDetectionState) {
     case 0:
       // Start printer detection
+      log_i("Start printer detection");
       serialBaudIndex = 0;
       printerDetectionState = 10;
       break;
 
     case 10:
       // Initialize baud and send a request to printezr
+      #ifndef USB_HOST_SERIAL
       #ifdef ESP8266
       PrinterSerial.begin(serialBauds[serialBaudIndex]); // See note above; we have actually renamed Serial to Serial1
       #endif
@@ -460,15 +402,18 @@ bool detectPrinter() {
       PrinterSerial.begin(serialBauds[serialBaudIndex], SERIAL_8N1, 32, 33); // gpio32 = rx, gpio33 = tx
       #endif
       telnetSend("Connecting at " + String(serialBauds[serialBaudIndex]));
+      #endif // USB_HOST_SERIAL
       commandQueue.push("M115"); // M115 - Firmware Info
       printerDetectionState = 20;
       break;
 
     case 20:
       // Check if there is a printer response
+      char buf[32];
+      memset(buf, 0, 32);
       if (commandQueue.isEmpty()) {
-        String value = M115ExtractString(lastReceivedResponse, "MACHINE_TYPE");
-        if (value == "") {
+        if (!M115ExtractString(buf, lastReceivedResponse, "MACHINE_TYPE")) {
+          log_i("Empty MACHINE_TYPE, retrying with different baud rate (lastRecv %s)", lastReceivedResponse);
           if (nM115++ >= REPEAT_M115_TIMES) {
             nM115 = 0;
             ++serialBaudIndex;
@@ -481,11 +426,16 @@ bool detectPrinter() {
             printerDetectionState = 10;      
         }
         else {
+          //printerConnected = true;
           telnetSend("Connected");
 
-          fwMachineType = value;
-          value = M115ExtractString(lastReceivedResponse, "EXTRUDER_COUNT");
-          fwExtruders = value == "" ? 1 : min(value.toInt(), (long)MAX_SUPPORTED_EXTRUDERS);
+          fwMachineType = buf;
+          log_i("Printer detected: '%s'", fwMachineType);
+          if (M115ExtractString(buf, lastReceivedResponse, "EXTRUDER_COUNT")) {
+            fwExtruders = min(atoi(buf), MAX_SUPPORTED_EXTRUDERS);
+          } else {
+            fwExtruders = 1;
+          }
           fwAutoreportTempCap = M115ExtractBool(lastReceivedResponse, "Cap:AUTOREPORT_TEMP");
           fwProgressCap = M115ExtractBool(lastReceivedResponse, "Cap:PROGRESS");
           fwBuildPercentCap = M115ExtractBool(lastReceivedResponse, "Cap:BUILD_PERCENT");
@@ -496,10 +446,11 @@ bool detectPrinter() {
           lcd(text);
           playSound();
 
-          if (fwAutoreportTempCap)
+          if (fwAutoreportTempCap) {
             commandQueue.push(AUTOTEMP_COMMAND + String(TEMPERATURE_REPORT_INTERVAL));   // Start auto report temperatures
-          else
+          } else {
             temperatureTimer = millis();
+          }
           return true;
         }
       }
@@ -543,9 +494,23 @@ inline String stringify(bool value) {
   return value ? "true" : "false";
 }
 
-void setup() {
-  log_i("Begin setup\n");
+#if defined(USB_HOST_SERIAL)
+#define USB_BUFSZ 1024
+char usb_buf[USB_BUFSZ];
+size_t usb_buf_idx = 0;
+size_t usb_read_idx = 0;
+bool handle_usb_rx(const uint8_t* data, size_t data_len, void *arg) {
+  //log_i("USB recv: %.*s", data_len, data);
+  for (int i = 0; i < data_len; i++) {
+    usb_buf[usb_buf_idx] = data[i];
+    usb_buf_idx = (usb_buf_idx + 1) % USB_BUFSZ;
+    assert(usb_buf_idx != usb_read_idx); // Overflow
+  }
+  return true;
+}
+#endif //USB_HOST_SERIAL
 
+void setup() {
   #if defined(LED_BUILTIN)
     pinMode(LED_BUILTIN, OUTPUT);     // Initialize the LED_BUILTIN pin as an output
   #endif
@@ -788,8 +753,9 @@ void setup() {
         if (error)
           request->send(400, "text/plain", error.c_str());
         else {
-          int responseCode = apiJobHandler(doc.as<JsonObject>());
-          request->send(responseCode, "text/plain", "");
+          char detail[64];
+          int responseCode = apiJobHandler(doc.as<JsonObject>(), detail);
+          request->send(responseCode, "text/plain", detail);
           content = "";
         }
       }
@@ -895,7 +861,10 @@ void setup() {
     #endif
     ArduinoOTA.begin();
   #endif
-  log_i("setup complete");
+
+  #if defined(USB_HOST_SERIAL)
+  USBHost::setup(&handle_usb_rx);
+  #endif // USB_HOST_SERIAL
 }
 
 inline void restartSerialTimeout() {
@@ -909,7 +878,14 @@ void SendCommands() {
     if (noResponsePending || printerUsedBuffer < PRINTER_RX_BUFFER_SIZE * 3 / 4) {  // Let's use no more than 75% of printer RX buffer
       if (noResponsePending)
         restartSerialTimeout();   // Receive timeout has to be reset only when sending a command and no pending response is expected
+
+      #if defined(USB_HOST_SERIAL)
+      char buf[64]; // TODO Const
+      snprintf(buf, 64, "%s\n", command.c_str());
+      USBHost::send((uint8_t*)buf, command.length()+1); // +1 for newline
+      #else
       PrinterSerial.println(command);          // Send to 3D Printer
+      #endif
       printerUsedBuffer += command.length();
       lastCommandSent = command;
       commandQueue.popSend();
@@ -921,20 +897,23 @@ void SendCommands() {
 
 void ReceiveResponses() {
   static int lineStartPos;
-  static String serialResponse;
+  static char serialResponse[SERIAL_RESPONSE_SZ];
+  int responseLength = 0;
+#if defined(USB_HOST_SERIAL)
+  while (usb_read_idx != usb_buf_idx) {
+    char ch = (char)usb_buf[usb_read_idx];
+    //log_printf("%c", ch);
+    usb_read_idx = (usb_read_idx + 1) % USB_BUFSZ;
+    serialResponse[lineStartPos + (responseLength++)] = ch;
 
-  while (PrinterSerial.available()) {
-    char ch = (char)PrinterSerial.read();
-    if (ch != '\n')
-      serialResponse += ch;
-    else {
+    if (ch == '\n') {
       bool incompleteResponse = false;
       String responseDetail = "";
 
-      if (serialResponse.startsWith("ok", lineStartPos)) {
-        if (lastCommandSent.startsWith(TEMP_COMMAND))
+      if (hasPrefix("ok", serialResponse+lineStartPos)) {
+        if (hasPrefix(TEMP_COMMAND, lastCommandSent.c_str()))
           parseTemperatures(serialResponse);
-        else if (fwAutoreportTempCap && lastCommandSent.startsWith(AUTOTEMP_COMMAND))
+        else if (fwAutoreportTempCap && hasPrefix(AUTOTEMP_COMMAND, lastCommandSent.c_str()))
           autoreportTempEnabled = (lastCommandSent[6] != '0');
 
         unsigned int cmdLen = commandQueue.popAcknowledge().length();     // Go on with next command
@@ -946,13 +925,13 @@ void ReceiveResponses() {
           responseDetail = "autotemp";
         else if (parsePosition(serialResponse))
           responseDetail = "position";
-        else if (serialResponse.startsWith("echo:busy"))
+        else if (hasPrefix("echo:busy", serialResponse))
           responseDetail = "busy";
-        else if (serialResponse.startsWith("echo: cold extrusion prevented")) {
+        else if (hasPrefix("echo: cold extrusion prevented", serialResponse)) {
           // To do: Pause sending gcode, or do something similar
           responseDetail = "cold extrusion";
         }
-        else if (serialResponse.startsWith("Error:")) {
+        else if (hasPrefix("Error:", serialResponse)) {
           cancelPrint = true;
           responseDetail = "ERROR";
         }
@@ -964,30 +943,48 @@ void ReceiveResponses() {
           incompleteResponse = true;
           responseDetail = "discovering";
       }
-
-      int responseLength = serialResponse.length();
-      telnetSend("<" + serialResponse.substring(lineStartPos, responseLength) + "#" + responseDetail + "#");
+      
+      log_i("RECV: incomplete=%d, detail=%s, rep=%s", incompleteResponse, responseDetail, serialResponse);
+      // TODO: telnetSend("<" + serialResponse.substring(lineStartPos, responseLength) + "#" + responseDetail + "#");
       if (incompleteResponse)
-        lineStartPos = responseLength;
+        lineStartPos += responseLength;
       else {
-        lastReceivedResponse = serialResponse;
+        strncpy(lastReceivedResponse, serialResponse, lineStartPos+responseLength);
+        lastReceivedResponse[lineStartPos+responseLength+1] = 0;
         lineStartPos = 0;
-        serialResponse = "";
+        memset(serialResponse, 0, SERIAL_RESPONSE_SZ);
       }
       restartSerialTimeout();
+      break; // Break out so printer detection can continue
     }
   }
+#else
+  /*
+  // See handle_usb_rx for response handling with USB host mode
+  while (PrinterSerial.available()) {
+    char ch = (char)PrinterSerial.read();
+    if (ch != '\n') {
+      serialResponse += ch;
+    } else {
+      parseResponse();
+    }
+  }*/
+#endif //USB_HOST_SERIAL
 
-  if (!commandQueue.isAckEmpty() && (signed)(serialReceiveTimeoutTimer - millis()) <= 0) {  // Command has been lost by printer, buffer has been freed
+  if (commandQueue.isEmpty()) {
+    restartSerialTimeout();
+  } else if (!commandQueue.isAckEmpty() && (signed)(serialReceiveTimeoutTimer - millis()) <= 0) {
+    log_w("Command '%s' has been lost by printer, rx buffer has been freed", commandQueue.peekSend());
     if (printerConnected)
       telnetSend("#TIMEOUT#");
     else
       commandQueue.clear();
     lineStartPos = 0;
-    serialResponse = "";
+    memset(serialResponse, 0, SERIAL_RESPONSE_SZ);
     restartSerialTimeout();
   }
   // this resets all the neopixels to an off state
+  /* TODO neopixel
   strip.Begin();
   strip.Show();
   // strip.SetPixelColor(0, red);
@@ -999,11 +996,18 @@ void ReceiveResponses() {
     strip.SetPixelColor(a, white);
   }
   strip.Show(); 
+  */
 }
 
 void loop() {
-/*
+
+  #ifdef USB_HOST_SERIAL
+  //log_d("loop vcp");
+  USBHost::loop();
+  #endif // USB_HOST_SERIAL
+
   #ifdef OTA_UPDATES
+  //log_d("check for OTA update");
     //****************
     //* OTA handling *
     //****************
@@ -1019,13 +1023,17 @@ void loop() {
   //********************
   //* Printer handling *
   //********************
-  if (!printerConnected)
-    printerConnected = detectPrinter();
+  if (!printerConnected) {
+    if (USBHost::is_connected()) { // TODO wrap in preprocessor define
+      printerConnected = detectPrinter();
+    }
+  }
   else {
     #ifndef OTA_UPDATES
      // MDNS.update();    // When OTA is active it's called by 'handle' method
     #endif
 
+    //log_d("handle print");
     handlePrint();
 
     if (cancelPrint && !isPrinting) { // Only when cancelPrint has been processed by 'handlePrint'
@@ -1041,6 +1049,7 @@ void loop() {
       //lcd("Print cancelled");
     }
 
+    /* TODO reenable 
     if (!autoreportTempEnabled) {
       unsigned long curMillis = millis();
       if ((signed)(temperatureTimer - curMillis) <= 0) {
@@ -1048,13 +1057,20 @@ void loop() {
         temperatureTimer = curMillis + TEMPERATURE_REPORT_INTERVAL * 1000;
       }
     }
+    */
   }
+
+
+  //log_d("send commands");
   SendCommands();
+  //log_d("recv responses");
   ReceiveResponses();
-*/
+
   //*******************
   //* Telnet handling *
   //*******************
+
+  //log_d("check telnet");
   // look for Client connect trial
   if (telnetServer.hasClient() && (!serverClient || !serverClient.connected())) {
     if (serverClient)
@@ -1080,6 +1096,7 @@ void loop() {
   }
     
   #ifdef OTA_UPDATES
+  //log_d("loop ota");
     AsyncElegantOTA.loop();
   #endif
 }
