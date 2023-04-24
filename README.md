@@ -121,3 +121,10 @@ Ycan also print from the command line using curl:
 ```
 curl -F "file=@/path/to/some.gcode" -F "print=true" http://the-ip-address/print
 ```
+
+
+Edits: .pio/libdeps/s2_mini/NeoPixelBus/src/internal/colors/NeoGammaDynamicTableMethod.h Serial -> Serial1
+
+Edited /home/semartin/.platformio/packages/framework-arduinoespressif32/cores/esp32/main.cpp commenting out Serial.begin()
+Edited .pio/libdeps/s2_mini/ESPAsyncWifiManager/ESPAsyncWiFiManager.cpp Serial -> Serial1
+Note: switch to C++17 to prevent issues when referencing static constexprs in VCP pid stuff - https://stackoverflow.com/questions/65999130/static-constexpr-undefined-reference-error-on-clang
